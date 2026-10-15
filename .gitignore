@@ -1,0 +1,9 @@
+/work_syn/
+/work_pnr/
+/work_dbg/
+/outflow/
+/ooc/
+/scripts/__pycache__/
+*.vvp
+/software/apb_reg_test/build/
+/software/workspace_b/
