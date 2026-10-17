@@ -156,6 +156,7 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [TEAM_SPLIT](docs/TEAM_SPLIT.md) | 三人责任、目录归属及共享接口变更规则 |
 | [ROADMAP](docs/ROADMAP.md) | 按赛题实际要求安排的后续任务与验收出口 |
 | [BLIT](docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
+| [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | A/B/C待确认的第一轮集成方案、分工与验收步骤 |
 
 `docs/` 维护上述长期说明及 BLIT 原型交付文档。历史阶段性快照和验证摘要已合并清理；正式 testbench 与回归脚本保留在 sim/、scripts/。
 

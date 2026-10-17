@@ -76,4 +76,6 @@ AXI端口沿用简化形式；ID0、SIZE4、INCR、CACHE3、PROT2、LOCK0、QOS0
 
 ## 集成前必须共同确认
 
+下一轮的参数表、DDR读写服务建议、Front→Back最小Demo和A/B/C确认事项见 [BLIT第一轮集成对接草案](BLIT_INTEGRATION.md)。该文件是待讨论方案，尚未改变正式寄存器或接线。
+
 A 负责确定新增命令字段、软件 API、源图资源加载和错误码；C 负责 BLIT 读服务与 Display Reader 的 AR/R 仲裁、响应路由、Back ownership 和显示保护。当前不能把本模块的读端口直接并接到正式 DDR，也不能单方面修改寄存器表或顶层工程源清单。集成后需要保留 FILL_RECT 回归，并补做 Efinity 综合、资源/时序检查和实板显示验证。
