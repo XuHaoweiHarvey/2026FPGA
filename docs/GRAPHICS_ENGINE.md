@@ -4,7 +4,7 @@
 
 对应赛题二基础要求第1项：硬件根据操作类型执行 Solid Fill 或 Block Copy。`graphics_engine.v` 在 B 内部接收一条命令，保存参数，选择现有 `fill_rect_writer` 或 `blit_engine`，并提供一套公共状态和写接口。
 
-当前 B 执行层已按 2026-10-17 用户提供的 A/C 反馈适配，经过独立仿真、与现有 `buffer_manager` 的合同测试，以及两块持久内存的绘制/复制/换帧闭环仿真。正式系统仍只接 FILL，尚未接入新增 APB 字段、C 的源窗口检查器/DDR 读仲裁/显示，也未加入 Efinity 工程、综合或上板。已确定的下一轮接口及各方实施状态见 [BLIT_INTEGRATION](BLIT_INTEGRATION.md)。
+当前 B 执行层已按 2026-10-17 用户提供的 A/C 反馈适配，经过独立仿真、与现有 `buffer_manager` 的合同测试，以及两块持久内存的绘制/复制/换帧闭环仿真。后续已实现 [C侧源窗口检查器](BLIT_SOURCE_GUARD.md)，并替换合同/双缓冲测试中的范围结果模型。正式系统仍只接 FILL，新增 APB 字段、源检查器、DDR 读仲裁和显示仍待正式连接；这些独立模块未加入 Efinity 工程、综合或上板。已确定的下一轮接口及各方实施状态见 [BLIT_INTEGRATION](BLIT_INTEGRATION.md)。
 
 ```text
 仿真命令（未来由 A 提供）
@@ -24,11 +24,13 @@
 |---|---|
 | `rtl/accelerator/graphics_engine.v` | 命令快照、选择、总线复用和公共结果 |
 | `sim/tb_graphics_engine.v` | 混合场景、像素记分板、状态/错误/超时验证 |
-| `sim/tb_graphics_contract.v` | 连接现有真实 manager，检查接收计数、Back 释放、错误换帧阻止和 FAULT；源检查结果和 DDR 由模型提供 |
+| `rtl/framebuffer/blit_source_guard.v` | 在最终accept寄存Front源矩形范围/stride检查结果 |
+| `sim/tb_blit_source_guard.v` | 真实1080p和缩小画布的边界、随机、锁存/复位检查 |
+| `sim/tb_graphics_contract.v` | 连接真实 manager/源检查器，检查接收计数、Back 释放、错误换帧阻止和 FAULT；DDR为模型 |
 | `sim/tb_graphics_double_buffer.v` | 真实 manager+B 的成功换帧、双向复制、最后 B 延迟、独立双槽像素检查 |
 | `sim/graphics_double_buffer_memory.v` | 仅仿真使用的双槽 AXI 内存，两槽均可读写，换帧不搬动内存内容 |
 | `sim/tb_blit_engine.v` | 复用其中的 `blit_test_memory`；新增可选 byte strobe 支持，BLIT 默认仍要求全 strobe |
-| `scripts/run_graphics_checks.ps1` | 两组执行层仿真、manager 合同测试、两组双缓冲闭环、负对照、可选波形和 PNG |
+| `scripts/run_graphics_checks.ps1` | 两组源检查器、两组执行层仿真、manager 合同测试、两组双缓冲闭环、负对照、可选波形和 PNG |
 | `scripts/render_blit_preview.py` | 共用 PPM→PNG 转换，新增可选 `--names`，原 BLIT 调用方式保留 |
 
 需要 PATH 中的 `iverilog`、`vvp`。在仓库根目录执行：
@@ -80,7 +82,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_graphics_c
 
 期望像素按场景坐标在独立数组中计算，源数据取自上一轮的期望 Front；不读取 DUT 内部地址/缓存，也不从实际内存反推正确答案。每条命令完成及每次成功换帧都检查两个完整槽，覆盖源图保持、目标矩形外保持和角色交替。
 
-画布缩为64×48、stride=256，以便快速仿真；实板第一轮仍按团队约定使用1920×1080、stride=7680和 `(64,64)` 目标位置。命令、范围结果、边界和 reader-safe/FIFO-empty 由测试提供，尚未模拟真实显示读流或 APB 软件提交；这里的通过不证明读仲裁或 HDMI 连续性。
+画布缩为64×48、stride=256，以便快速仿真；实板第一轮仍按团队约定使用1920×1080、stride=7680和 `(64,64)` 目标位置。范围结果现在由真实源检查器计算；命令、边界和 reader-safe/FIFO-empty 由测试提供，尚未模拟真实显示读流或 APB 软件提交；这里的通过不证明读仲裁或 HDMI 连续性。
 
 ## 命令和状态规则
 
@@ -136,7 +138,7 @@ FILL 固定使用 `SETTLE_FRAMES=0`，与现有双缓冲正式模式一致：完
 - sideband 沿用现有约定，由集成层补齐；需要保留 C 的写准入和显示保护。
 - FILL 支持任意像素 x/width 与边缘 WSTRB；BLIT 仍要求源地址/stride16字节对齐、x/width为4像素倍数。
 - Front 范围和首轮 `src_stride=7680` 的检查由 C 完成，并通过 `src_range_valid` 交付；B 不自行推断 Front，也不能在正式系统把该信号绑1绕过检查。B 子模块保留原有通用对齐/尺寸/stride/溢出检查。
-- C 需限制源地址在锁存 Front 的有效 `0x7E9000` 字节内，按 offset/7680 推导源坐标，并检查源矩形不横向跨行、宽高非零且不越界，扩展位宽防溢出。8MiB 槽剩余空间不是有效图像。实际检查器不在本轮 B RTL 中。
+- C 需限制源地址在锁存 Front 的有效 `0x7E9000` 字节内，按 offset/7680 推导源坐标，并检查源矩形不横向跨行、宽高非零且不越界，扩展位宽防溢出。8MiB 槽剩余空间不是有效图像。现由独立 `blit_source_guard` 实现，已在合同与双缓冲仿真连接，正式平台待接入。
 - 入口不实现 DDR 读仲裁、swap、命令队列或资源加载。C 的读 owner 必须按预期拍数与 RLAST 双重检查；异常 RLAST 不得直接释放 owner。Back ownership 与读 burst owner 是两套状态。
 
 按 A/C 本轮方案使用以下错误码，正式 APB 的 ERROR_CODE 映射仍待 A/C 集成：
@@ -161,4 +163,6 @@ FILL 固定使用 `SETTLE_FRAMES=0`，与现有双缓冲正式模式一致：完
 
 随后新增双缓冲闭环：默认最多32beat与最多1beat配置各11个场景、20条命令、8次换帧和178,176次像素比较，共新增22个场景。检查脚本合计114个场景通过，另有3个故意错误的负对照（原像素、换帧后像素、旧Back基地址）均按预期被拒绝。真实manager的reader-safe/FIFO-empty仍是模型输入；故意扣住reader-safe的边界使missed计数增加1，这是测试预期，不是显示连续性测量。
 
-下一步由 A 按方案接正式寄存器/软件命令，由 C 实现源范围检查和读仲裁，并接公共状态/Back写服务，再进行系统并发仿真、Efinity综合/时序检查和板级验收。合同测试使用真实 manager，但源检查结果、DDR与reader-safe仍是模型输入，未验证C的检查算法、实际读owner/响应路由/最大等待和显示连续性。当前测试不证明整机已完成这些步骤。
+后续已接入真实源检查器：1080p/7680与64×48/256两组各426个矩形（各400随机），manager合同从7场景扩展至17场景；双缓冲仍为两组各11场景。现合计852个源矩形用例与124个执行/合同/双缓冲场景，4个负对照通过（新增强制绕过源检查的非法AXI检测）。详细覆盖与结果边界见 [BLIT_SOURCE_GUARD](BLIT_SOURCE_GUARD.md)。
+
+下一步由 A 按方案接正式寄存器/软件命令，继续实现C的读仲裁，并将检查器、公共状态和Back写服务接入正式平台，再进行系统并发仿真、Efinity综合/时序检查和板级验收。合同/双缓冲测试使用真实manager和源检查器，DDR与reader-safe仍是模型输入，尚未验证实际读owner/响应路由/最大等待和显示连续性。当前测试不证明整机已完成这些步骤。

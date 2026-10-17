@@ -51,7 +51,7 @@ C历史成功DONE额外等待两个VS（SETTLE_FRAMES=2），且读写同槽0；
 
 该模块尚未加入正式顶层或Efinity源清单，未改现有FILL_RECT、寄存器、DDR/显示路径或生成IP。本轮没有验证Efinity综合、资源/时序、真实DDR并发、HDMI显示和板级性能。
 
-### FILL / BLIT Dispatcher Independent RTL
+### FILL / BLIT Dispatcher Independent RTL（源检查器接入前记录）
 
 2026-10-17：`graphics_engine.v` 在独立仿真中组合原FILL/BLIT，尚未加入正式顶层或Efinity源清单。复现入口为 `scripts/run_graphics_checks.ps1`，运行和端口规则见 [GRAPHICS_ENGINE](GRAPHICS_ENGINE.md)。
 
@@ -68,7 +68,7 @@ C历史成功DONE额外等待两个VS（SETTLE_FRAMES=2），且读写同槽0；
 
 原BLIT42用例及其负对照、原 `tb_fill_rect_writer` 回归通过；工程51个源条目/47个CSR一致性检查通过。共享模拟内存新增可选byte-strobe模式，BLIT原用例默认仍要求全strobe。PNG脚本新增可选名称参数，旧调用兼容。FILL/BLIT子执行单元、正式APB/软件、Framebuffer/显示、生成IP和工程清单均未修改。本轮未验证C的真实源窗口算法、显示/BLIT读仲裁/owner路由/最大等待，也没有Efinity综合/时序、真实DDR/显示并发或实板性能结果。首轮src_stride=7680由C检查；模型中的其他stride用于验证B通用搬运能力，不代表正式平台允许其他stride。
 
-### FILL / BLIT Double-buffer Loop
+### FILL / BLIT Double-buffer Loop（首次记录）
 
 2026-10-17：新增 `sim/tb_graphics_double_buffer.v` 与 `sim/graphics_double_buffer_memory.v`，由 `scripts/run_graphics_checks.ps1` 一并运行。连接真实B执行层和现有真实manager，两块物理内存均可读写且跨换帧保留内容；源图由FILL命令生成，不预置图块。
 
@@ -84,6 +84,22 @@ C历史成功DONE额外等待两个VS（SETTLE_FRAMES=2），且读写同槽0；
 原执行层85场景、错误manager合同7场景及新增22场景，共114场景通过；3个故意错误的负对照均被拦截。原BLIT42用例及其负对照、原FILL回归通过。Icarus提示原 `fill_rect_writer` / `buffer_manager` 继承timescale，未修改这些已验证RTL。
 
 本次改动是仿真模型、测试、运行入口和文档。64×48画布/256字节stride用于缩短仿真；APB命令、真实C源检查器、显示读仲裁、显示FIFO/CDC、HDMI和DDR/PHY不在本测试路径。reader-safe/FIFO-empty及边界由测试驱动；故意制造的reader不安全边界使missed计数增1，不能据此报告实板underflow/missed或带宽。后续仍需正式接入、综合/时序检查和实板验收。运行与7张分步图说明见 [GRAPHICS_ENGINE](GRAPHICS_ENGINE.md)。
+
+### BLIT Source Guard（当前仿真）
+
+在上述初版基础上，新增 `rtl/framebuffer/blit_source_guard.v` 和 `sim/tb_blit_source_guard.v`，合同及双缓冲测试已改为连接真实源检查器。实现和接收时序见 [BLIT_SOURCE_GUARD](BLIT_SOURCE_GUARD.md)，同一个 `scripts/run_graphics_checks.ps1` 入口运行。
+
+| 配置 | 结果 |
+|---|---|
+| source_guard_1080p，1920×1080 / stride7680 | 426个矩形，其中400个固定种子随机；保持/复位检查通过 |
+| source_guard_small，64×48 / stride256 | 同426个矩形及保持/复位检查通过 |
+| manager_contract，真实B/manager/检查器 | 扩展为17场景，源拒绝计数/0x21/无AXI/释放Back、连续有效/无效快照、FILL兼容、pending/FAULT保护通过 |
+| double_buffer / double_buffer_single_beat | 每组仍11场景、20命令、8次swap、178,176次像素比较；Front角色交替时由真实检查器计算结果 |
+| BYPASS_SOURCE_GUARD负对照 | 故意将B范围输入绑1，断言检测到非法命令暴露AXI，按预期失败 |
+
+两组独立源矩形共852个，加原执行层85场景、当前合同17场景、双缓冲22场景；总入口合计852个源矩形与124个执行/合同/双缓冲场景，4种故意错误负对照通过。参考逐行检查源字节区间，覆盖源行跨越、右下边界、有效图像后空隙、Front/Back角色、非像素对齐、错误stride、巨大宽高及地址溢出；接收后变更实时参数不改变已锁存结果。
+
+正式APB/软件、`rgb_framebuffer.v`、工程源清单、DDR/PHY、HDMI未修改。源检查器仍待正式接入与Efinity综合/时序检查，常量除法/取余的100MHz时序与资源尚未验证。DDR、显示边界、reader-safe/FIFO-empty仍是模型/测试输入；当前不含读仲裁、实际读owner/响应路由/最大等待、显示并发连续性或新实板验收。原FILL/BLIT执行RTL和manager均未修改；继承timescale提示保留。
 
 ### Buffer Manager / Reader / CDC
 

@@ -14,7 +14,7 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 | D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
 | E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
 
-当前正式系统支持 **FILL_RECT**。Block Copy / BLIT 和 FILL/BLIT 统一执行入口已通过独立仿真，另完成真实buffer_manager与双槽模拟内存的绘制→复制→换帧闭环；尚未接入正式 APB 命令、真实 DDR 和 HDMI；Line、Alpha Blend 尚未实现。统一入口、双缓冲分步图的运行与限制见 [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md)。基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
+当前正式系统支持 **FILL_RECT**。Block Copy / BLIT、FILL/BLIT 统一执行入口与 [源窗口检查器](docs/BLIT_SOURCE_GUARD.md) 已通过仿真，另完成真实buffer_manager/源检查器与双槽模拟内存的绘制→复制→换帧闭环；尚未接入正式 APB 命令、DDR读仲裁和 HDMI；Line、Alpha Blend 尚未实现。统一入口、双缓冲分步图的运行与限制见 [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md)。基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
 
 ## 框架
 
@@ -158,6 +158,7 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [BLIT](docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
 | [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md) | FILL/BLIT统一入口、混合场景仿真与三步结果图 |
 | [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | 按A/C反馈确定的首轮接口、实施状态与验收步骤 |
+| [BLIT_SOURCE_GUARD](docs/BLIT_SOURCE_GUARD.md) | C侧源窗口检查、accept时序、边界用例及对接限制 |
 
 `docs/` 维护上述长期说明及 BLIT 原型交付文档。历史阶段性快照和验证摘要已合并清理；正式 testbench 与回归脚本保留在 sim/、scripts/。
 

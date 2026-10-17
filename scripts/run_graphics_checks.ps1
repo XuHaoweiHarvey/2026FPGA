@@ -25,9 +25,16 @@ function Invoke-GraphicsSimulation {
     $caseDir = Join-Path $outputPath $Name
     New-Item -ItemType Directory -Path $caseDir -Force | Out-Null
     $binaryPath = Join-Path $caseDir 'graphics.vvp'
-    $compileSources = $sourcePaths
+    $compileSources = @()
+    if ($Top -ne 'tb_blit_source_guard') { $compileSources += $sourcePaths }
     if ($Top -in @('tb_graphics_contract', 'tb_graphics_double_buffer')) {
         $compileSources += Join-Path $taskRoot 'rtl/framebuffer/buffer_manager.v'
+    }
+    if ($Top -in @('tb_blit_source_guard', 'tb_graphics_contract', 'tb_graphics_double_buffer')) {
+        $compileSources += Join-Path $taskRoot 'rtl/framebuffer/blit_source_guard.v'
+    }
+    if ($Top -eq 'tb_blit_source_guard') {
+        $compileSources += Join-Path $taskRoot 'sim/tb_blit_source_guard.v'
     }
     if ($Top -eq 'tb_graphics_contract') {
         $compileSources += Join-Path $taskRoot 'sim/tb_graphics_contract.v'
@@ -64,6 +71,11 @@ Start-Transcript -Path $logPath -Force | Out-Null
 try {
     Write-Host "Icarus: $iverilogExe"
     Write-Host "Artifacts: $outputPath"
+    Invoke-GraphicsSimulation -Name 'source_guard_1080p' -Overrides @() -Wave:(-not $NoWave) `
+        -Top 'tb_blit_source_guard' -PassPattern '^PASS SOURCE GUARD:'
+    Invoke-GraphicsSimulation -Name 'source_guard_small' -Overrides @(
+        '-Ptb_blit_source_guard.FRAME_WIDTH=64', '-Ptb_blit_source_guard.FRAME_HEIGHT=48'
+    ) -Top 'tb_blit_source_guard' -PassPattern '^PASS SOURCE GUARD:'
     Invoke-GraphicsSimulation -Name 'basic' -Overrides @() -Wave:(-not $NoWave)
     Invoke-GraphicsSimulation -Name 'single_beat_remapped' -Overrides @(
         '-Ptb_graphics_engine.MAX_BURST_BEATS=1',
@@ -88,6 +100,20 @@ try {
         throw 'The scoreboard did not reject the deliberately corrupted pixel.'
     }
     Write-Host 'PASS scoreboard negative control: incorrect pixel detected.'
+
+    Write-Host 'Check source guard negative control: bypass policy and require rejection'
+    Push-Location -LiteralPath (Join-Path $outputPath 'manager_contract')
+    try {
+        $guardOutput = @(& $vvpExe (Join-Path $outputPath 'manager_contract/graphics.vvp') '+BYPASS_SOURCE_GUARD')
+        $guardExit = $LASTEXITCODE
+    } finally { Pop-Location }
+    $guardOutput | Set-Content -LiteralPath (
+        Join-Path $outputPath 'source_guard_expected_failure.log'
+    ) -Encoding UTF8
+    if ($guardExit -eq 0 -or -not ($guardOutput -match 'Rejected command exposed AXI')) {
+        throw 'The contract test did not reject a bypassed source guard.'
+    }
+    Write-Host 'PASS source guard negative control: unsafe AXI request detected.'
 
     foreach ($guard in @(
         @{Name='double_buffer_scoreboard'; Argument='+CORRUPT_FRAME'; Pattern='Double-buffer pixel'},
@@ -141,8 +167,9 @@ try {
     } else {
         Write-Host 'PNG previews skipped: optional Python 3 not found. PPMs and RTL checks are available.'
     }
-    Write-Host 'PASS all graphics dispatcher and double-buffer simulations. APB/DDR arbiter/HDMI/board integration pending.'
+    Write-Host 'PASS source guard, graphics dispatcher and double-buffer simulations. APB/DDR arbiter/HDMI/board integration pending.'
     if (-not $NoWave) {
+        Write-Host ('Source guard waveform: ' + (Join-Path $outputPath 'source_guard_1080p/graphics.vcd'))
         Write-Host ('Waveform: ' + (Join-Path $outputPath 'basic/graphics.vcd'))
         Write-Host ('Double-buffer waveform: ' + (Join-Path $outputPath 'double_buffer/graphics.vcd'))
     }

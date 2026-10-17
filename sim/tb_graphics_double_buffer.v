@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 // Real B executor + real buffer_manager, with two persistent memory slots.
-// Commands, source-range decisions, reader-safe/FIFO ack and frame boundaries
-// are test stimuli. This is NOT an APB/DDR arbiter/HDMI integration test.
+// Real source guard; commands, reader-safe/FIFO ack and frame boundaries are
+// test stimuli. This is NOT an APB/DDR arbiter/HDMI integration test.
 module tb_graphics_double_buffer;
 parameter MAX_BURST_BEATS = 32;
 localparam FRAME_WIDTH = 64, FRAME_HEIGHT = 48, FRAME_WORDS = FRAME_WIDTH*FRAME_HEIGHT;
@@ -10,7 +10,7 @@ localparam [31:0] BACKGROUND = 32'h00101428;
 reg clk=0, rst_n=0, request=0;
 always #5 clk=~clk;
 reg [31:0] op=0, x=0, y=0, width=0, height=0, color=0, src_addr=0;
-reg src_range_valid=0;
+wire src_range_valid;
 reg swap_request=0, clear_done=0, boundary_tick=0;
 reg reader_safe=1, reader_fifo_empty=1, stall_ar=0, stall_b=0;
 wire manager_accept, accept, busy, done, owned, draw_ready, pending, swap_done;
@@ -35,9 +35,13 @@ end
 // slot 1 after the first swap. Normally the latched base is added exactly once.
 wire [31:0] physical_awaddr=(stale_back_base ? BUFFER1_BASE : command_base)+awaddr;
 
-always @(posedge clk or negedge rst_n)
-    if (!rst_n) src_range_valid<=0;
-    else if (manager_accept) src_range_valid<=op==1;
+blit_source_guard #(.FRAME_WIDTH(FRAME_WIDTH), .FRAME_HEIGHT(FRAME_HEIGHT),
+    .FRAME_STRIDE(FRAME_WIDTH*4)) source_guard (
+    .clk(clk), .rst_n(rst_n), .command_accept(manager_accept),
+    .front_base(front_base), .back_base(back_base), .src_addr(src_addr),
+    .src_stride(32'd256), .width(width), .height(height),
+    .src_range_valid(src_range_valid)
+);
 
 buffer_manager #(.BUFFER0_BASE(BUFFER0_BASE), .BUFFER1_BASE(BUFFER1_BASE),
     .FLUSH_CYCLES(4)) manager (
@@ -377,7 +381,7 @@ initial begin
     end
     if (wanted_swaps!=8 || wanted_commands!=20 || missed_boundary_count!=1)
         $fatal(1,"Unexpected scenario totals");
-    $display("PASS GRAPHICS DOUBLE BUFFER: %0d cases, %0d commands, %0d swaps, %0d pixel comparisons; model boundaries/range/DDR, no display arbiter",
+    $display("PASS GRAPHICS DOUBLE BUFFER: %0d cases, %0d commands, %0d swaps, %0d pixel comparisons; real source guard, model boundaries/DDR, no display arbiter",
         cases,command_count,swap_count,pixel_checks);
     $finish;
 end
