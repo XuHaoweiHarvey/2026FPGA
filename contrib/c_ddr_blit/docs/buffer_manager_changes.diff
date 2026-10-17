@@ -1,0 +1,19 @@
+--- reference/buffer_manager.v
++++ rtl/c_buffer_manager.v
+@@ -0,0 +1 @@
++`timescale 1ns/1ps
+@@ -2 +3 @@
+-module buffer_manager #(
++module c_buffer_manager #(
+@@ -6 +7 @@
+-    input wire clk,rst_n,init_done,
++    input wire clk,rst_n,init_done,platform_fault,
+@@ -22 +23 @@
+-assign draw_ready=front_valid && !swap_pending && !swap_request && !writer_busy && !writer_owned;
++assign draw_ready=!platform_fault && writer_error!=32'h25 && front_valid && !swap_pending && !swap_request && !writer_busy && !writer_owned;
+@@ -37 +38 @@
+-        else if(writer_owned && writer_done && !writer_busy) writer_owned<=0;
++        else if(writer_owned && writer_done && !writer_busy && !platform_fault && writer_error!=32'h25) writer_owned<=0;
+@@ -55 +56 @@
+-                if(commit_swap) begin
++                if(commit_swap && !platform_fault && !writer_busy && !writer_owned && !cmd_request && writer_error==0) begin
