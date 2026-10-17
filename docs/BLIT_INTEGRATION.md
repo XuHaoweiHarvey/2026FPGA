@@ -4,7 +4,7 @@
 
 状态：**已按2026-10-17用户转来的A/C反馈记录本轮方案；B执行层已适配，系统集成尚未完成。** 以下区分下一轮约定与已实现状态，不表示新增CSR、读仲裁或实板功能已生效。当前正式工程的合同仍见 [INTERFACES](INTERFACES.md)、[REGISTER_MAP](REGISTER_MAP.md) 和 [TEAM_SPLIT](TEAM_SPLIT.md)。独立模块与验证见 [BLIT](BLIT.md)。
 
-进度补充（2026-10-17）：B 的 [FILL/BLIT统一执行入口](GRAPHICS_ENGINE.md) 已支持0x26、C提供的src_range_valid、最终accept接收，85个像素/状态用例及7个真实manager合同用例通过。正式APB、C源窗口检查器/DDR读仲裁、顶层和实板尚未接通；7个合同用例不包含真实显示仲裁。
+进度补充（2026-10-17）：B 的 [FILL/BLIT统一执行入口](GRAPHICS_ENGINE.md) 已支持0x26、C提供的src_range_valid、最终accept接收，85个像素/状态用例及7个真实manager合同用例通过。另新增默认/单拍两组双缓冲闭环，各20条命令、8次换帧，验证FILL构图后交替Front/Back复制及最后B前不得发布。正式APB、C源窗口检查器/DDR读仲裁、顶层和实板尚未接通；这些测试均不包含真实显示仲裁。
 
 ## 1. 下一轮的共同目标
 
@@ -142,7 +142,7 @@ FILL/BLIT 共用现有受显示保护的 Back 写服务。每笔 AW 准入一旦
 | 人员 | 当前进度/准备 | 下一步实施 |
 |---|---|---|
 | A | 梳理现有 API/寄存器扩展，准备上述 Demo 的软件调用流程 | 新 offset、opcode、版本/能力、BLIT API 和正式命令输出 |
-| B（你） | 执行层已按A/C反馈适配，并通过独立及真实manager合同测试 | 参与正式连接后的系统回归，核对watchdog与C的服务上限 |
+| B（你） | 执行层已按A/C反馈适配，独立/真实manager合同及两槽绘制→复制→换帧闭环通过 | 参与正式连接后的系统回归，核对watchdog与C的服务上限 |
 | C | 确认读仲裁插入点、显示服务统计/flush 影响，准备仲裁测试方案 | 读服务、响应路由、Back ownership、显示保护与共享接线 |
 
 共享顶层 `rtl/ti60f225_oob_top.v`、`rgb_framebuffer.v` 的跨边界连接以及 Efinity 工程清单，建议指定 C 或共同指定的集成人统一修改；B 提供执行层实例端口，A 提供命令/状态端口。

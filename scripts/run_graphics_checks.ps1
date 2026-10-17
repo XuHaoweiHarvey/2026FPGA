@@ -26,8 +26,14 @@ function Invoke-GraphicsSimulation {
     New-Item -ItemType Directory -Path $caseDir -Force | Out-Null
     $binaryPath = Join-Path $caseDir 'graphics.vvp'
     $compileSources = $sourcePaths
+    if ($Top -in @('tb_graphics_contract', 'tb_graphics_double_buffer')) {
+        $compileSources += Join-Path $taskRoot 'rtl/framebuffer/buffer_manager.v'
+    }
     if ($Top -eq 'tb_graphics_contract') {
-        $compileSources += @('sim/tb_graphics_contract.v', 'rtl/framebuffer/buffer_manager.v') |
+        $compileSources += Join-Path $taskRoot 'sim/tb_graphics_contract.v'
+    }
+    if ($Top -eq 'tb_graphics_double_buffer') {
+        $compileSources += @('sim/tb_graphics_double_buffer.v', 'sim/graphics_double_buffer_memory.v') |
             ForEach-Object { Join-Path $taskRoot $_ }
     }
     $compileArgs = @('-g2005-sv', '-Wall', '-s', $Top) + $Overrides +
@@ -65,6 +71,11 @@ try {
     )
     Invoke-GraphicsSimulation -Name 'manager_contract' -Overrides @() `
         -Top 'tb_graphics_contract' -PassPattern '^PASS GRAPHICS CONTRACT:'
+    Invoke-GraphicsSimulation -Name 'double_buffer' -Overrides @() -Wave:(-not $NoWave) `
+        -Top 'tb_graphics_double_buffer' -PassPattern '^PASS GRAPHICS DOUBLE BUFFER:'
+    Invoke-GraphicsSimulation -Name 'double_buffer_single_beat' -Overrides @(
+        '-Ptb_graphics_double_buffer.MAX_BURST_BEATS=1'
+    ) -Top 'tb_graphics_double_buffer' -PassPattern '^PASS GRAPHICS DOUBLE BUFFER:'
 
     Write-Host 'Check scoreboard: deliberately corrupt a pixel and require rejection'
     Push-Location -LiteralPath (Join-Path $outputPath 'basic')
@@ -77,6 +88,25 @@ try {
         throw 'The scoreboard did not reject the deliberately corrupted pixel.'
     }
     Write-Host 'PASS scoreboard negative control: incorrect pixel detected.'
+
+    foreach ($guard in @(
+        @{Name='double_buffer_scoreboard'; Argument='+CORRUPT_FRAME'; Pattern='Double-buffer pixel'},
+        @{Name='double_buffer_base'; Argument='+STALE_BACK_BASE'; Pattern='AW outside locked Back'}
+    )) {
+        Write-Host ('Check double-buffer negative control: ' + $guard.Argument)
+        Push-Location -LiteralPath (Join-Path $outputPath 'double_buffer')
+        try {
+            $guardOutput = @(& $vvpExe (Join-Path $outputPath 'double_buffer/graphics.vvp') $guard.Argument)
+            $guardExit = $LASTEXITCODE
+        } finally { Pop-Location }
+        $guardOutput | Set-Content -LiteralPath (
+            Join-Path $outputPath ($guard.Name + '_expected_failure.log')
+        ) -Encoding UTF8
+        if ($guardExit -eq 0 -or -not ($guardOutput -match $guard.Pattern)) {
+            throw ('Double-buffer negative control did not reject: ' + $guard.Argument)
+        }
+        Write-Host ('PASS double-buffer negative control: ' + $guard.Name)
+    }
 
     $pythonArgs = @()
     if (-not $PythonExe) {
@@ -103,10 +133,18 @@ try {
             (Join-Path $outputPath 'basic') --names checker_source 01_fill 02_blit 03_overlay |
             ForEach-Object { Write-Host $_ }
         if ($LASTEXITCODE -ne 0) { throw 'PNG preview conversion failed.' }
+        & $PythonExe @pythonArgs (Join-Path $PSScriptRoot 'render_blit_preview.py') `
+            (Join-Path $outputPath 'double_buffer') --names 01_source_back 02_source_front `
+                03_cleared_back 04_pending_front 05_copy_front 06_return_front 07_overlay_front |
+            ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) { throw 'Double-buffer PNG preview conversion failed.' }
     } else {
         Write-Host 'PNG previews skipped: optional Python 3 not found. PPMs and RTL checks are available.'
     }
-    Write-Host 'PASS all graphics dispatcher simulations. No APB/DDR/HDMI integration or board validation.'
-    if (-not $NoWave) { Write-Host ('Waveform: ' + (Join-Path $outputPath 'basic/graphics.vcd')) }
+    Write-Host 'PASS all graphics dispatcher and double-buffer simulations. APB/DDR arbiter/HDMI/board integration pending.'
+    if (-not $NoWave) {
+        Write-Host ('Waveform: ' + (Join-Path $outputPath 'basic/graphics.vcd'))
+        Write-Host ('Double-buffer waveform: ' + (Join-Path $outputPath 'double_buffer/graphics.vcd'))
+    }
     Write-Host "Log: $logPath"
 } finally { Stop-Transcript | Out-Null }

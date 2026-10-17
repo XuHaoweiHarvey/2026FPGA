@@ -68,6 +68,23 @@ C历史成功DONE额外等待两个VS（SETTLE_FRAMES=2），且读写同槽0；
 
 原BLIT42用例及其负对照、原 `tb_fill_rect_writer` 回归通过；工程51个源条目/47个CSR一致性检查通过。共享模拟内存新增可选byte-strobe模式，BLIT原用例默认仍要求全strobe。PNG脚本新增可选名称参数，旧调用兼容。FILL/BLIT子执行单元、正式APB/软件、Framebuffer/显示、生成IP和工程清单均未修改。本轮未验证C的真实源窗口算法、显示/BLIT读仲裁/owner路由/最大等待，也没有Efinity综合/时序、真实DDR/显示并发或实板性能结果。首轮src_stride=7680由C检查；模型中的其他stride用于验证B通用搬运能力，不代表正式平台允许其他stride。
 
+### FILL / BLIT Double-buffer Loop
+
+2026-10-17：新增 `sim/tb_graphics_double_buffer.v` 与 `sim/graphics_double_buffer_memory.v`，由 `scripts/run_graphics_checks.ps1` 一并运行。连接真实B执行层和现有真实manager，两块物理内存均可读写且跨换帧保留内容；源图由FILL命令生成，不预置图块。
+
+| 配置 | 结果 |
+|---|---|
+| double_buffer：最多32beat | 11个场景、20条命令、8次换帧、178,176次像素比较通过；导出7步实际内存图片和可选VCD |
+| double_buffer_single_beat：最多1beat | 同11个场景、20条命令、8次换帧、178,176次像素比较通过 |
+| CORRUPT_FRAME负对照 | 故意修改第二次换帧后的Front像素，独立记分板按预期报错 |
+| STALE_BACK_BASE负对照 | 故意让wrapper在换帧后仍写Buffer1，地址断言按预期报错 |
+
+覆盖四色图块FILL构建、两方向BLIT、多次成功swap、非零源坐标、右下角、非对齐FILL叠加、AR反压下pending及额外命令拒绝；全部W完成但最后B被扣住时仍保持BUSY/Back ownership且不能swap，B结束和释放后仍等下一边界。另检查reader-safe/FIFO-empty确认、sticky swap结果清除、命令计数、AXI稳定性和目标基地址只加一次。
+
+原执行层85场景、错误manager合同7场景及新增22场景，共114场景通过；3个故意错误的负对照均被拦截。原BLIT42用例及其负对照、原FILL回归通过。Icarus提示原 `fill_rect_writer` / `buffer_manager` 继承timescale，未修改这些已验证RTL。
+
+本次改动是仿真模型、测试、运行入口和文档。64×48画布/256字节stride用于缩短仿真；APB命令、真实C源检查器、显示读仲裁、显示FIFO/CDC、HDMI和DDR/PHY不在本测试路径。reader-safe/FIFO-empty及边界由测试驱动；故意制造的reader不安全边界使missed计数增1，不能据此报告实板underflow/missed或带宽。后续仍需正式接入、综合/时序检查和实板验收。运行与7张分步图说明见 [GRAPHICS_ENGINE](GRAPHICS_ENGINE.md)。
+
 ### Buffer Manager / Reader / CDC
 
 - manager单测64个异相事件、11次交换，检查Front≠Back、busy/pending、writer完成仍无边界、边界到来但writer未完、sticky DONE/CLEAR_DONE及FIFO empty反馈。

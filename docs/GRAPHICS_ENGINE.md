@@ -4,7 +4,7 @@
 
 对应赛题二基础要求第1项：硬件根据操作类型执行 Solid Fill 或 Block Copy。`graphics_engine.v` 在 B 内部接收一条命令，保存参数，选择现有 `fill_rect_writer` 或 `blit_engine`，并提供一套公共状态和写接口。
 
-当前 B 执行层已按 2026-10-17 用户提供的 A/C 反馈适配，经过独立仿真及与现有 `buffer_manager` 的合同测试。正式系统仍只接 FILL，尚未接入新增 APB 字段、C 的源窗口检查器/DDR 读仲裁/显示，也未加入 Efinity 工程、综合或上板。已确定的下一轮接口及各方实施状态见 [BLIT_INTEGRATION](BLIT_INTEGRATION.md)。
+当前 B 执行层已按 2026-10-17 用户提供的 A/C 反馈适配，经过独立仿真、与现有 `buffer_manager` 的合同测试，以及两块持久内存的绘制/复制/换帧闭环仿真。正式系统仍只接 FILL，尚未接入新增 APB 字段、C 的源窗口检查器/DDR 读仲裁/显示，也未加入 Efinity 工程、综合或上板。已确定的下一轮接口及各方实施状态见 [BLIT_INTEGRATION](BLIT_INTEGRATION.md)。
 
 ```text
 仿真命令（未来由 A 提供）
@@ -25,8 +25,10 @@
 | `rtl/accelerator/graphics_engine.v` | 命令快照、选择、总线复用和公共结果 |
 | `sim/tb_graphics_engine.v` | 混合场景、像素记分板、状态/错误/超时验证 |
 | `sim/tb_graphics_contract.v` | 连接现有真实 manager，检查接收计数、Back 释放、错误换帧阻止和 FAULT；源检查结果和 DDR 由模型提供 |
+| `sim/tb_graphics_double_buffer.v` | 真实 manager+B 的成功换帧、双向复制、最后 B 延迟、独立双槽像素检查 |
+| `sim/graphics_double_buffer_memory.v` | 仅仿真使用的双槽 AXI 内存，两槽均可读写，换帧不搬动内存内容 |
 | `sim/tb_blit_engine.v` | 复用其中的 `blit_test_memory`；新增可选 byte strobe 支持，BLIT 默认仍要求全 strobe |
-| `scripts/run_graphics_checks.ps1` | 两组像素仿真、manager 合同测试、负对照、可选波形和 PNG |
+| `scripts/run_graphics_checks.ps1` | 两组执行层仿真、manager 合同测试、两组双缓冲闭环、负对照、可选波形和 PNG |
 | `scripts/render_blit_preview.py` | 共用 PPM→PNG 转换，新增可选 `--names`，原 BLIT 调用方式保留 |
 
 需要 PATH 中的 `iverilog`、`vvp`。在仓库根目录执行：
@@ -52,8 +54,33 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_graphics_c
 | `basic/02_blit_6x.png` | 源棋盘复制至 `(8,5)`，大小32×32 |
 | `basic/03_overlay_6x.png` | 再在 `(11,12)` 填13×5红色矩形，验证 FILL 非对齐边缘 |
 | `scoreboard_expected_failure.log` | 故意写坏像素后，记分板应当拒绝的负对照 |
+| `double_buffer/graphics.vcd` | 双缓冲闭环波形，可观察 command_base、pending、B 握手和换帧 |
+| `double_buffer/01_source_back_6x.png` | FILL 在 Back1 画出的四色源图，尚未换帧 |
+| `double_buffer/02_source_front_6x.png` | 第一次换帧后，相同源图成为 Front1 |
+| `double_buffer/03_cleared_back_6x.png` | 新 Back0 已清空，Front1 保持源图 |
+| `double_buffer/04_pending_front_6x.png` | BLIT 最后 B 尚未返回，换帧 pending，当前 Front1 仍显示旧源图 |
+| `double_buffer/05_copy_front_6x.png` | 完成并换帧后，Front0 在 `(8,8)` 显示复制的32×32图块 |
+| `double_buffer/06_return_front_6x.png` | 反向复制并换帧后，Front1 的图块位于 `(28,16)`，贴近右下角 |
+| `double_buffer/07_overlay_front_6x.png` | 再次复制到 `(0,0)`，叠加非四像素对齐的 FILL 后换帧 |
+| `double_buffer_scoreboard_expected_failure.log` | 故意改坏第二次换帧后的一个像素，要求记分板报错 |
+| `double_buffer_base_expected_failure.log` | 故意让 wrapper 永远加 Buffer1 base，要求在写错槽前报错 |
 
 同名 PPM 和原尺寸 PNG 也会生成。图片来自仿真实际目标内存；6倍放大便于查看。它不是 HDMI 截图，正确性由逐像素比较决定。
+
+## 双缓冲闭环怎么理解
+
+新增测试使用真实的 `graphics_engine`、两个子执行单元和 `buffer_manager`。仿真内存只保存两个物理槽的像素；Front/Back 是 manager 给槽分配的角色，交换时不复制或重新初始化内存。
+
+1. 复位时 Front=槽0、Back=槽1，两个槽初始颜色不同。用真实 FILL 命令清空 Back，再画四块16×16颜色，组成32×32源图；源图没有预先写进模型。
+2. 请求换帧；先扣住 reader-safe，再扣住 FIFO-empty，分别验证等待条件。满足边界和确认条件后，槽1成为 Front。
+3. 清空新的 Back（槽0），从 Front 的 `(0,0)` 复制32×32图块到 Back 的 `(8,8)`。
+4. 在 AR 被反压时请求换帧，并尝试额外命令；pending 必须阻止额外接收。释放 AR 后，等全部256个 W beats 已写入，再扣住最后 B。此时像素虽然已在内存里，命令仍未完成，Back 仍被占有，边界不能提交换帧。
+5. 释放 B，等待 DONE、BUSY=0 和 ownership 释放；没有新边界仍不能换帧。下一边界才发布槽0，检查两槽全部像素。
+6. 从槽0复制回槽1、测试非零源坐标、右下角和非对齐 FILL 叠加，再连续交替四轮，总计20条命令、8次换帧。
+
+期望像素按场景坐标在独立数组中计算，源数据取自上一轮的期望 Front；不读取 DUT 内部地址/缓存，也不从实际内存反推正确答案。每条命令完成及每次成功换帧都检查两个完整槽，覆盖源图保持、目标矩形外保持和角色交替。
+
+画布缩为64×48、stride=256，以便快速仿真；实板第一轮仍按团队约定使用1920×1080、stride=7680和 `(64,64)` 目标位置。命令、范围结果、边界和 reader-safe/FIFO-empty 由测试提供，尚未模拟真实显示读流或 APB 软件提交；这里的通过不证明读仲裁或 HDMI 连续性。
 
 ## 命令和状态规则
 
@@ -131,5 +158,7 @@ FILL 固定使用 `SETTLE_FRAMES=0`，与现有双缓冲正式模式一致：完
 覆盖 FILL→BLIT→FILL、同类连续命令、非对齐FILL、参数/操作快照、enabled只控制接受、旧DONE/ERROR隔离、公共accept与计数一致、忙时拒绝请求、非法操作/参数、最后B前不完成、反压稳定、R/B响应错误、两种单元的超时排空及BLIT协议FAULT/平台复位。新增C在accept锁存结果的时序、源范围无效不启动/不发AXI、0x21/0x26计数/释放Back、真正接收才清错误、pending时拒绝请求及FAULT禁止swap提交。
 
 回归：原BLIT42用例及负对照、原FILL测试通过；工程51个源清单和47个CSR的一致性检查通过。Icarus 对原 `fill_rect_writer` 未显式定义 timescale 给出继承提示，不影响仿真；本轮未改该执行单元。
+
+随后新增双缓冲闭环：默认最多32beat与最多1beat配置各11个场景、20条命令、8次换帧和178,176次像素比较，共新增22个场景。检查脚本合计114个场景通过，另有3个故意错误的负对照（原像素、换帧后像素、旧Back基地址）均按预期被拒绝。真实manager的reader-safe/FIFO-empty仍是模型输入；故意扣住reader-safe的边界使missed计数增加1，这是测试预期，不是显示连续性测量。
 
 下一步由 A 按方案接正式寄存器/软件命令，由 C 实现源范围检查和读仲裁，并接公共状态/Back写服务，再进行系统并发仿真、Efinity综合/时序检查和板级验收。合同测试使用真实 manager，但源检查结果、DDR与reader-safe仍是模型输入，未验证C的检查算法、实际读owner/响应路由/最大等待和显示连续性。当前测试不证明整机已完成这些步骤。
