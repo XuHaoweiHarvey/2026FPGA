@@ -5,6 +5,7 @@
 module blit_test_memory #(
     parameter FRAME_WIDTH = 64, FRAME_HEIGHT = 48,
     parameter SOURCE_WORDS = 32768,
+    parameter ALLOW_PARTIAL_STROBES = 0,
     parameter [31:0] SOURCE_BASE = 32'h01000000,
     parameter [31:0] BACK_BASE = 32'h00800000
 )(
@@ -106,13 +107,16 @@ always @(posedge clk or negedge rst_n) begin
             write_left <= awlen+1; aw_count <= aw_count+1;
         end
         if (wvalid && wready) begin
-            if (wlast !== (write_left == 1) || wstrb !== 16'hffff)
+            if (wlast !== (write_left == 1) ||
+                (!ALLOW_PARTIAL_STROBES && wstrb !== 16'hffff))
                 $fatal(1, "Wrong WLAST/WSTRB");
-            for (lane=0; lane<4; lane=lane+1)
-                target_mem[write_index+lane] <= wdata[lane*32+:32];
+            for (lane=0; lane<16; lane=lane+1)
+                if (wstrb[lane])
+                    target_mem[write_index+lane/4][(lane%4)*8+:8] <= wdata[lane*8+:8];
             // Negative control: the runner verifies that the independent
             // pixel scoreboard actually rejects a deliberately wrong pixel.
-            if(corrupt_write) target_mem[write_index] <= wdata[31:0] ^ 32'h1;
+            if(corrupt_write && wstrb[0])
+                target_mem[write_index][7:0] <= wdata[7:0] ^ 8'h1;
             write_index <= write_index+4; write_left <= write_left-1;
             w_count <= w_count+1;
             if (write_left == 1) begin write_active <= 0; b_delay <= 9; end

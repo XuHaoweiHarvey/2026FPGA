@@ -1,8 +1,10 @@
-# BLIT 第一轮集成对接草案
+# BLIT 第一轮集成方案与实施状态
 
 日期：2026-10-17。对照版本：`cdb9159`，Person B 的独立 BLIT 原型。
 
-状态：**供 A/B/C 讨论，尚未共同确认，尚未实现系统集成。** 本文提出建议，不重新分配现有寄存器或修改冻结接口。正式合同仍见 [INTERFACES](INTERFACES.md)、[REGISTER_MAP](REGISTER_MAP.md) 和 [TEAM_SPLIT](TEAM_SPLIT.md)。已完成的独立模块与验证见 [BLIT](BLIT.md)。
+状态：**已按2026-10-17用户转来的A/C反馈记录本轮方案；B执行层已适配，系统集成尚未完成。** 以下区分下一轮约定与已实现状态，不表示新增CSR、读仲裁或实板功能已生效。当前正式工程的合同仍见 [INTERFACES](INTERFACES.md)、[REGISTER_MAP](REGISTER_MAP.md) 和 [TEAM_SPLIT](TEAM_SPLIT.md)。独立模块与验证见 [BLIT](BLIT.md)。
+
+进度补充（2026-10-17）：B 的 [FILL/BLIT统一执行入口](GRAPHICS_ENGINE.md) 已支持0x26、C提供的src_range_valid、最终accept接收，85个像素/状态用例及7个真实manager合同用例通过。正式APB、C源窗口检查器/DDR读仲裁、顶层和实板尚未接通；7个合同用例不包含真实显示仲裁。
 
 ## 1. 下一轮的共同目标
 
@@ -28,56 +30,57 @@ flowchart TD
 | 范围 | 已有 | 本轮需要补齐 |
 |---|---|---|
 | A：控制/软件 | FILL 参数、START、状态轮询、显式 swap API | 操作类型、源地址/stride、新 BLIT API 与兼容处理 |
-| B：执行单元 | FILL 已在系统中使用；BLIT 已独立仿真通过 | FILL/BLIT 选择、公共状态与计数、两种命令交替执行的测试 |
+| B：执行单元 | FILL 已在系统中使用；BLIT、公共入口及本轮A/C接口适配已仿真通过 | 将本轮端口接入正式平台并参与系统回归 |
 | C：内存/显示 | Display Reader 独占读端；Back 写准入与安全换帧 | BLIT 读服务、显示/BLIT 读仲裁、响应路由及并发验证 |
 | 共同集成 | 正式顶层目前只接 FILL | 指定集成人同步接线、源清单、接口文档、系统测试及上板 |
 
-## 3. A → B：命令参数建议
+## 3. A → B：本轮命令约定
 
-信号名表示建议含义，最终端口名由双方确认。现有 `cmd_x/y/width/height/color` 可继续使用。
+B公开端口使用团队约定的 `op/x/y/width/height/color/src_addr/src_stride/start/accept`，新增C到B的 `src_range_valid`。A/C上层网络仍可命名为 `cmd_*`，通过实例端口映射连接。
 
 | 字段 | 建议含义 | 第一轮规则 |
 |---|---|---|
-| `cmd_op` | 选择 FILL_RECT 或 BLIT | 建议 FILL 编码为 0、BLIT 为 1；待确认 |
-| `cmd_x`、`cmd_y` | 目标左上角，单位像素 | 继续使用现有字段 |
-| `cmd_width`、`cmd_height` | 矩形宽高，单位像素 | 非零、目标矩形不越界 |
-| `cmd_color` | FILL 的 XRGB8888 颜色 | BLIT 不使用 |
-| `cmd_src_addr` | 源首像素的 32 位绝对字节地址 | BLIT 使用，16 字节对齐 |
-| `cmd_src_stride` | 源图相邻行首的字节距离 | BLIT 使用，16 字节对齐且至少 `width*4` |
-| START / `command_accept` | 启动请求 / 平台最终接受 | 保留现有 START→manager→执行单元的路径 |
+| `op` | 选择 FILL_RECT 或 BLIT | FILL=0，BLIT=1；其他值接受后报0x26 |
+| `x`、`y` | 目标左上角，单位像素 | 继续使用现有矩形寄存器 |
+| `width`、`height` | 矩形宽高，单位像素 | 非零、目标矩形不越界 |
+| `color` | FILL 的 XRGB8888 颜色 | BLIT 不使用 |
+| `src_addr` | 源首像素的 32 位绝对字节地址 | BLIT 使用，16 字节对齐 |
+| `src_stride` | 源图相邻行首的字节距离 | B保留通用对齐/至少width*4检查；首轮C强制7680 |
+| `start` / `accept` | B的最终启动输入 / 实际接受输出 | B.start接manager.command_accept，accept仅作接收观察，不另触发或回接形成组合环 |
+| `src_range_valid` | C锁存的源范围/stride检查结果 | 0也接收计数，随后报0x21且不发AR/AW |
 
-首次有效 APB START 对所有命令字段做一次快照；manager 最终接受时，B 锁存执行选择和参数，C 锁存 Back base。执行期间再写参数、CPU debug reset 或下一次软件调用，都不能改变已接受事务。
+首次有效 APB START 对所有命令字段做一次快照；manager 最终接受时，B锁存执行选择和参数，C锁存Back base及源范围结果。C在accept边沿更新的寄存结果，B在下一拍CHECK_SOURCE读取，避免同拍误读上一命令的结果。C需在这一采样沿前稳定结果；B检查通过前不启动BLIT、不暴露AR/AW。执行期间再写参数、CPU debug reset 或下一次软件调用，都不能改变已接受事务。详细时序见 [GRAPHICS_ENGINE](GRAPHICS_ENGINE.md)。
 
 BLIT 第一轮维持原型限制：`x` 和 `width` 是 4 像素的倍数。FILL 继续保留原有任意像素 x/width 与边缘 WSTRB 能力，不能把 BLIT 限制套到旧 FILL 上。
 
 ### 寄存器和软件兼容
 
-- 现有 offset `0x00..0xB8` 及语义保留。新增字段的 offset、访问/复位规则由 A 提出并共同确认，本草案不直接占用新地址。
-- 建议操作类型复位为 FILL；更新后的 `accel_fill_rect()` 每次显式选择 FILL，避免执行 BLIT 后下一次填充仍被解释成 BLIT。
-- 建议增加 `accel_blit(src_addr, src_stride, x, y, width, height)`，返回约定与 FILL 一样：提交确认和执行成功分别检查。
-- 当前 `accel_init()` 对 VERSION 和 CAPABILITIES 做精确匹配。A 扩展能力标志时必须同步软件期望值、检查脚本和兼容策略；不能只改硬件常量。
-- opcode 数值、非法 opcode 的拒绝/计数规则、BLIT 错误码映射及软件调用名仍需 A/B 确认。
+- 旧offset `0x00..0xB8`、访问和既有命令语义保留；正式启用BLIT时仅更新VERSION/CAPABILITIES等能力标识。约定新增 `0xBC COMMAND_OP`、`0xC0 SRC_ADDR`、`0xC4 SRC_STRIDE`，均32位RW、CPU/APB复位为0，成功START时与矩形字段一同快照；由A实施，当前仍未映射。
+- `COMMAND_OP`复位为FILL；更新后的 `accel_fill_rect()` 每次显式写0，避免上一条BLIT残留类型影响填充。
+- 增加 `accel_blit(src_addr, src_stride, x, y, width, height)`，返回0只确认COMMAND_COUNT增加；执行成功还需 `accel_wait_done()` 检查ERROR=0、DONE=1、BUSY=0、WRITER_OWNED=0，随后软件显式swap。
+- 正式启用BLIT时目标 `VERSION=0x00040000`、`CAPABILITIES=0x0000007B`（新增bit6）；当前仍是0x00030000/0x3B。`accel_init()`精确匹配值、头文件、脚本、正式合同须随A/C系统实现同步更新，不能仅靠B独立仿真提前宣告能力。
+- 非法opcode作为已接受的参数错误：公共计数加1、DONE=1、BUSY=0、ERROR_CODE=0x26，无AR/AW；Back按结束释放。下条真正接受的命令或平台复位清除，普通参数写、CPU/debug reset及CONTROL.bit1不清除执行层错误。
 
 ## 4. B → A/C：执行选择和状态
 
-建议由 B 增加一个公共执行层，内部选择现有 `fill_rect_writer` 或 `blit_engine`；一次只启动一个执行单元，按命令锁存选择。
+B的公共执行层已实现，内部选择现有 `fill_rect_writer` 或 `blit_engine`；一次只启动一个执行单元，按命令锁存选择。
 
-| 公共输出 | 建议规则 |
+| 公共输出 | 本轮规则 |
 |---|---|
 | `busy` | 覆盖整条 FILL/BLIT，包括 BLIT 只读阶段、写阶段和出错排空 |
 | `done` | 当前命令结束的 sticky 状态；接受下一命令时清旧值 |
-| `error_code` | 当前命令结果；0 才表示成功，最终编码待确认 |
+| `error_code` | 当前命令结果；0才表示成功，FILL0x11～0x13、BLIT0x21～0x25、非法opcode0x26 |
 | `command_count` | 每次公共命令被接受只加一次，参数非法命令保留现有计数语义 |
 
 不能直接 OR 两个单元的 sticky DONE/ERROR：空闲单元可能还保留上一次结果。公共计数也不能在切换单元时改成其中一个单元的局部计数。
 
 manager 的 `writer_busy/writer_done/writer_error` 应接公共结果；从 BLIT 接受命令开始就持有 Back，直到所有读写事务处理结束。最后成功 B 返回之前不得报告成功。错误或 FAULT 期间按现有安全规则阻止失败画面被发布。
 
-## 5. B ↔ C：DDR 读写服务建议
+## 5. B ↔ C：DDR 读写服务约定
 
 ### 地址与数据
 
-| 项目 | 本轮建议 |
+| 项目 | 本轮约定 |
 |---|---|
 | 时钟/复位 | core 100 MHz / 平台复位，沿用当前域；CPU reset 不取消 DMA |
 | 像素 | XRGB8888，低地址 B/G/R/X；128 位数据每拍四像素，低32位是 P0 |
@@ -90,10 +93,10 @@ manager 的 `writer_busy/writer_done/writer_error` 应接公共结果；从 BLIT
 
 ### 读仲裁和返回数据归属
 
-建议第一轮采用整个 DDR 读通路最多一笔 outstanding 的方案。Display Reader 和 BLIT 共用 ID0，由 C 记录这笔事务属于谁，再把返回的 R 只交给对应一方。Display Reader 的现有 burst 可达128beats，不能因为 BLIT 最多32beats而一并缩短或错误拒绝显示请求。
+按C回复，第一轮采用整个DDR读通路最多一笔outstanding。Display Reader和BLIT共用ID0，由C记录事务owner，再将R只交给对应一方。Display Reader现有burst可达128beats，不能因为BLIT最多32beats而一并缩短或错误拒绝显示请求。仲裁RTL仍待C实现与验证。
 
 1. AR 一旦对 DDR 暴露，选择和载荷保持到握手，不因优先级变化撤回 VALID。
-2. AR 被接受后锁存 owner；对应 R burst 完整结束前，不切换到另一方的读事务。正常末拍必须同时满足预期计数和 RLAST。
+2. AR被接受后锁存owner；对应R burst完整结束前不切换。正常释放必须同时满足RVALID、RREADY、RLAST以及接收拍数等于ARLEN+1。异常RLAST进入故障保留原owner，故障判定优先于正常释放。
 3. 未选中的 master 不获得 ARREADY；RVALID/RDATA/RRESP/RID/RLAST 和 RREADY 按 owner 路由，不能广播读数据。
 4. 显示低水位时优先补显示，但也要在健康水位下给 BLIT 可验证的服务机会。仲裁等待上限应与 B 的 watchdog 一起确认，不能让 BLIT 永久等待。
 5. 不把整条 BLIT 的执行期锁成“DDR 全归 BLIT”。两段 BLIT 事务之间必须允许 Display Reader 继续读。
@@ -111,13 +114,15 @@ manager 的 `writer_busy/writer_done/writer_error` 应接公共结果；从 BLIT
 
 FILL/BLIT 共用现有受显示保护的 Back 写服务。每笔 AW 准入一旦向 DDR 暴露，应一直保持到完成；W/B 不额外等待下一笔显示额度。B 的源图读不应依赖“先拿到写准入”，以免互相等待。
 
-当前原型对 RRESP/RID 错误排空已接受读 burst，坏数据段不写出；BRESP/BID 错误后停止后续段；超时保持已提出的 VALID，等待事务排空。早到或缺失 RLAST 会进入 FAULT，保持 BUSY 并等待平台复位。C 需共同确认协议故障下的路由保留与平台恢复方式，不能用 CPU reset 假装撤销事务。
+当前B对RRESP/RID错误排空已接受burst，坏数据段不写出；BRESP/BID错误后停止后续段；超时保持已提出的VALID，等待排空。早到/缺失RLAST进入0x25 FAULT，保持BUSY及Back ownership，禁止新命令和swap提交。C保留出错读burst的原owner，不把后续响应转交显示；内部故障时也不清除仍未完成的事务归属，无在途读时不凭空创建owner。统一平台复位负责清除相关在途事务，CPU/debug reset不可用于取消DMA；共享读故障后不承诺HDMI仍能正常供数。
+
+本轮错误码：0x21包括源窗口/stride/尺寸/对齐错误，不发AR/AW；0x22为RRESP/RID；0x23为BRESP/BID；0x24为无进展超时且不撤回VALID；0x25为协议FAULT；0x26为非法opcode。0x21～0x24也可能伴随DONE，0x25保持BUSY；软件必须检查错误。B默认watchdog27位，在100MHz下约1.34秒无握手超时，C的实际最大等待仍待验证。
 
 ## 6. 第一轮源图建议：从 Front 复制到 Back
 
 当前 Sapphire CPU 没有直接 DDR 访问端口，C 数组不能自动成为 DDR 源图。第一轮建议利用已有 FILL 和换帧，先在 Front 建立源图，再复制到另一个 Back，无需先新增图片文件上传通路。
 
-这项建议需 A/C 同意：它增加 BLIT 对 Front 的只读访问，仍保留显示读 Front、绘图只写锁存 Back 的规则。
+本轮已按A/C反馈采用Front到Back方案：BLIT对Front只读，保留显示读Front、绘图只写锁存Back的规则。
 
 最小 Demo 顺序：
 
@@ -128,30 +133,30 @@ FILL/BLIT 共用现有受显示保护的 Back 写服务。每笔 AW 准入一旦
 5. B/C 完成复制，软件等待命令计数确认及 `done=1 && busy=0 && error=0`，并确认 writer ownership 释放。
 6. A 显式请求并确认下一次 swap；屏幕应在 `(64,64)` 显示完全相同的四色图块。
 
-单 CPU 命令流中，从获取源 Front 到 BLIT 完成不能插入 swap。系统接收层也需确认并约束源图位于锁存 Front 的有效帧范围内，源坐标/宽高合法、源 stride 等于帧 stride、源目标不重叠；由 A/C 约定校验责任和失败报告。不能仅凭一个软件地址值就允许读取任意 DDR 区域。
+单CPU命令流中，从获取源Front到BLIT完成不能插入swap。C接收层按最终accept的参数和Front锁存检查结果：src_stride=7680、src_addr>=Front base、像素对齐，扩展位宽计算offset=src_addr-Front base；推导src_x=(offset%7680)/4、src_y=offset/7680，宽高非零、src_x+width<=1920、src_y+height<=1080，并限制于有效0x7E9000字节。不能将整个8MiB槽视为有效图像，也不能允许源矩形横向跨行。Front与锁存Back必须不同。失败以src_range_valid=0交给B接受计数并报0x21，不能只压住accept让软件等不到计数。
 
 这只是第一轮联调的源图办法。PNG/BMP、串口或其他资源加载方式在此后另行设计，正式图片资源区地址尚未分配。
 
 ## 7. 各自可以继续做什么
 
-| 人员 | 当前可以准备 | 依赖共同确认后实施 |
+| 人员 | 当前进度/准备 | 下一步实施 |
 |---|---|---|
 | A | 梳理现有 API/寄存器扩展，准备上述 Demo 的软件调用流程 | 新 offset、opcode、版本/能力、BLIT API 和正式命令输出 |
-| B（你） | 复现 BLIT 测试，整理端口与限制，设计公共执行层和混合命令测试 | 按确认的命令格式实现选择层、统一状态及错误映射 |
+| B（你） | 执行层已按A/C反馈适配，并通过独立及真实manager合同测试 | 参与正式连接后的系统回归，核对watchdog与C的服务上限 |
 | C | 确认读仲裁插入点、显示服务统计/flush 影响，准备仲裁测试方案 | 读服务、响应路由、Back ownership、显示保护与共享接线 |
 
 共享顶层 `rtl/ti60f225_oob_top.v`、`rgb_framebuffer.v` 的跨边界连接以及 Efinity 工程清单，建议指定 C 或共同指定的集成人统一修改；B 提供执行层实例端口，A 提供命令/状态端口。
 
-## 8. 开始写集成代码前的确认表
+## 8. 本轮约定与待实施项
 
-| 需要确定的内容 | 建议答案 / 待补项 | 确认人 |
+| 内容 | 本轮约定 / 待实施项 | 负责方 |
 |---|---|---|
-| 第一轮目标 | 32×32 Front→Back，FILL保留，显式swap显示 | A/B/C |
-| 命令字段与编码 | 本文第3节；FILL=0、BLIT=1仅为建议 | A/B |
-| 新寄存器、版本与能力 | A给出分配及复位值，保持旧offset | A/B/C |
-| 地址与源图范围 | 绝对源地址、相对Back写地址；首轮仅有效Front范围 | A/B/C |
-| 读服务与等待界限 | 一笔全局outstanding、burst级owner、显示优先且BLIT有进展；等待上限待C验证 | B/C |
-| 完成、错误及恢复 | 公共BUSY/DONE/count；映射错误码；FAULT保持与平台恢复 | A/B/C |
+| 第一轮目标 | 32×32 Front→Back，FILL保留，显式swap显示；待系统实现 | A/B/C |
+| 命令字段与编码 | 第3节；FILL=0、BLIT=1、非法0x26；B已适配 | A/B |
+| 新寄存器、版本与能力 | BC/C0/C4、32位RW复位0；正式启用目标v4/0x7B；待A实施 | A/B/C |
+| 地址与源图范围 | 绝对源、相对Back写；C检查并锁存范围结果，B下一拍检查；B已适配、C检查器待实现 | A/B/C |
+| 读服务与等待界限 | 一笔全局outstanding、burst级owner、显示优先且BLIT有进展；RTL与等待上限待C验证 | B/C |
+| 完成、错误及恢复 | 0x21/0x26正常结束释放Back，0x25保持FAULT；B/现有manager合同通过，真实读owner/平台恢复待C验证 | A/B/C |
 | 接线、合并和板级执行人 | 待填姓名；合并前保留各模块测试与旧基线回归 | A/B/C |
 
 ## 9. 验收顺序
@@ -162,4 +167,4 @@ FILL/BLIT 共用现有受显示保护的 Back 写服务。每笔 AW 准入一旦
 4. **Efinity 检查**：指定集成人加入源清单、综合、布局布线，保存资源与时序结果。工具版本先与 A 已成功的 Efinity 2026.1 构建和许可一致。
 5. **实板联合验收**：按第6节完成四色图块复制，记录版本、诊断baseline/delta、连续运行结果。仿真通过不替代实板签收。
 
-到第5步需要团队板卡，前面的端口讨论、单测和工程准备可以各自进行。未新增实现前，本草案不宣称上述验收已通过。
+到第5步需要团队板卡，前面的模块实现、单测和工程准备可以各自进行。当前仅B独立验证和所列manager合同验证通过，后续系统/工程/实板出口仍需逐项验收。

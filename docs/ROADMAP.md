@@ -4,6 +4,8 @@
 
 Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双缓冲、safe swap和显示保护已实现，不是TODO。** 后续 BLIT 已新增独立 RTL 原型和单元仿真，运行及限制见 [BLIT](BLIT.md)；正式系统和实板集成仍待完成。
 
+B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md) 已按A/C反馈支持最终accept、src_range_valid和0x26，通过85个混合命令用例与7个真实manager合同用例；正式寄存器/顶层、C源窗口检查器与读仲裁尚未接入。
+
 依据仓库 [2026 FPGA赛道选题指南（易灵思）](../docs_reference/全国大学生嵌入式芯片与系统设计竞赛'2026FPGA赛道选题指南-易灵思.pdf) 的“赛题二”，PDF第7～9页：基础要求含Block Copy/Solid Fill、总线burst/FIFO、双缓冲驱动与软硬渲染对比；高阶含Alpha、Color Keying和高负载互动Demo。Line属于团队可选扩展，不是该段列明的基础必做项。
 
 ## Scope and Priority

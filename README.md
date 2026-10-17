@@ -14,7 +14,7 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 | D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
 | E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
 
-当前正式系统支持 **FILL_RECT**。Block Copy / BLIT 已新增独立 RTL 原型并通过单元仿真，尚未接入控制命令、真实 DDR 和 HDMI；Line、Alpha Blend 尚未实现。基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
+当前正式系统支持 **FILL_RECT**。Block Copy / BLIT 和 FILL/BLIT 统一执行入口已通过独立仿真，尚未接入正式 APB 命令、真实 DDR 和 HDMI；Line、Alpha Blend 尚未实现。统一入口的运行与限制见 [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md)。基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
 
 ## 框架
 
@@ -104,7 +104,7 @@ ip/              厂商生成 IP，默认只读
 embedded_sw/     正式 Sapphire 生成 BSP、启动文件及支持文件，默认只读
 constraints/     项目约束相关文件
 README.md        快速介绍与文档导航
-docs/            八份长期项目说明
+docs/            项目说明、独立模块与集成草案
 demo/            原始参考工程，只读
 docs_reference/  开发板资料和赛题指南，只读
 ```
@@ -156,7 +156,8 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [TEAM_SPLIT](docs/TEAM_SPLIT.md) | 三人责任、目录归属及共享接口变更规则 |
 | [ROADMAP](docs/ROADMAP.md) | 按赛题实际要求安排的后续任务与验收出口 |
 | [BLIT](docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
-| [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | A/B/C待确认的第一轮集成方案、分工与验收步骤 |
+| [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md) | FILL/BLIT统一入口、混合场景仿真与三步结果图 |
+| [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | 按A/C反馈确定的首轮接口、实施状态与验收步骤 |
 
 `docs/` 维护上述长期说明及 BLIT 原型交付文档。历史阶段性快照和验证摘要已合并清理；正式 testbench 与回归脚本保留在 sim/、scripts/。
 

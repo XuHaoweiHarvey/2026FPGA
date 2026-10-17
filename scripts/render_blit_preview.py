@@ -43,8 +43,10 @@ def write_png(path, width, height, pixels, scale):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
+    parser.add_argument("--names", nargs="+", default=["checker_source", "checker_target"],
+                        help="PPM filename stems to convert (without .ppm)")
     args = parser.parse_args()
-    for name in ("checker_source", "checker_target"):
+    for name in args.names:
         width, height, pixels = read_ppm(args.directory / f"{name}.ppm")
         write_png(args.directory / f"{name}.png", width, height, pixels, 1)
         preview = args.directory / f"{name}_6x.png"

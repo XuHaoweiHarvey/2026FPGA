@@ -51,6 +51,23 @@ C历史成功DONE额外等待两个VS（SETTLE_FRAMES=2），且读写同槽0；
 
 该模块尚未加入正式顶层或Efinity源清单，未改现有FILL_RECT、寄存器、DDR/显示路径或生成IP。本轮没有验证Efinity综合、资源/时序、真实DDR并发、HDMI显示和板级性能。
 
+### FILL / BLIT Dispatcher Independent RTL
+
+2026-10-17：`graphics_engine.v` 在独立仿真中组合原FILL/BLIT，尚未加入正式顶层或Efinity源清单。复现入口为 `scripts/run_graphics_checks.ps1`，运行和端口规则见 [GRAPHICS_ENGINE](GRAPHICS_ENGINE.md)。
+
+| 配置 | 结果 |
+|---|---|
+| basic：32beat，FILL=0/BLIT=1 | 43用例通过 |
+| single_beat_remapped：1beat，FILL=7/BLIT=9 | 42用例通过；无提前RLAST的多beat条件，跳过该用例 |
+| manager_contract：现有真实buffer_manager+B | 7用例通过；C源检查结果寄存模型、模拟DDR、reader-safe/empty为测试输入 |
+| scoreboard negative control | 故意写坏像素，按预期被逐像素记分板拒绝 |
+
+共92个用例：覆盖FILL→BLIT→FILL与同类连续执行、任意像素FILL边缘、参数/操作快照、公共计数和旧状态隔离、disabled/忙时请求、非法操作/几何、最后B前不完成、AXI停顿稳定、读写响应错误、两类超时安全排空、BLIT协议FAULT和平台复位。逐像素检查目标、区域外保持和源不变；分步图片导自实际目标模拟内存。
+
+本轮A/C适配新增：公开op/x/y/width/height/color/src_addr/src_stride/start/accept端口；非法opcode改为0x26；C在accept边沿锁存源范围结果，B在下一拍CHECK_SOURCE读取，结果无效也计数、报0x21且不启动BLIT/不暴露AR/AW；FILL忽略源范围限制。真实manager合同检查0x21/0x26结束后释放Back、只由真正接收的新命令清错误、pending时不接收及0x25保持Back/BUSY并阻止swap提交。未修改manager实现。
+
+原BLIT42用例及其负对照、原 `tb_fill_rect_writer` 回归通过；工程51个源条目/47个CSR一致性检查通过。共享模拟内存新增可选byte-strobe模式，BLIT原用例默认仍要求全strobe。PNG脚本新增可选名称参数，旧调用兼容。FILL/BLIT子执行单元、正式APB/软件、Framebuffer/显示、生成IP和工程清单均未修改。本轮未验证C的真实源窗口算法、显示/BLIT读仲裁/owner路由/最大等待，也没有Efinity综合/时序、真实DDR/显示并发或实板性能结果。首轮src_stride=7680由C检查；模型中的其他stride用于验证B通用搬运能力，不代表正式平台允许其他stride。
+
 ### Buffer Manager / Reader / CDC
 
 - manager单测64个异相事件、11次交换，检查Front≠Back、busy/pending、writer完成仍无边界、边界到来但writer未完、sticky DONE/CLEAR_DONE及FIFO empty反馈。
