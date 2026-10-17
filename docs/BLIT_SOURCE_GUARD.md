@@ -1,6 +1,6 @@
 # BLIT 源图范围检查
 
-`rtl/framebuffer/blit_source_guard.v` 实现首轮约定的 C 侧源窗口策略，已接入 manager 合同仿真和双缓冲闭环仿真。正式 `rgb_framebuffer.v`、APB 和 Efinity 工程源清单尚未接入；显示/BLIT 读仲裁仍待实现。
+`rtl/framebuffer/blit_source_guard.v` 实现首轮约定的 C 侧源窗口策略，已接入 manager 合同仿真和双缓冲闭环仿真。正式 `rgb_framebuffer.v`、APB 和 Efinity 工程源清单尚未接入；[显示/BLIT读仲裁](DDR_READ_ARBITER.md) 后续已实现并通过独立测试，正式共享读通路仍待连接。
 
 ## 为什么需要
 
@@ -59,4 +59,4 @@ Icarus 的 `iverilog`、`vvp` 需要在 PATH 中。`-NoWave` 跳过波形；Pyth
 
 独立参考逐行检查源字节区间及行边界；期望值不读取 DUT 的内部坐标或判断结果。定向覆盖整图、精确右/下边界、横向跨行、底部越界、8MiB槽尾、Back/旧Front、错误stride、非像素对齐、巨大无符号尺寸及32位地址空间顶部。
 
-现有85场景执行层回归保留，总入口合计852个源矩形用例＋124个执行/合同/双缓冲场景，4个故意错误的负对照。DDR内存、命令、显示边界与 reader-safe/FIFO-empty仍由模型/测试提供，尚无实际读仲裁、HDMI连续性、综合时序或实板验收结果。
+现有85场景执行层回归保留，源检查器接入后合计852个源矩形用例＋124个执行/合同/双缓冲场景，4个故意错误的负对照；统一入口后续另增加独立读仲裁单测及其串线负对照。这里的DDR内存、命令、显示边界与 reader-safe/FIFO-empty仍由模型/测试提供，尚无正式共享读通路、HDMI连续性、综合时序或实板验收结果。

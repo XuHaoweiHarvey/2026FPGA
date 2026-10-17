@@ -31,6 +31,7 @@
 | `sim/graphics_double_buffer_memory.v` | 仅仿真使用的双槽 AXI 内存，两槽均可读写，换帧不搬动内存内容 |
 | `sim/tb_blit_engine.v` | 复用其中的 `blit_test_memory`；新增可选 byte strobe 支持，BLIT 默认仍要求全 strobe |
 | `scripts/run_graphics_checks.ps1` | 两组源检查器、两组执行层仿真、manager 合同测试、两组双缓冲闭环、负对照、可选波形和 PNG |
+| `scripts/run_read_arbiter_checks.ps1` | 独立C侧读仲裁单测；统一入口也会运行，尚未与B/真实显示reader连接 |
 | `scripts/render_blit_preview.py` | 共用 PPM→PNG 转换，新增可选 `--names`，原 BLIT 调用方式保留 |
 
 需要 PATH 中的 `iverilog`、`vvp`。在仓库根目录执行：
@@ -165,4 +166,6 @@ FILL 固定使用 `SETTLE_FRAMES=0`，与现有双缓冲正式模式一致：完
 
 后续已接入真实源检查器：1080p/7680与64×48/256两组各426个矩形（各400随机），manager合同从7场景扩展至17场景；双缓冲仍为两组各11场景。现合计852个源矩形用例与124个执行/合同/双缓冲场景，4个负对照通过（新增强制绕过源检查的非法AXI检测）。详细覆盖与结果边界见 [BLIT_SOURCE_GUARD](BLIT_SOURCE_GUARD.md)。
 
-下一步由 A 按方案接正式寄存器/软件命令，继续实现C的读仲裁，并将检查器、公共状态和Back写服务接入正式平台，再进行系统并发仿真、Efinity综合/时序检查和板级验收。合同/双缓冲测试使用真实manager和源检查器，DDR与reader-safe仍是模型输入，尚未验证实际读owner/响应路由/最大等待和显示连续性。当前测试不证明整机已完成这些步骤。
+后续C侧 [读仲裁器](DDR_READ_ARBITER.md) 已通过独立协议测试，统一入口也会执行该单测。该项使用测试客户端/DDR，未插入这里的B/manager/双缓冲路径；不能将两项独立通过当作共享显示链路已连接。
+
+下一步由 A 按方案接正式寄存器/软件命令，将检查器、仲裁器、公共状态和Back写服务接入正式平台，再进行系统并发仿真、Efinity综合/时序检查和板级验收。合同/双缓冲测试使用真实manager和源检查器，DDR与reader-safe仍是模型输入，尚未验证正式共享读通路、最大等待和显示连续性。当前测试不证明整机已完成这些步骤。

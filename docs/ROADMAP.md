@@ -4,7 +4,7 @@
 
 Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双缓冲、safe swap和显示保护已实现，不是TODO。** 后续 BLIT 已新增独立 RTL 原型和单元仿真，运行及限制见 [BLIT](BLIT.md)；正式系统和实板集成仍待完成。
 
-B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md) 已按A/C反馈支持最终accept、src_range_valid和0x26，通过85个混合命令用例；[C侧源窗口检查器](BLIT_SOURCE_GUARD.md) 已实现并接入仿真，两组各426个源矩形测试、17个真实manager合同场景通过。另通过两组各11场景的双缓冲绘制/复制/换帧闭环，每组20条命令与8次换帧。正式寄存器/顶层/源检查器连接与读仲裁尚未完成，闭环中的边界/reader-safe/内存为模型。
+B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md) 已按A/C反馈支持最终accept、src_range_valid和0x26，通过85个混合命令用例；[C侧源窗口检查器](BLIT_SOURCE_GUARD.md) 已实现并接入仿真，两组各426个源矩形测试、17个真实manager合同场景通过。另通过两组各11场景的双缓冲绘制/复制/换帧闭环，每组20条命令与8次换帧。[读仲裁器](DDR_READ_ARBITER.md) 已通过独立协议仿真；正式寄存器/顶层/检查器/读仲裁的连接尚未完成，闭环中的边界/reader-safe/内存为模型。
 
 依据仓库 [2026 FPGA赛道选题指南（易灵思）](../docs_reference/全国大学生嵌入式芯片与系统设计竞赛'2026FPGA赛道选题指南-易灵思.pdf) 的“赛题二”，PDF第7～9页：基础要求含Block Copy/Solid Fill、总线burst/FIFO、双缓冲驱动与软硬渲染对比；高阶含Alpha、Color Keying和高负载互动Demo。Line属于团队可选扩展，不是该段列明的基础必做项。
 
@@ -14,7 +14,7 @@ B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md) 已按A/C反馈支持最终ac
 |---|---|---|
 | 基线 | Solid Fill / FILL_RECT、DDR显示、RISC-V/APB、Front/Back、safe swap、连续性保护 | **Done，A～E实板通过** |
 | Phase 3首要 | Block Copy / BitBlt / BLIT | 独立 RTL 原型已通过单元仿真；仍需完成 DDR 源图、软件配置、显示仲裁和实板验收 |
-| Phase 3前置 | Accelerator DDR read与Display Reader仲裁 | Not implemented；显示服务优先且两方最终进展，不能影响已提交AXI响应归属 |
+| Phase 3前置 | Accelerator DDR read与Display Reader仲裁 | 独立RTL/协议仿真通过；正式接线/并发/时序待验收，低水位显示优先、健康状态轮流，已提交响应归属保持 |
 | Phase 3演示/测量 | 资源图像加载、纯软件/硬件渲染对照与板级性能统计 | Not implemented；测量条件/耗时/像素工作量可复现，不把仿真速度当实测 |
 | 后续高阶 | Alpha Blend、Color Keying | Not implemented；透明/不透明端点、舍入/饱和/色键跳过与Back ownership均验证 |
 | 后续可选 | Line与进一步命令扩展 | Not implemented；独立确定几何/边界、接口与测试 |

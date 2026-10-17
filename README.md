@@ -16,6 +16,8 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 
 当前正式系统支持 **FILL_RECT**。Block Copy / BLIT、FILL/BLIT 统一执行入口与 [源窗口检查器](docs/BLIT_SOURCE_GUARD.md) 已通过仿真，另完成真实buffer_manager/源检查器与双槽模拟内存的绘制→复制→换帧闭环；尚未接入正式 APB 命令、DDR读仲裁和 HDMI；Line、Alpha Blend 尚未实现。统一入口、双缓冲分步图的运行与限制见 [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md)。基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
 
+[显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已实现并通过独立协议仿真，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。正式framebuffer接线、显示统计/写准入适配、综合时序与实板联调仍待完成。
+
 ## 框架
 
 ```mermaid
@@ -159,6 +161,7 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md) | FILL/BLIT统一入口、混合场景仿真与三步结果图 |
 | [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | 按A/C反馈确定的首轮接口、实施状态与验收步骤 |
 | [BLIT_SOURCE_GUARD](docs/BLIT_SOURCE_GUARD.md) | C侧源窗口检查、accept时序、边界用例及对接限制 |
+| [DDR_READ_ARBITER](docs/DDR_READ_ARBITER.md) | 显示/BLIT读仲裁、响应归属、故障保留及独立测试 |
 
 `docs/` 维护上述长期说明及 BLIT 原型交付文档。历史阶段性快照和验证摘要已合并清理；正式 testbench 与回归脚本保留在 sim/、scripts/。
 

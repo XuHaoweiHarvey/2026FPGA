@@ -71,6 +71,12 @@ Start-Transcript -Path $logPath -Force | Out-Null
 try {
     Write-Host "Icarus: $iverilogExe"
     Write-Host "Artifacts: $outputPath"
+    $arbiterArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+        (Join-Path $PSScriptRoot 'run_read_arbiter_checks.ps1'),
+        '-OutputDir', (Join-Path $outputPath 'read_arbiter'))
+    if ($NoWave) { $arbiterArgs += '-NoWave' }
+    & powershell.exe @arbiterArgs | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw 'Independent read arbiter checks failed.' }
     Invoke-GraphicsSimulation -Name 'source_guard_1080p' -Overrides @() -Wave:(-not $NoWave) `
         -Top 'tb_blit_source_guard' -PassPattern '^PASS SOURCE GUARD:'
     Invoke-GraphicsSimulation -Name 'source_guard_small' -Overrides @(
@@ -167,7 +173,7 @@ try {
     } else {
         Write-Host 'PNG previews skipped: optional Python 3 not found. PPMs and RTL checks are available.'
     }
-    Write-Host 'PASS source guard, graphics dispatcher and double-buffer simulations. APB/DDR arbiter/HDMI/board integration pending.'
+    Write-Host 'PASS independent read arbiter, source guard, graphics dispatcher and double-buffer checks. Formal APB/DDR/HDMI/board integration pending.'
     if (-not $NoWave) {
         Write-Host ('Source guard waveform: ' + (Join-Path $outputPath 'source_guard_1080p/graphics.vcd'))
         Write-Host ('Waveform: ' + (Join-Path $outputPath 'basic/graphics.vcd'))

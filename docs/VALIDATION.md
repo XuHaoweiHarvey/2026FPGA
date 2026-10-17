@@ -101,6 +101,16 @@ C历史成功DONE额外等待两个VS（SETTLE_FRAMES=2），且读写同槽0；
 
 正式APB/软件、`rgb_framebuffer.v`、工程源清单、DDR/PHY、HDMI未修改。源检查器仍待正式接入与Efinity综合/时序检查，常量除法/取余的100MHz时序与资源尚未验证。DDR、显示边界、reader-safe/FIFO-empty仍是模型/测试输入；当前不含读仲裁、实际读owner/响应路由/最大等待、显示并发连续性或新实板验收。原FILL/BLIT执行RTL和manager均未修改；继承timescale提示保留。
 
+### Display / BLIT DDR Read Arbiter（独立协议仿真）
+
+新增 `rtl/framebuffer/ddr_read_arbiter.v`、`sim/tb_ddr_read_arbiter.v` 和独立入口 `scripts/run_read_arbiter_checks.ps1`，统一 `scripts/run_graphics_checks.ps1` 也会先执行仲裁器。接口、恢复与正式连接注意点见 [DDR_READ_ARBITER](DDR_READ_ARBITER.md)。
+
+2026-10-17：27场景通过，其中包含200笔固定种子的随机请求；共249次DDR AR、10,274拍R握手受检。覆盖128拍显示/32拍BLIT/256拍AXI边界、全数据lane/sideband/ID/响应路由、AR/R反压稳定、低高水位双向滞回、健康状态持续竞争、无显示请求时BLIT进展、launch/flush/enable不取消事务、RID/RRESP错误传递、AR/R同拍、早/缺RLAST及多余拍、无owner响应、AR未接受时故障保留与平台复位恢复。独立记分板根据实际客户端/DDR握手建模，不读取DUT内部状态。
+
+串线负对照在testbench故意交换两方看到的RVALID，断言按预期拒绝，runner要求检测到错误才通过。独立仲裁器编译无warning，原FILL/manager的继承timescale提示保留。原图形入口852个源矩形和124个执行/合同/双缓冲场景通过；统一入口共运行仲裁串线及原图形四种负对照。
+
+正式Framebuffer、APB/软件、工程源清单、生成IP未修改，仲裁器未连接真实B、Display Reader/FIFO、guard或写准入；当前两个独立路径分别通过，不代表已完成共享显示读写系统。显示紧急状态下优先显示，BLIT进展保证依赖健康水位、DDR响应和owner READY；没有实际仲裁最坏等待、underflow/missed、Efinity时序/资源或新板级验收证据。
+
 ### Buffer Manager / Reader / CDC
 
 - manager单测64个异相事件、11次交换，检查Front≠Back、busy/pending、writer完成仍无边界、边界到来但writer未完、sticky DONE/CLEAR_DONE及FIFO empty反馈。
