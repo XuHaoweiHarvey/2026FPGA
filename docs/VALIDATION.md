@@ -36,6 +36,21 @@
 
 C历史成功DONE额外等待两个VS（SETTLE_FRAMES=2），且读写同槽0；**当前正式模式使用SETTLE_FRAMES=0及双缓冲**，不能把旧完成规则搬入当前寄存器说明。
 
+### BLIT Independent RTL Prototype
+
+2026-10-17 将 Person B 本地原型整理到仓库，并从新的 `scripts/run_blit_checks.ps1` 入口复验。执行单元为 `rtl/accelerator/blit_engine.v`，测试平台为 `sim/tb_blit_engine.v`；接口草案、工具依赖、运行及输出说明见 [BLIT](BLIT.md)。
+
+| 测试组 | 结果 / 范围 |
+|---|---|
+| basic，64×48，最多32beats | 32用例：四像素/棋盘/唯一像素、stride padding、边缘、参数快照、非法参数、R/B响应与ID错误、五通道超时排空、RLAST异常及平台复位 |
+| boundaries，1088×48，最多32beats | 5用例：长行分段、源4KiB、目标4KiB、读写距边界不同、右下角 |
+| single_beat_buffer，1088×48，最多1beat | 同5用例通过，验证最小缓存与计数边界 |
+| scoreboard negative control | 故意改坏像素后，自动比较按预期失败；runner要求检测到错误才判定负对照通过 |
+
+共42个用例通过，另通过一次错误像素检测负对照。目标像素、区域外保持、源不变及AXI burst/握手由独立记分板和内存模型检查。PNG只转换实际内存导出的PPM，不参与正确性判定。
+
+该模块尚未加入正式顶层或Efinity源清单，未改现有FILL_RECT、寄存器、DDR/显示路径或生成IP。本轮没有验证Efinity综合、资源/时序、真实DDR并发、HDMI显示和板级性能。
+
 ### Buffer Manager / Reader / CDC
 
 - manager单测64个异相事件、11次交换，检查Front≠Back、busy/pending、writer完成仍无边界、边界到来但writer未完、sticky DONE/CLEAR_DONE及FIFO empty反馈。

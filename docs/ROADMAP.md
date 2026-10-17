@@ -2,7 +2,7 @@
 
 ## Starting Point
 
-Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双缓冲、safe swap和显示保护已实现，不是TODO。** 本文只规划后续工作，不代表任何新功能已写入代码。
+Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双缓冲、safe swap和显示保护已实现，不是TODO。** 后续 BLIT 已新增独立 RTL 原型和单元仿真，运行及限制见 [BLIT](BLIT.md)；正式系统和实板集成仍待完成。
 
 依据仓库 [2026 FPGA赛道选题指南（易灵思）](../docs_reference/全国大学生嵌入式芯片与系统设计竞赛'2026FPGA赛道选题指南-易灵思.pdf) 的“赛题二”，PDF第7～9页：基础要求含Block Copy/Solid Fill、总线burst/FIFO、双缓冲驱动与软硬渲染对比；高阶含Alpha、Color Keying和高负载互动Demo。Line属于团队可选扩展，不是该段列明的基础必做项。
 
@@ -11,7 +11,7 @@ Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双
 | 优先级 | 工作 | 当前状态 / 完成出口 |
 |---|---|---|
 | 基线 | Solid Fill / FILL_RECT、DDR显示、RISC-V/APB、Front/Back、safe swap、连续性保护 | **Done，A～E实板通过** |
-| Phase 3首要 | Block Copy / BitBlt / BLIT | Not implemented；DDR源图块搬到Back，软件配置可见，Front绘制期稳定 |
+| Phase 3首要 | Block Copy / BitBlt / BLIT | 独立 RTL 原型已通过单元仿真；仍需完成 DDR 源图、软件配置、显示仲裁和实板验收 |
 | Phase 3前置 | Accelerator DDR read与Display Reader仲裁 | Not implemented；显示服务优先且两方最终进展，不能影响已提交AXI响应归属 |
 | Phase 3演示/测量 | 资源图像加载、纯软件/硬件渲染对照与板级性能统计 | Not implemented；测量条件/耗时/像素工作量可复现，不把仿真速度当实测 |
 | 后续高阶 | Alpha Blend、Color Keying | Not implemented；透明/不透明端点、舍入/饱和/色键跳过与Back ownership均验证 |
