@@ -14,7 +14,7 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 | D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
 | E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
 
-当前只实现 **FILL_RECT**。Block Copy / BLIT、Line、Alpha Blend 尚未实现；基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
+当前正式系统支持 **FILL_RECT**。Block Copy / BLIT 已新增独立 RTL 原型并通过单元仿真，尚未接入控制命令、真实 DDR 和 HDMI；Line、Alpha Blend 尚未实现。基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
 
 ## 框架
 
@@ -87,7 +87,7 @@ Bayer 适合摄像头原始采样，2D 图元需要明确的 R/G/B 颜色。Pack
 | 命令 | 参数 | 状态 / 语义 |
 |---|---|---|
 | **FILL_RECT：已实现、已上板** | `x, y, width, height, color` | START 接收时快照参数；BUSY 执行；成功 DONE 以最后 B 完成为准 |
-| Block Copy / BLIT | Planned / Not implemented | 下一阶段优先实现 |
+| Block Copy / BLIT | 独立原型：`src_addr, src_stride, dst_x, dst_y, width, height` | 单元仿真通过；正式系统接口和实板待集成 |
 | Line | Planned / Not implemented | 可选图元扩展 |
 | Alpha Blend | Planned / Not implemented | 后续混合管线 |
 
@@ -155,8 +155,10 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) | 已遇到故障、根因、修复和验证 |
 | [TEAM_SPLIT](docs/TEAM_SPLIT.md) | 三人责任、目录归属及共享接口变更规则 |
 | [ROADMAP](docs/ROADMAP.md) | 按赛题实际要求安排的后续任务与验收出口 |
+| [BLIT](docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
+| [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | A/B/C待确认的第一轮集成方案、分工与验收步骤 |
 
-`docs/` 仅保留上述八份长期 Markdown。阶段性快照和验证摘要已合并清理；正式 testbench 与回归脚本保留在 sim/、scripts/。
+`docs/` 维护上述长期说明及 BLIT 原型交付文档。历史阶段性快照和验证摘要已合并清理；正式 testbench 与回归脚本保留在 sim/、scripts/。
 
 ## 路线图
 
@@ -165,4 +167,4 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 - Alpha Blend、Color Keying 与后续高负载互动 Demo。
 - Line、进一步命令扩展，以及依据测量决定的 FIFO / line buffer / cache 优化。
 
-以上均为 Planned，未在本次基础框架中实现。赛题来源、前置设计决策和验收条件见 [ROADMAP](docs/ROADMAP.md)。
+BLIT 独立原型已通过单元仿真，完整系统集成与其余扩展仍待完成。赛题来源、前置设计决策和验收条件见 [ROADMAP](docs/ROADMAP.md)。
