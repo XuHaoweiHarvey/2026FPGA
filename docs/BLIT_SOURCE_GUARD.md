@@ -1,6 +1,6 @@
 # BLIT 源图范围检查
 
-`rtl/framebuffer/blit_source_guard.v` 实现首轮约定的 C 侧源窗口策略，已接入 manager 合同仿真和双缓冲闭环仿真。正式 `rgb_framebuffer.v`、APB 和 Efinity 工程源清单尚未接入；[显示/BLIT读仲裁](DDR_READ_ARBITER.md) 后续已实现并通过独立测试，正式共享读通路仍待连接。
+`rtl/framebuffer/blit_source_guard.v` 实现首轮约定的 C 侧源窗口策略，已接入 manager合同、双缓冲仿真及正式 `rgb_framebuffer.v`。APB命令、[读仲裁](DDR_READ_ARBITER.md)、工程源清单和软件API已同步；正式共享读系统测试和上板步骤见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。v4尚待综合时序及实板验收。
 
 ## 为什么需要
 

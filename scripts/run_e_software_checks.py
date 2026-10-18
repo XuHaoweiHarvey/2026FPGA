@@ -67,9 +67,9 @@ class Machine:
         self.symbols={parts[-1]:int(parts[0],16) for line in symbols.splitlines()
                       if len(parts:=line.split())>=3}
         self.entry=struct.unpack_from('<I',data,24)[0]
-        self.reg={i:0 for i in range(0,0xbc,4)}
-        self.reg.update({0:0x4143434C,4:0x30000,0xc:0x1a,0x2c:0,0x30:0x800000,
-                         0x34:7680,0x38:1920,0x3c:1080,0x40:0x3b,0x44:518400,
+        self.reg={i:0 for i in range(0,0xc8,4)}
+        self.reg.update({0:0x4143434C,4:0x40000,0xc:0x1a,0x2c:0,0x30:0x800000,
+                         0x34:7680,0x38:1920,0x3c:1080,0x40:0x7b,0x44:518400,
                          0x48:4050,0x4c:4050,0x50:4050,0x54:518400,0x58:1,
                          0x5c:0xfffffffc if wrap else 37,0x64:0x12,
                          0x80:0xfffffffe if wrap else 11,0x84:3,0x88:0x30,
@@ -135,11 +135,12 @@ class Machine:
 
     def write(self,uc,access,address,size,value,data):
         offset=address-APB
-        assert size==4 and offset in (8,0x10,0x14,0x18,0x1c,0x20,0x28,0x60)
+        assert size==4 and offset in (8,0x10,0x14,0x18,0x1c,0x20,0x28,0x60,0xbc,0xc0,0xc4)
         self.advance();self.writes.append((offset,value))
         if offset==8:
             assert value==1,'software must never reset/clear an in-flight transaction'
             assert not self.remaining and not(self.reg[0x64]&0x24)
+            assert self.reg[0xbc]==0,'FILL demo must explicitly select FILL for every command'
             command=tuple(self.reg[o] for o in (0x10,0x14,0x18,0x1c,0x20))
             self.commands.append((self.reg[0x30],*command))
             if self.case=='ack_timeout': return

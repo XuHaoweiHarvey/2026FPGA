@@ -1,6 +1,6 @@
 # Register Map — 当前 accel_regs
 
-本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。正式ENGINE_ENABLE=1、DOUBLE_BUFFER=1；A～E均已实板通过，offset及既有行为冻结。
+本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。正式ENGINE_ENABLE=1、DOUBLE_BUFFER=1、BLIT_ENABLE=1。A～E旧v3基线已实板通过；v4新增BLIT接线需重新综合、构建软件及上板验收。
 
 ## Address and Access
 
@@ -8,7 +8,7 @@
 - 同文件 `SYSTEM_RAM_A_CTRL=0xF9000000`、SIZE=`0x10000`；正式linker为64KiB OCRAM、默认8192byte stack，不能用旧Demo地址替代。
 - offset为**本地byte地址**；下表Offset列均为十六进制。32bit整字、4byte对齐、无PSTRB/byte写。
 - 写在PSEL&&PENABLE&&PREADY最终access边沿发生；默认WAIT_CYCLES=1。PSLVERROR仅最终access有效。setup/wait不重复写。
-- `RO`无读清除；写RO报错。BC及之后未映射，错误读返回0。不要让IDE Memory自动扫描整个64KiB窗口。
+- `RO`无读清除；写RO报错。C8及之后未映射，错误读返回0。不要让IDE Memory自动扫描整个64KiB窗口。
 
 ## Reset Notation
 
@@ -21,7 +21,7 @@
 | Offset | 名称 | 访问 | 复位值 / 域 | 位域、含义与清除语义 |
 |---|---|---|---|---|
 | 00 | ACCEL_ID | RO | 0x4143434C / 常量 | ASCII ACCL |
-| 04 | ACCEL_VERSION | RO | 0x00030000 / 常量 | 当前正式双缓冲版本 |
+| 04 | ACCEL_VERSION | RO | 0x00040000 / 常量 | FILL/BLIT双缓冲版本；BLIT_ENABLE=0保留旧v3 |
 | 08 | CONTROL | RW/W1 | 0 / C | bit0写1请求START、读0；bit1写1清APB错误；[31:1]保存写值并可读回，其他位无功能 |
 | 0C | STATUS | RO | 0 / P输入与C错误组合 | bit0 BUSY，1 DONE，2 ERROR，3 INIT_DONE，4 OWNER_ACCEL；[31:5]=0 |
 | 10 | RECT_X | RW | 0 / C | x，pixel；新START快照，不影响在途命令 |
@@ -36,7 +36,7 @@
 | 34 | FRAME_STRIDE | RO | 7680=0x1E00 / 常量 | bytes/line |
 | 38 | FRAME_WIDTH | RO | 1920=0x780 / 常量 | pixels/line |
 | 3C | FRAME_HEIGHT | RO | 1080=0x438 / 常量 | lines/frame |
-| 40 | CAPABILITIES | RO | 0x0000003B / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap；bit2=0 |
+| 40 | CAPABILITIES | RO | 0x0000007B / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT；bit2=0 |
 | 44 | INIT_DATA_BEATS | RO | 0 / P | 初始化WVALID&&WREADY数，单位128bit beat；INIT_DONE后冻结 |
 | 48 | INIT_AW_BURSTS | RO | 0 / P | 初始化AW握手数，单位burst；完成后冻结 |
 | 4C | INIT_WLAST_BURSTS | RO | 0 / P | 初始化W握手且WLAST数，单位burst；完成后冻结 |
@@ -67,6 +67,9 @@
 | B0 | WRITER_MAX_CYCLES | RO | 0 / P | 已准入AW暴露（含等AWREADY）至B结束的最大连续core周期 |
 | B4 | SERVICE_READ_QUOTA | RO | 128=0x80 / 常量 | 上一笔写B之后所需真实R handshake数 |
 | B8 | SERVICE_WATERMARKS | RO | 0x02000180 / 常量 | [31:16]HIGH512；[15:0]LOW384，单位128bit FIFO words |
+| BC | COMMAND_OP | RW | 0 / C | 0 FILL，1 BLIT；其他值接受计数后报0x26；START时快照 |
+| C0 | SRC_ADDR | RW | 0 / C | BLIT源绝对字节地址，16byte对齐，整个矩形位于当前Front有效图像 |
+| C4 | SRC_STRIDE | RW | 0 / C | BLIT源行距bytes，首轮固定7680；START时快照 |
 
 BUFFER_STATUS复位时Front0、Back1、active/owned/valid/pending/done=0；bit7按`!active && reader_idle && !ARVALID && !RVALID && outstanding==0 && reader_error==0`实时组合。Reader/DDR空闲且复位已稳定时可读0x82，不能把bit7当manager存储复位常量。
 
@@ -74,7 +77,9 @@ SERVICE_STATUS复位healthy=0、read_credit=0、grant=0、transaction_active=0�
 
 ## START / DONE / Swap Semantics
 
-START有效时，先检查INIT_DONE，再BUSY/已有start_pulse，再draw_ready；成功APB access快照五参数，下一core拍manager/engine接收并锁存Back。width/height>0，x<1920、y<1080，33bit相加的x+width/y+height不越界；不裁剪，x/width无需4对齐。
+START有效时，先检查INIT_DONE，再BUSY/已有start_pulse，再draw_ready；成功APB access快照五个矩形字段及op/src_addr/src_stride，下一core拍manager/engine接收并锁存Back；源检查器同拍锁存结果，engine下一拍读取。width/height>0，x<1920、y<1080，33bit相加的x+width/y+height不越界，不裁剪。FILL的x/width无需4对齐；BLIT的x/width必须4像素对齐。BLIT源只能位于当前Front的0x7E9000有效图像内，不能使用8MiB槽尾padding，也不能横跨源行。FILL不使用源字段，API每次显式写op=0。
+
+70/74/6C及94..A0、读quota只观察显示客户端的AR/R；BLIT读不计入显示帧或写准入额度。全局读仲裁最多一笔outstanding。共享协议FAULT映射READER_ERROR=0x2004，阻止新START、REQUEST和提交换帧；CPU reset不能清除，也不取消在途AR/R/AW/W/B。
 
 STATUS.ERROR是init/engine/reader/APB任一非0的组合。成功FILL后通常STATUS=0x1A；INIT后未绘制通常0x18。DONE sticky，新engine接收命令清零；错误也可DONE，必须看ERROR_CODE和BUSY。正式SETTLE_FRAMES=0，以最后成功B为准，不等HDMI扫描。
 
@@ -100,6 +105,12 @@ WRITE_OWNER是TPG是否永久交出写端口；WRITER_OWNED是当前命令是否
 | 0x0011 | engine几何非法/越界 | DONE+ERROR，无AW；下一engine接收命令或P清 |
 | 0x0012 | BRESP!=OKAY或BID!=0 | 当前B接收后终止，不发后续burst；下一engine接收命令或P清 |
 | 0x0013 | engine无进展超时 | 不撤回VALID，排空当前事务后退出；完全失应答可能保持BUSY；下一命令或P清 |
+| 0x0021 | BLIT源范围/stride/尺寸/对齐错误 | 接受计数，DONE，无AR/AW，释放Back；下一engine接收命令或P清 |
+| 0x0022 | BLIT RRESP/RID错误 | 排空当前读burst，坏数据段不写出；下一命令或P清 |
+| 0x0023 | BLIT BRESP/BID错误 | 当前B后停止后续段；下一命令或P清 |
+| 0x0024 | BLIT无进展超时 | 保持已提出VALID，等待排空；可能持续BUSY；下一命令或P清 |
+| 0x0025 | BLIT RLAST/拍数协议FAULT | 保持BUSY和Back ownership，禁止swap；只能P恢复 |
+| 0x0026 | 非法COMMAND_OP | 接受计数，DONE，无AR/AW；下一engine接收命令或P清 |
 | 0x1001 | 初始化FIFO溢出 | INIT_DONE不置位，不交owner；P清 |
 | 0x1002 | 初始化BRESP/BID错误 | 同上 |
 | 0x1003 | 初始化地址/长度/WLAST/strobe/计数/协议错误 | 同上 |
@@ -107,6 +118,7 @@ WRITE_OWNER是TPG是否永久交出写端口；WRITER_OWNED是当前命令是否
 | 0x2001 | reader不safe时launch | sticky；禁止后续读启动/交换，P清 |
 | 0x2002 | AR地址/size/burst/4KiB或R计数/RLAST协议错误 | 同上 |
 | 0x2003 | RRESP!=OKAY或RID!=0 | 同上 |
+| 0x2004 | 共享读仲裁出现无owner响应或RLAST/拍数错误 | 保持原owner与在途事务，阻止新命令/换帧，P清；engine错误优先读出 |
 
 优先级：未对齐→未映射→写RO→START/REQUEST状态检查；ERROR_CODE读取优先init、engine、reader、APB。普通正确读写不清APB错误；CONTROL bit1不清INIT/engine/reader错误，不复位DDR或owner。组合写START+clear若START被拒绝，整个目标写不执行，只记录错误。
 

@@ -173,7 +173,7 @@ try {
     } else {
         Write-Host 'PNG previews skipped: optional Python 3 not found. PPMs and RTL checks are available.'
     }
-    Write-Host 'PASS independent read arbiter, source guard, graphics dispatcher and double-buffer checks. Formal APB/DDR/HDMI/board integration pending.'
+    Write-Host 'PASS independent read arbiter, source guard, graphics dispatcher and double-buffer checks. Run run_d_checks.py --graphics for system integration; Efinity/board verification pending.'
     if (-not $NoWave) {
         Write-Host ('Source guard waveform: ' + (Join-Path $outputPath 'source_guard_1080p/graphics.vcd'))
         Write-Host ('Waveform: ' + (Join-Path $outputPath 'basic/graphics.vcd'))

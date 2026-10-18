@@ -2,7 +2,7 @@
 // One-shot TPG, real legacy engines and shared mock DDR, APB registers,
 // accelerator, CVO and serializer. No CPU or encrypted-controller simulation.
 module tb_checkpoint_d;
-parameter WIDTH=512, HEIGHT=64, APB_WAITS=1;
+parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0;
 localparam INIT_ONLY=0;
 localparam BEATS=WIDTH*HEIGHT/4;
 reg axi_clk=0, i_clk=0, o_clk=0, rst_n=0;
@@ -24,7 +24,9 @@ reg inject_late=0,late_held=0,skip_pixels=0;
 integer image_tag[0:1];
 wire [31:0] init_error,engine_error,commands,beats,aws,lasts,bs,reserved;
 wire [31:0] cx,cy,cw,ch,cc;
-accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.WAIT_CYCLES(APB_WAITS)) regs (
+wire [31:0] cop,csrc,cstride;
+accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.WAIT_CYCLES(APB_WAITS),
+ .FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.FRAME_STRIDE(WIDTH*4)) regs (
  .PCLK(axi_clk),.PRESETn(apb_reset),.PADDR(paddr),.PWDATA(pwdata),.PSEL(psel),.PENABLE(penable),.PWRITE(pwrite),
  .PRDATA(prdata),.PREADY(pready),.PSLVERROR(pslverror),.display_buffer_base(front_base),.tpg_write_buffer_base(back_base),
  .init_done(init_done),.init_error(init_error),.engine_busy(busy),.engine_done(done),.engine_error(engine_error),
@@ -46,7 +48,8 @@ accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.WAIT_CYCLES(APB_WAITS)) regs (
  .reader_reserved_beats(reader_reserved_beats),.reader_error(reader_error),.boundary_count(boundary_count),
  .swap_count(swap_count),.missed_boundary_count(missed_boundary_count),
  .command_count(commands),.init_data_beats(beats),.init_aw_bursts(aws),.init_wlast_bursts(lasts),.init_b_responses(bs),
- .init_aw_beats(reserved),.cmd_x(cx),.cmd_y(cy),.cmd_width(cw),.cmd_height(ch),.cmd_color(cc),.start_pulse(start));
+ .init_aw_beats(reserved),.cmd_x(cx),.cmd_y(cy),.cmd_width(cw),.cmd_height(ch),.cmd_color(cc),
+ .cmd_op(cop),.cmd_src_addr(csrc),.cmd_src_stride(cstride),.start_pulse(start));
 wire [127:0] vin;
 wire [31:0] tpg_frames;
 rgb_tpg #(.H_ACTIVE(WIDTH),.V_ACTIVE(HEIGHT),.H_BLANK_CYCLES(INIT_ONLY?320:95),.V_BLANK_LINES(INIT_ONLY?170:10),.ONE_FRAME(1)) tpg (
@@ -64,14 +67,18 @@ reg write_active=0,read_active=0;
 integer w_index=0,w_left=0,r_index=0,r_left=0;
 integer ticks=0,w_beats=0,r_beats=0,aw_count=0,ar_count=0,b_count=0;
 reg stall_aw=0;
+reg hold_b=0,force_stray=0;
+reg stall_read=0;
+reg expect_engine_error=0,expect_read_error=0;
+wire routed_bvalid=bvalid && !hold_b;
 wire awready=!write_active && !bvalid && !stall_aw && ticks%5!=0;
 wire wready=write_active && (!read_active || ticks%2==0);
-wire arready=!read_active && !rvalid && ticks%3!=0;
+wire arready=!read_active && !rvalid && !stall_read && ticks%3!=0;
 wire [63:0] axis_data;
 wire axis_valid,axis_last,axis_user,full;
 wire axis_ready;
 wire [1:0] wr_bank,rd_bank;
-rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),.RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1)) dut (
+rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),.RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS)) dut (
     .axi_clk(axi_clk),.rst_n(rst_n),.i_clk(i_clk),.i_frame_start(frame_start),
     .i_de(source_de),.vin(vin),.o_clk(o_clk),.fifo_rd_period(period),
     .display_underflow(underflow),
@@ -80,11 +87,12 @@ rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_
     .awaddr(awaddr),.awlen(awlen),.awsize(awsize),.awburst(awburst),
     .awvalid(awvalid),.awready(awready),.wdata(wdata),.wstrb(wstrb),
     .wlast(wlast),.wvalid(wvalid),.wready(wready),
-    .bid(4'b0),.bvalid(bvalid),.bready(bready),
+    .bid(4'b0),.bvalid(routed_bvalid),.bready(bready),
     .araddr(araddr),.arlen(arlen),.arsize(arsize),.arburst(arburst),
     .arvalid(arvalid),.arready(arready),.rid(4'b0),.rdata(rdata),
-    .rlast(rlast),.rvalid(rvalid),.rready(rready),.rresp(2'b0),
+    .rlast(rlast),.rvalid(rvalid || force_stray),.rready(rready),.rresp(2'b0),
     .source_done(source_done),.bresp(2'b0),.cmd_start(start),.cmd_x(cx),.cmd_y(cy),.cmd_width(cw),.cmd_height(ch),.cmd_color(cc),
+    .cmd_op(cop),.cmd_src_addr(csrc),.cmd_src_stride(cstride),
     .init_done(init_done),.init_error(init_error),.engine_busy(busy),.engine_done(done),.engine_error(engine_error),.command_count(commands),
     .init_data_beats(beats),.init_aw_bursts(aws),.init_wlast_bursts(lasts),.init_b_responses(bs),.init_aw_beats(reserved),
 .draw_ready(draw_ready),.buffer_status(buffer_status),.swap_request(swap_request),.clear_swap_done(clear_swap_done),
@@ -130,9 +138,10 @@ always @(posedge axi_clk) begin
     if(rst_n) begin
         ticks<=ticks+1;
         if(final_b_pending && release_final_b) begin bvalid<=1;final_b_pending<=0;end
-        if(init_error || engine_error || reader_error) $fatal(1,"D error init=%h engine=%h reader=%h",init_error,engine_error,reader_error);
+        if(init_error || (engine_error && !expect_engine_error) || (reader_error && !expect_read_error))
+            $fatal(1,"D error init=%h engine=%h reader=%h",init_error,engine_error,reader_error);
         if(arvalid && !init_done) $fatal(1,"display read before INIT_DONE");
-        if(bvalid && bready) begin bvalid<=0; b_count<=b_count+1; end
+        if(routed_bvalid && bready) begin bvalid<=0; b_count<=b_count+1; end
         if(awvalid && awready) begin
             if(awsize!=4 || awburst!=1 || awaddr[3:0]!=0 ||
                 awaddr[11:0]+(awlen+1)*16>4096) $fatal(1,"Bad AW burst/alignment");
@@ -212,6 +221,15 @@ always @(posedge pixel_clk) begin
        endcase
     1: begin color=24'h0000ff;if(x>=3 && x<76 && y>=11 && y<30) color=24'hff0000;end
     2: begin color=0;if(x>=137 && x<192 && y>=27 && y<44) color=24'h00ff00;end
+    3: begin
+        color=0;
+        if(x<32 && y<32) color=y<16 ? (x<16?24'hff0000:24'h00ff00) : (x<16?24'h0000ff:24'hffffff);
+       end
+    4: begin
+        color=0;
+        if(x>=64 && x<96 && y>=16 && y<48)
+            color=y<32 ? (x<80?24'hff0000:24'h00ff00) : (x<80?24'h0000ff:24'hffffff);
+       end
     default: $fatal(1,"Displayed unbuilt Back");
    endcase
    if(checking && (frame_index!=buffer_status[0] || {red,green,blue}!==color))
@@ -251,8 +269,18 @@ end endtask
 task start_rect;
 input integer xx,yy,ww,hh,cc;
 begin
+ if(GRAPHICS) access('hBC,1,0,0);
  access('h10,1,xx,0);access('h14,1,yy,0);access('h18,1,ww,0);access('h1c,1,hh,0);access('h20,1,cc,0);
  access(8,1,1,0);wait(busy || done);@(negedge axi_clk);
+end endtask
+task start_blit;
+input integer source,stride,xx,yy,ww,hh;
+integer previous_count;
+begin
+ previous_count=commands;
+ access('hBC,1,1,0);access('hC0,1,source,0);access('hC4,1,stride,0);
+ access('h10,1,xx,0);access('h14,1,yy,0);access('h18,1,ww,0);access('h1C,1,hh,0);
+ access(8,1,1,0);wait(commands==previous_count+1);@(negedge axi_clk);
 end endtask
 task wait_fill;
 begin wait(done && !busy);repeat(4) @(negedge axi_clk);end endtask
@@ -272,11 +300,11 @@ initial begin
  wait(final_b_pending);repeat(80) @(negedge axi_clk);
  if(init_done || beats!=BEATS || aws!=lasts || bs!=aws-1 || tpg_frames!=1) $fatal(1,"early handoff");
  release_final_b=1;wait(init_done);wait(draw_ready);
- access(8,1,2,0);access(4,0,0,0);if(prdata!='h30000)$fatal(1,"D VERSION");
+ access(8,1,2,0);access(4,0,0,0);if(prdata!=(GRAPHICS?'h40000:'h30000))$fatal(1,"D VERSION");
  access('h64,1,0,1);access('h24,0,0,0);if(prdata!=3)$fatal(1,"BUFFER_STATUS RO");
- access('hBC,0,0,1);access(8,1,2,0);
+ access('hBC,0,0,GRAPHICS?0:1);access(8,1,2,0);
  wait(frames>=1);
- for(round_no=0;round_no<4;round_no=round_no+1) begin
+ for(round_no=0;round_no<(GRAPHICS?1:4);round_no=round_no+1) begin
   back_slot=buffer_status[1];old_index=buffer_status[0];old_sw=swap_count;
   start_rect(0,0,WIDTH,HEIGHT,round_no%2==0?'h000000ff:0);wait_fill;
   if(buffer_status[0]!=old_index || swap_count!=old_sw) $fatal(1,"Implicit swap after clear");
@@ -298,6 +326,7 @@ initial begin
   if(!buffer_status[3]) $fatal(1,"SWAP_DONE not sticky");
   access('h60,1,2,0);repeat(3) @(negedge axi_clk);if(buffer_status[3])$fatal(1,"CLEAR_DONE failed");
  end
+ if(GRAPHICS) graphics_round;
  // Hold the last R of a frame across two boundaries. Last AR is NOT completion.
  // Build Back first: the read-service policy correctly refuses unlimited
  // writes while this test deliberately withholds all further read service.
@@ -313,9 +342,98 @@ initial begin
  inject_late=0;wait_swap(old_sw);skip_pixels=0;
  old_frames=frames;wait(frames>=old_frames+3);
  if(missed_boundary_count<2 || tpg_frames!=1 || reader_error || engine_error) $fatal(1,"Late R recovery");
+ if(GRAPHICS) graphics_fault;
  $display("PASS D pipeline: %0d swaps, %0d full frames/%0d pixels; Back-only AW, Front-only AR, busy/pending, APB reset, delayed last R recovery",swap_count,frames,checked_pixels);
  $finish;
 end
+integer display_during_blit=0,blit_during_display=0,contention=0;
+reg copy_in_progress=0;
+wire shared_busy;
+generate if(GRAPHICS) begin: graphics_checks
+ assign shared_busy=dut.shared_read.arbiter.busy;
+ always @(posedge axi_clk) if(rst_n) begin
+  if(dut.display_rvalid && dut.b_rvalid) $fatal(1,"Read owners broadcast");
+  if(dut.u_ddr_rd_buffer.rvalid !== dut.display_rvalid)
+   $fatal(1,"Display reader received another client's response");
+  if(dut.d_buffers.write_service.rf !== (dut.display_rvalid && dut.display_rready))
+   $fatal(1,"BLIT read counted as display write-admission quota");
+  if(dut.b_rvalid && (dut.display_rvalid || dut.display_rdata!==0)) $fatal(1,"BLIT leaked into display FIFO");
+  if(dut.b_arvalid && dut.display_arvalid) contention=contention+1;
+  if(copy_in_progress && busy && dut.display_arvalid && dut.display_arready) display_during_blit=display_during_blit+1;
+  if(dut.d_active && dut.b_arvalid && dut.b_arready) blit_during_display=blit_during_display+1;
+ end
+end else begin: no_graphics_checks
+ assign shared_busy=0;
+end endgenerate
+task graphics_round;
+integer before_ar,before_aw,before_commands,underflow_before,missed_before,saved_front,k;
+begin
+ access('h40,0,0,0);if(prdata!='h7b) $fatal(1,"Graphics capabilities");
+ // Reject a source in Back without any memory traffic from the accelerator.
+ expect_engine_error=1;
+ before_aw=aw_count;before_commands=commands;
+ start_blit(back_base,WIDTH*4,64,16,32,32);wait_fill;
+ if(engine_error!='h21 || commands!=before_commands+1 || aw_count!=before_aw || dut.b_arvalid || buffer_status[5])
+  $fatal(1,"Invalid source did not retire safely");
+ access('hBC,1,99,0);access(8,1,1,0);wait_fill;
+ if(engine_error!='h26 || aw_count!=before_aw) $fatal(1,"Invalid opcode touched DDR");
+ // Build a reference sprite with real FILL commands, then publish it.
+ back_slot=buffer_status[1];old_sw=swap_count;
+ start_rect(0,0,WIDTH,HEIGHT,0);wait_fill;
+ expect_engine_error=0;
+ start_rect(0,0,16,16,'hff0000);wait_fill;start_rect(16,0,16,16,'h00ff00);wait_fill;
+ start_rect(0,16,16,16,'h0000ff);wait_fill;start_rect(16,16,16,16,'hffffff);wait_fill;
+ image_tag[back_slot]=3;request_swap;wait_swap(old_sw);
+ old_frames=frames;wait(frames>=old_frames+2);
+ back_slot=buffer_status[1];old_sw=swap_count;saved_front=front_base;
+ start_rect(0,0,WIDTH,HEIGHT,0);wait_fill;
+ underflow_before=display_underflow_count;missed_before=missed_boundary_count;
+ // Make the copy start during active scanout, then hold the last write B.
+ wait(dut.d_active && reader_fifo_level>=128);
+ stall_read=1;
+ copy_in_progress=1;
+ start_blit(front_base,WIDTH*4,64,16,32,32);
+ wait(dut.b_arvalid && dut.display_arvalid);
+ repeat(3)@(negedge axi_clk);stall_read=0;
+ // Editing APB registers after START must not change the active command.
+ access('hBC,1,0,0);access('hC0,1,back_base,0);access('hC4,1,16,0);
+ wait(wvalid && wlast && wready && w_index%BEATS==(47*WIDTH/4+23));
+ @(negedge axi_clk);hold_b=1;wait(bvalid);repeat(4)@(negedge axi_clk);
+ if(done || !busy || !buffer_status[5]) $fatal(1,"BLIT finished before final B");
+ request_swap;
+ @(negedge axi_clk);apb_reset=0;repeat(10)@(negedge axi_clk);apb_reset=1;
+ access('hBC,0,0,0);if(prdata!=0) $fatal(1,"Opcode reset");
+ access('hC0,0,0,0);if(prdata!=0) $fatal(1,"Source reset");
+ access('hC4,0,0,0);if(prdata!=0) $fatal(1,"Stride reset");
+ old_boundary=boundary_count;wait(boundary_count>=old_boundary+2);
+ if(front_base!=saved_front || swap_count!=old_sw || !busy || !buffer_status[5]) $fatal(1,"CPU reset cancelled BLIT");
+ image_tag[back_slot]=4;hold_b=0;wait_fill;wait_swap(old_sw);
+ copy_in_progress=0;
+ old_frames=frames;wait(frames>=old_frames+3);
+ if(engine_error || reader_error || display_underflow_count!=underflow_before || missed_boundary_count!=missed_before)
+  $fatal(1,"Shared display/BLIT errors underflow=%0d missed=%0d",display_underflow_count-underflow_before,missed_boundary_count-missed_before);
+ if(!display_during_blit || !blit_during_display || !contention)
+  $fatal(1,"Missing concurrent read coverage display=%0d blit=%0d contention=%0d",display_during_blit,blit_during_display,contention);
+ $display("PASS shared BLIT: APB snapshot/reset, four-color copy, final B/pending swap, concurrent display=%0d blit=%0d contention=%0d, underflow/missed delta=0",display_during_blit,blit_during_display,contention);
+end endtask
+task graphics_fault;
+integer saved_sw,saved_commands;
+begin
+ skip_pixels=1;
+ expect_read_error=1;
+ wait(!shared_busy && !rvalid);
+ @(negedge axi_clk);force_stray=1;
+ @(negedge axi_clk);force_stray=0;
+ repeat(3)@(negedge axi_clk);
+ if(reader_error!='h2004 || draw_ready || buffer_status[7]) $fatal(1,"Shared fault not contained");
+ saved_sw=swap_count;saved_commands=commands;
+ access('h78,0,0,0);if(prdata!='h2004) $fatal(1,"Shared fault CSR");
+ access(8,1,1,1);access('h60,1,1,1);
+ apb_reset=0;repeat(10)@(negedge axi_clk);apb_reset=1;
+ repeat(1000)@(negedge axi_clk);
+ if(reader_error!='h2004 || swap_count!=saved_sw || commands!=saved_commands) $fatal(1,"CPU reset cleared shared fault");
+ $display("PASS shared fault: 0x2004, START/swap rejected, CPU reset preserves platform fault");
+end endtask
 always @(posedge i_clk) if(source_de && full) $fatal(1,"pipeline writer overflow");
 initial begin
  for(j=0;j<2*BEATS;j=j+1) memory[j]=0;

@@ -1,6 +1,6 @@
 # Interfaces — 冻结接口合同
 
-Phase 2已实板验收通过。此文是Person A/B/C协作合同；寄存器唯一详细定义见[REGISTER_MAP](REGISTER_MAP.md)，模块内部实现见[ARCHITECTURE](ARCHITECTURE.md)，责任与变更流程见[TEAM_SPLIT](TEAM_SPLIT.md)。
+Phase 2旧FILL/v3已实板验收通过。当前源码按已约定BLIT合同扩展为v4，需重新综合和上板。此文是Person A/B/C协作合同；寄存器唯一详细定义见[REGISTER_MAP](REGISTER_MAP.md)，系统接线见[BLIT_INTEGRATION](BLIT_INTEGRATION.md)。
 
 ## Frozen Contract
 
@@ -10,8 +10,8 @@ Phase 2已实板验收通过。此文是Person A/B/C协作合同；寄存器唯�
 | Geometry | 1920×1080、4bytes/pixel、stride7680bytes、frame0x7E9000bytes |
 | Buffers | 0与00800000，8MiB槽；Front≠Back；读Front、写锁存Back |
 | APB | 32-bit、byte offset、4byte对齐、无PSTRB/中断；00..B8不重排 |
-| Identity | ID4143434C、VERSION00030000、CAPABILITIES3B |
-| Command | 接收时快照五参数及Back base；busy/owned/pending不接受新START |
+| Identity | ID4143434C、VERSION00040000、CAPABILITIES7B；旧BLIT_ENABLE=0为v3 |
+| Command | START快照五参数及op/src_addr/src_stride，accept锁存Back/source结果；busy/owned/pending/读故障不接受新START |
 | AXI | address32为byte单位，data128、WSTRB16、ID4且0、AXSIZE4、INCR；写最大32beats，一个outstanding |
 | DONE | 最后成功B后、错误为0、BUSY/owned释放；不是已显示完成 |
 | Swap | 显式请求、sticky DONE+count ticket；safe boundary且旧R/流水线结束、FIFO清空确认后提交 |
@@ -32,7 +32,7 @@ Base使用正式BSP宏IO_APB_SLAVE_0_INPUT/IO_APB_SLAVE_0_INPUT_SIZE，当前F81
 
 ### Command Interface
 
-accel_regs快照`cmd_x/cmd_y/cmd_width/cmd_height/cmd_color[31:0]`，输出一周期`start_pulse`；sapphire_control对外命名`start_test_pulse`，顶层连接`fb_cmd_start`。manager将cmd_request与draw_ready相与为command_accept，engine只在accept时启动，manager同拍锁存command_base。
+accel_regs快照`cmd_x/cmd_y/cmd_width/cmd_height/cmd_color/cmd_op/cmd_src_addr/cmd_src_stride[31:0]`，输出一周期`start_pulse`；sapphire_control对外命名`start_test_pulse`。manager产生最终command_accept，graphics_engine只在accept时启动，manager同拍锁存command_base，源检查器同拍锁存范围结果，engine下一拍读取。op=0 FILL，1 BLIT，其他值接受后报0x26。
 
 接收要求INIT_DONE、有效Front、非BUSY、非writer_owned、无swap_pending/同拍swap_request。x/y/width/height单位pixel；宽高非零且完全在画面内，不裁剪；color按XRGB字定义。API先等COMMAND_COUNT增加确认接收，再单独wait_done，避免旧sticky DONE。短命令可能在CPU读BUSY前结束，软件不要求一定采样到BUSY=1。
 
@@ -52,13 +52,13 @@ fill_rect_writer生成**相对frame**的byte地址。C的wrapper只加一次锁�
 | W | WDATA128={P3,P2,P1,P0}、WSTRB16、WLAST、VALID/READY；每pixel占连续4个byte strobe，保护矩形外像素 |
 | B | BID4/BRESP2/BVALID/BREADY；每burst等待B后才下一笔；BID必须0、BRESP必须OKAY |
 | 固定sideband | AW/AR ID0、SIZE4、INCR、CACHE3、PROT2、LOCK0；QOS保持原值0 |
-| AR/R（当前） | 只有Display Reader；128bit R，RID0、RRESP0，最大一个outstanding、128beat burst |
+| AR/R（当前） | Display/BLIT共享读仲裁，128bit R、ID0、全局一笔outstanding；显示最多128beats、BLIT最多32beats |
 
 B负责合法AXI状态机、几何、地址、strobe及错误/超时安全排空。C负责地址偏移、初始化owner mux、reader、buffer manager、显示服务准入和CDC。上电TPG与engine AW/W/B统一二选一，不能OR；原TPG最后B/流水线完整结束后才永久交接。
 
 Reader active时每笔写B后，128个真实R握手及FIFO健康水位满足才准入新AW。已准入AW保持至B，不因低水位/新launch撤回；W/B和AR/R直通。整帧reader safe的slack允许有限事务继续前进；错误停止新准入。B不得绕过门控直连DDR，C不得通过截断已有事务保证显示。
 
-未来BLIT需要新的Accelerator读服务，**当前未实现**。必须先定义与Display Reader的AR/R仲裁、ID/响应路由、服务上界及FIFO，不得直接把第二个AR master接到现有端口。
+BLIT源为Front绝对字节地址，写仍为相对Back地址。读仲裁按burst锁owner，R只返回原方；低水位显示优先，健康时轮流。显示guard、quota和等待统计只观察显示端口。FAULT保留在途事务并映射0x2004；只平台复位恢复。持续显示紧急时未承诺BLIT固定等待上界，27位watchdog不能替代板级带宽验证。
 
 ## A ↔ C: Buffer / Swap / Diagnostics
 
@@ -84,6 +84,7 @@ A保证SoC/APB reset不回接平台DMA/video/DDR；CPU重跑先等待旧busy/own
 |---|---|
 | accel_init() | ID/版本/几何/服务配置正确，初始化完成且旧操作已排空 |
 | accel_fill_rect(x,y,w,h,color) | 新COMMAND_COUNT确认接收；尚需wait_done |
+| accel_blit(src_addr,src_stride,x,y,w,h) | 同上；源在Front、stride7680、源16byte对齐、x/w为4像素倍数 |
 | accel_wait_done() | 错误为0、DONE且非BUSY、owned释放 |
 | display_swap_request(&ticket) | 已写REQUEST|CLEAR_DONE并取得下一计数ticket；尚需等待 |
 | display_wait_swap_done(ticket) | pending清、sticky DONE且SWAP_COUNT匹配ticket |

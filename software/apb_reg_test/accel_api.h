@@ -2,7 +2,7 @@
 #define ACCEL_API_H
 #include "accel_regs.h"
 
-/* Polling-only API. No CPU accesses to DDR; all addresses below are APB offsets.
+/* Polling-only API. CPU accesses only APB; src_addr is a DDR address for DMA.
  * Returns 0 on success, hardware ERROR_CODE or an E0xx/E1xx software error otherwise.
  * One CPU owns the command stream. Rebuild the entire Back before presenting it. */
 #ifndef ACCEL_POLL_LIMIT
@@ -73,7 +73,7 @@ static inline uint32_t accel_init(void) {
     }
     if(i==ACCEL_POLL_LIMIT) return UINT32_C(0xE001);
     if(accel_read(ACCEL_WIDTH)!=1920 || accel_read(ACCEL_HEIGHT)!=1080 ||
-       accel_read(ACCEL_STRIDE)!=7680 || accel_read(ACCEL_CAPABILITIES)!=0x3Bu ||
+       accel_read(ACCEL_STRIDE)!=7680 || accel_read(ACCEL_CAPABILITIES)!=0x7Bu ||
        accel_read(ACCEL_SERVICE_READ_QUOTA)!=128 ||
        accel_read(ACCEL_SERVICE_WATERMARKS)!=UINT32_C(0x02000180) ||
        !(accel_read(ACCEL_SERVICE_STATUS)&(1u<<5))) return UINT32_C(0xE003);
@@ -94,12 +94,15 @@ static inline uint32_t accel_wait_done(void) {
     }
     return UINT32_C(0xE101);
 }
-static inline uint32_t accel_fill_rect(uint32_t x,uint32_t y,uint32_t width,uint32_t height,uint32_t color) {
+static inline uint32_t accel_submit(uint32_t op,uint32_t src_addr,uint32_t src_stride,
+                                  uint32_t x,uint32_t y,uint32_t width,uint32_t height,uint32_t color) {
     uint32_t before,i,e,bs=accel_read(ACCEL_BUFFER_STATUS);
     if(!(bs&FRAME_FRONT_VALID) || (bs&(FRAME_SWAP_PENDING|FRAME_WRITER_OWNED)) ||
        (accel_read(ACCEL_STATUS)&ACCEL_BUSY)) return UINT32_C(0xE102);
     e=accel_error();if(e) return e;
     before=accel_read(ACCEL_COMMAND_COUNT);
+    accel_write(ACCEL_COMMAND_OP,op);
+    accel_write(ACCEL_SRC_ADDR,src_addr);accel_write(ACCEL_SRC_STRIDE,src_stride);
     accel_write(ACCEL_RECT_X,x);accel_write(ACCEL_RECT_Y,y);
     accel_write(ACCEL_RECT_WIDTH,width);accel_write(ACCEL_RECT_HEIGHT,height);
     accel_write(ACCEL_RECT_COLOR,color);
@@ -110,6 +113,16 @@ static inline uint32_t accel_fill_rect(uint32_t x,uint32_t y,uint32_t width,uint
         if(accel_read(ACCEL_COMMAND_COUNT)==before+1u) return 0;
     }
     return UINT32_C(0xE103);
+}
+static inline uint32_t accel_fill_rect(uint32_t x,uint32_t y,uint32_t width,uint32_t height,uint32_t color) {
+    return accel_submit(ACCEL_OP_FILL,0,0,x,y,width,height,color);
+}
+/* Source is an absolute address in current Front; stride=7680. Destination x
+ * and width are multiples of four. A successful submit only acknowledges START;
+ * call accel_wait_done(), then explicitly request/wait for a swap. */
+static inline uint32_t accel_blit(uint32_t src_addr,uint32_t src_stride,uint32_t x,uint32_t y,
+                                uint32_t width,uint32_t height) {
+    return accel_submit(ACCEL_OP_BLIT,src_addr,src_stride,x,y,width,height,0);
 }
 static inline uint32_t frame_swap_request(uint32_t *ticket) {
     uint32_t e=accel_error(),bs=accel_read(ACCEL_BUFFER_STATUS);

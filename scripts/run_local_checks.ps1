@@ -23,6 +23,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Checkpoint C simulations failed' }
     & $Python 'scripts/run_d_checks.py'
     if ($LASTEXITCODE -ne 0) { throw 'Checkpoint D ownership/display-protection simulations failed' }
+    & $Python 'scripts/run_d_checks.py' '--graphics'
+    if ($LASTEXITCODE -ne 0) { throw 'Shared-read FILL/BLIT integration simulations failed' }
     & $Python 'scripts/run_apb_checks.py' '--iverilog' $Iverilog '--vvp' $Vvp
     if ($LASTEXITCODE -ne 0) { throw 'APB compatibility regression failed' }
     & $Python 'scripts/run_rgb_checks.py' '--quick' '--iverilog' $Iverilog '--vvp' $Vvp

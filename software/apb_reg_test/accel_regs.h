@@ -8,12 +8,12 @@
 #ifndef IO_APB_SLAVE_0_INPUT_SIZE
 #error "Formal soc.h must declare the APB3 Slave 0 window size"
 #endif
-#if IO_APB_SLAVE_0_INPUT_SIZE < 0xBC
+#if IO_APB_SLAVE_0_INPUT_SIZE < 0xC8
 #error "APB window is smaller than the accel_regs register map"
 #endif
 #define ACCEL_BASE ((uintptr_t)IO_APB_SLAVE_0_INPUT)
 #define ACCEL_ID_EXPECTED      UINT32_C(0x4143434C)
-#define ACCEL_VERSION_EXPECTED UINT32_C(0x00030000)
+#define ACCEL_VERSION_EXPECTED UINT32_C(0x00040000)
 #define ACCEL_ID          0x00u
 #define ACCEL_VERSION     0x04u
 #define ACCEL_CONTROL     0x08u
@@ -76,4 +76,9 @@
 #define ACCEL_WRITER_MAX_CYCLES 0xB0u
 #define ACCEL_SERVICE_READ_QUOTA 0xB4u
 #define ACCEL_SERVICE_WATERMARKS 0xB8u
+#define ACCEL_COMMAND_OP      0xBCu
+#define ACCEL_SRC_ADDR        0xC0u
+#define ACCEL_SRC_STRIDE      0xC4u
+#define ACCEL_OP_FILL         UINT32_C(0)
+#define ACCEL_OP_BLIT         UINT32_C(1)
 #endif

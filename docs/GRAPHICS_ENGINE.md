@@ -4,7 +4,7 @@
 
 对应赛题二基础要求第1项：硬件根据操作类型执行 Solid Fill 或 Block Copy。`graphics_engine.v` 在 B 内部接收一条命令，保存参数，选择现有 `fill_rect_writer` 或 `blit_engine`，并提供一套公共状态和写接口。
 
-当前 B 执行层已按 2026-10-17 用户提供的 A/C 反馈适配，经过独立仿真、与现有 `buffer_manager` 的合同测试，以及两块持久内存的绘制/复制/换帧闭环仿真。后续已实现 [C侧源窗口检查器](BLIT_SOURCE_GUARD.md)，并替换合同/双缓冲测试中的范围结果模型。正式系统仍只接 FILL，新增 APB 字段、源检查器、DDR 读仲裁和显示仍待正式连接；这些独立模块未加入 Efinity 工程、综合或上板。已确定的下一轮接口及各方实施状态见 [BLIT_INTEGRATION](BLIT_INTEGRATION.md)。
+当前B执行层已通过独立仿真、真实manager/源检查器合同测试和双槽绘制/复制/换帧仿真。2026-10-18已接入正式APB、framebuffer、源检查器、DDR读仲裁及工程清单，系统验证和软件兼容见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。v4尚待Efinity综合时序和实板验收。下文独立模块/双槽测试的范围保持原样，不应将它们当作整机证据。
 
 ```text
 仿真命令（未来由 A 提供）
@@ -31,7 +31,7 @@
 | `sim/graphics_double_buffer_memory.v` | 仅仿真使用的双槽 AXI 内存，两槽均可读写，换帧不搬动内存内容 |
 | `sim/tb_blit_engine.v` | 复用其中的 `blit_test_memory`；新增可选 byte strobe 支持，BLIT 默认仍要求全 strobe |
 | `scripts/run_graphics_checks.ps1` | 两组源检查器、两组执行层仿真、manager 合同测试、两组双缓冲闭环、负对照、可选波形和 PNG |
-| `scripts/run_read_arbiter_checks.ps1` | 独立C侧读仲裁单测；统一入口也会运行，尚未与B/真实显示reader连接 |
+| `scripts/run_read_arbiter_checks.ps1` | 独立C侧读仲裁单测；统一入口也会运行；系统并发另见run_d_checks.py --graphics |
 | `scripts/render_blit_preview.py` | 共用 PPM→PNG 转换，新增可选 `--names`，原 BLIT 调用方式保留 |
 
 需要 PATH 中的 `iverilog`、`vvp`。在仓库根目录执行：
@@ -168,4 +168,4 @@ FILL 固定使用 `SETTLE_FRAMES=0`，与现有双缓冲正式模式一致：完
 
 后续C侧 [读仲裁器](DDR_READ_ARBITER.md) 已通过独立协议测试，统一入口也会执行该单测。该项使用测试客户端/DDR，未插入这里的B/manager/双缓冲路径；不能将两项独立通过当作共享显示链路已连接。
 
-下一步由 A 按方案接正式寄存器/软件命令，将检查器、仲裁器、公共状态和Back写服务接入正式平台，再进行系统并发仿真、Efinity综合/时序检查和板级验收。合同/双缓冲测试使用真实manager和源检查器，DDR与reader-safe仍是模型输入，尚未验证正式共享读通路、最大等待和显示连续性。当前测试不证明整机已完成这些步骤。
+正式接线现已完成，系统并发验证单独记录于 [SYSTEM_BLIT](SYSTEM_BLIT.md)。本页的合同/双缓冲测试仍使用DDR与reader-safe模型输入，只证明所列模块合同；最大板级等待、Efinity资源时序和实板显示连续性仍需测量。

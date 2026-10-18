@@ -6,6 +6,7 @@ module accel_regs #(
     parameter WAIT_CYCLES = 1,
     parameter ENGINE_ENABLE = 0,
     parameter DOUBLE_BUFFER = 0,
+    parameter BLIT_ENABLE = 0,
     parameter [31:0] FRAME_WIDTH = 1920,
     parameter [31:0] FRAME_HEIGHT = 1080,
     parameter [31:0] FRAME_STRIDE = 7680
@@ -26,6 +27,7 @@ module accel_regs #(
     input wire engine_busy,engine_done,input wire [31:0] engine_error,command_count,
     input wire [31:0] init_data_beats,init_aw_bursts,init_wlast_bursts,init_b_responses,init_aw_beats,
     output reg [31:0] cmd_x,cmd_y,cmd_width,cmd_height,cmd_color,
+    output reg [31:0] cmd_op,cmd_src_addr,cmd_src_stride,
     input wire draw_ready,input wire [31:0] buffer_status,
     input wire [31:0] reader_frame_base,reader_outstanding,reader_data_beats,reader_reserved_beats,reader_error,
     input wire [31:0] boundary_count,swap_count,missed_boundary_count,
@@ -43,6 +45,7 @@ localparam WAIT_BITS = (WAIT_CYCLES > 0) ? $clog2(WAIT_CYCLES+1) : 1;
 reg [WAIT_BITS-1:0] wait_remaining;
 reg [31:1] control;
 reg [31:0] rect_x, rect_y, rect_width, rect_height, rect_color, scratch;
+reg [31:0] command_op,source_addr,source_stride;
 reg start_seen;
 reg [31:0] error_code;
 reg mapped, writable;
@@ -55,7 +58,7 @@ always @(*) begin
     writable = 0;
     case (PADDR)
         32'h00: PRDATA = ID;
-        32'h04: PRDATA = DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
+        32'h04: PRDATA = BLIT_ENABLE ? 32'h00040000 : DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
         32'h08: begin PRDATA = {control,1'b0}; writable = 1; end
         32'h0C: PRDATA = ENGINE_ENABLE ?
             {27'b0,init_done,init_done,(init_error!=0 || engine_error!=0 || error_code!=0 || (DOUBLE_BUFFER && reader_error!=0)),engine_done,engine_busy} :
@@ -73,7 +76,7 @@ always @(*) begin
         32'h34: PRDATA = FRAME_STRIDE;
         32'h38: PRDATA = FRAME_WIDTH;
         32'h3C: PRDATA = FRAME_HEIGHT;
-        32'h40: PRDATA = DOUBLE_BUFFER ? 32'h0000003B : ENGINE_ENABLE ? 32'h0000001B : 32'h00000007;
+        32'h40: PRDATA = BLIT_ENABLE ? 32'h0000007B : DOUBLE_BUFFER ? 32'h0000003B : ENGINE_ENABLE ? 32'h0000001B : 32'h00000007;
         32'h44: begin PRDATA=init_data_beats;if(!ENGINE_ENABLE) mapped=0;end
         32'h48: begin PRDATA=init_aw_bursts;if(!ENGINE_ENABLE) mapped=0;end
         32'h4C: begin PRDATA=init_wlast_bursts;if(!ENGINE_ENABLE) mapped=0;end
@@ -104,6 +107,9 @@ always @(*) begin
         32'hB0: begin PRDATA=writer_max_cycles;if(!DOUBLE_BUFFER) mapped=0;end
         32'hB4: begin PRDATA=service_read_quota;if(!DOUBLE_BUFFER) mapped=0;end
         32'hB8: begin PRDATA=service_watermarks;if(!DOUBLE_BUFFER) mapped=0;end
+        32'hBC: begin PRDATA=command_op;writable=1;if(!BLIT_ENABLE) mapped=0;end
+        32'hC0: begin PRDATA=source_addr;writable=1;if(!BLIT_ENABLE) mapped=0;end
+        32'hC4: begin PRDATA=source_stride;writable=1;if(!BLIT_ENABLE) mapped=0;end
         default: mapped = 0;
     endcase
     if (|PADDR[1:0]) transaction_error = 1;
@@ -114,6 +120,7 @@ always @(*) begin
     else if(DOUBLE_BUFFER && PWRITE && PADDR==8 && PWDATA[0] && !draw_ready) transaction_error=6;
     else if(DOUBLE_BUFFER && PWRITE && PADDR=='h60 && PWDATA[0] && !buffer_status[4]) transaction_error=4;
     else if(DOUBLE_BUFFER && PWRITE && PADDR=='h60 && PWDATA[0] && (buffer_status[2] || swap_request)) transaction_error=6;
+    else if(BLIT_ENABLE && PWRITE && PADDR=='h60 && PWDATA[0] && reader_error!=0) transaction_error=6;
     else transaction_error = 0;
     if (transaction_error != 0) PRDATA = 0;
 end
@@ -134,6 +141,8 @@ always @(posedge PCLK or negedge PRESETn) begin
         start_pulse <= 0;swap_request<=0;clear_swap_done<=0;
         error_code <= 0;
         cmd_x<=0;cmd_y<=0;cmd_width<=0;cmd_height<=0;cmd_color<=0;
+        command_op<=0;source_addr<=0;source_stride<=0;
+        cmd_op<=0;cmd_src_addr<=0;cmd_src_stride<=0;
     end else begin
         start_pulse <= 0;swap_request<=0;clear_swap_done<=0;
         // Setup loads the wait count; each access wait consumes one cycle.
@@ -151,6 +160,7 @@ always @(posedge PCLK or negedge PRESETn) begin
                         if (PWDATA[0]) begin
                             if(ENGINE_ENABLE) error_code<=0;
                             cmd_x<=rect_x;cmd_y<=rect_y;cmd_width<=rect_width;cmd_height<=rect_height;cmd_color<=rect_color;
+                            cmd_op<=command_op;cmd_src_addr<=source_addr;cmd_src_stride<=source_stride;
                             start_pulse <= 1;
                             start_seen <= 1;
                         end
@@ -162,6 +172,9 @@ always @(posedge PCLK or negedge PRESETn) begin
                     32'h1C: rect_height <= PWDATA;
                     32'h20: rect_color <= PWDATA;
                     32'h28: scratch <= PWDATA;
+                    32'hBC: command_op <= PWDATA;
+                    32'hC0: source_addr <= PWDATA;
+                    32'hC4: source_stride <= PWDATA;
                     default: begin end
                 endcase
             end
@@ -170,5 +183,7 @@ always @(posedge PCLK or negedge PRESETn) begin
 end
 // synthesis translate_off
 initial if (WAIT_CYCLES < 0) $fatal(1,"WAIT_CYCLES must be nonnegative");
+initial if (BLIT_ENABLE && (!ENGINE_ENABLE || !DOUBLE_BUFFER))
+    $fatal(1,"BLIT registers require the double-buffered graphics engine");
 // synthesis translate_on
 endmodule

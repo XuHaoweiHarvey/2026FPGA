@@ -50,6 +50,14 @@ assert ".total_burst_len(FRAME_BEATS)" in rgb_fb and ".burst_len(FRAME_BEATS)" i
 assert '.C_MODE(1)' in formal and '.ONE_FRAME(1)' in formal
 for name in ('rtl/accelerator/fill_rect_writer.v','rtl/framebuffer/init_write_monitor.v'):
     assert name in files
+for name in ('rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
+             'rtl/framebuffer/blit_source_guard.v','rtl/framebuffer/ddr_read_arbiter.v'):
+    assert name in files, f'Missing shared-read graphics source: {name}'
+assert '.BLIT_ENABLE(1)' in formal and 'ddr_read_arbiter #' in rgb_fb
+control = (ROOT / 'rtl/control/sapphire_control.v').read_text(encoding='utf8')
+assert '.BLIT_ENABLE(1)' in control
+for port in ('cmd_op','cmd_src_addr','cmd_src_stride'):
+    assert len(re.findall(r'\.'+port+r'\s*\(',formal))==2, f'Unpaired graphics command: {port}'
 assert not any(s in formal for s in ["csi_rx_controller", "i2c_master_ctrl_top", "debug_edb_top debug_edb_top_inst"])
 if checkpoint_b:
     assert "assign jtag_inst1_TDO = jtag_inst1_TDI;" not in formal
@@ -69,5 +77,6 @@ offsets = {int(value, 16) for _, value in re.findall(
 documented = {int(value, 16) for value in re.findall(
     r"^\| ([0-9A-Fa-f]{2}) \|", doc, re.M)}
 assert cases == offsets == documented, "RTL/header/REGISTER_MAP offsets disagree"
+assert '0x00040000' in header and "32'h00040000" in rtl
 print(f"PASS project: {len(files)} unique, existing design entries; current RGB/control integration")
 print(f"PASS register contract: {len(cases)} current RTL/header/documented offsets agree")

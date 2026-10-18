@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-// B-side command dispatcher, not connected to the platform yet.
+// B-side command dispatcher; enabled in the formal double-buffered platform.
 // START is the manager's final command_accept; ACCEPT reports local acceptance.
 // C registers src_range_valid on that edge; CHECK_SOURCE samples it next cycle.
 // Source addresses are absolute bytes; destination AW is relative to Back.

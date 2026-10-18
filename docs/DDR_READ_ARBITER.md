@@ -1,6 +1,6 @@
 # 显示与 BLIT 的 DDR 读仲裁
 
-`rtl/framebuffer/ddr_read_arbiter.v` 是独立的双客户端 AXI 读仲裁模块。显示与 BLIT 共用一条128位 DDR 读通道、ID0，全局最多一笔未完成的读事务。独立仿真通过，正式 framebuffer、工程清单、显示 FIFO/guard/写准入尚未接入。
+`rtl/framebuffer/ddr_read_arbiter.v` 是双客户端 AXI 读仲裁模块。显示与 BLIT 共用一条128位 DDR 读通道、ID0，全局最多一笔未完成的读事务。独立仿真通过，现已接入正式framebuffer、工程清单及显示FIFO/guard/写准入；系统验证见 [SYSTEM_BLIT](SYSTEM_BLIT.md)，综合时序及实板仍待验收。
 
 ## 这一步的作用
 
@@ -29,7 +29,7 @@ BLIT 的 AR/R ──────────┘
 | `read_active` | AR已被DDR接受，读事务尚未正常退休；协议FAULT也保持 |
 | `busy / owner_blit` | busy表示pending或active；busy=1时owner_blit为0表示显示、1表示BLIT |
 | `beats_left[8:0]` | 尚需接收的拍数，支持1～256拍；协议故障后饱和到0，不回绕 |
-| `fault / fault_code` | 平台复位前保持的本地协议故障；当前不是新增APB寄存器或B错误码 |
+| `fault / fault_code` | 平台复位前保持的本地协议故障；wrapper将fault折叠为已有READER_ERROR=0x2004，fault_code本身不新增CSR或B错误码 |
 | `display_bursts / blit_bursts` | 各自实际AR握手数 |
 | `display_beats / blit_beats` | 各自实际R握手数，包括传给原owner的错误/故障响应；不是帧成功数 |
 

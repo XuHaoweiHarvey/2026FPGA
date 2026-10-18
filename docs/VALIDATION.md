@@ -20,6 +20,12 @@
 
 ## Simulation Results
 
+### v4正式BLIT接线（2026-10-18）
+
+APB→graphics_engine→源检查/读仲裁→真实Display Reader/FIFO/CVO/serializer的512×64系统仿真已通过WAIT0/1/3，每组4次swap、27完整帧/916257次像素比较；正常拷贝underflow/missed增量0，参数快照、CPU reset、最后B/最后R保护和共享故障0x2004通过。两种故意误接显示数据/读quota的临时副本均被测试拒绝。旧D WAIT1、RGB回归/正式v4顶层端口展开、原独立图形测试、APB兼容及v4寄存器测试通过。
+
+当前55源/50CSR一致，v4软件以本机替代GNU RISC-V工具链和正式BSP构建，尚未重跑CPU/MMIO模型；**没有v4综合时序/完整1080p带宽/实板BLIT验收**。准确环境、测试计数及复现见 [SYSTEM_BLIT](SYSTEM_BLIT.md)，不将上表A～E历史通过扩展到v4。
+
 ### RGB / APB / FILL_RECT
 
 | 测试 | 已记录覆盖 |

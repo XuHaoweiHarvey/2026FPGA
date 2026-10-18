@@ -1,10 +1,10 @@
 # Architecture
 
-本文只描述当前已上板通过的 Phase 2 架构。开发故障见 [TROUBLESHOOTING](TROUBLESHOOTING.md)，阶段证据见 [VALIDATION](VALIDATION.md)，共享契约见 [INTERFACES](INTERFACES.md)。
+本文描述当前源码架构。Phase 2旧FILL/v3已上板通过；新增v4 BLIT尚待综合时序及实板验收，当前系统验证见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。开发故障见 [TROUBLESHOOTING](TROUBLESHOOTING.md)，阶段证据见 [VALIDATION](VALIDATION.md)，共享契约见 [INTERFACES](INTERFACES.md)。
 
 ## Overall Architecture
 
-根项目 [ti60f225_oob.xml](../ti60f225_oob.xml)，顶层 [ti60f225_oob_top.v](../rtl/ti60f225_oob_top.v)。当前为51个 design entries 和单独注册的 `soc_control` IP；不要重复加入生成 RTL。
+根项目 [ti60f225_oob.xml](../ti60f225_oob.xml)，顶层 [ti60f225_oob_top.v](../rtl/ti60f225_oob_top.v)。当前为55个 design entries 和单独注册的 `soc_control` IP；不要重复加入生成 RTL。
 
 ```text
 u_control: sapphire_control
@@ -13,19 +13,21 @@ u_control: sapphire_control
     → cmd_* / start_test_pulse
 checker0: rgb_framebuffer
   d_buffers.manager: buffer_manager → command_accept / 锁存 command_base
-  c_control.engine: fill_rect_writer → 相对 AXI 写地址
+  c_control.graphics.source_guard: blit_source_guard → 锁存Front源范围结果
+  c_control.graphics.engine: graphics_engine → FILL/BLIT选择、相对AXI写地址
   d_buffers.write_service: ddr_write_admission → 新 AW 准入
   写 owner mux + command_base → u_ddr3_top → DDR Back
 
 cvo_axi_inst.fifo_rd_period → d_buffers.frame_cdc: video_frame_cdc
-  d_buffers.guard: read_frame_guard ← 实际 AR/R、reader idle
+  d_buffers.guard: read_frame_guard ← 显示客户端AR/R、reader idle
   d_buffers.manager → safe swap / reader_base / flush / launch
   u_ddr_rd_buffer: ddr_rd_buffer ← DDR Front
     → u_unpack: rgb_unpack128_to64 → cvo_axi_inst: cvo_axi
     → u_rgb_to_hdmi: rgb_to_hdmi → dvi_encoder_m0 → HDMI LVDS TX
+  shared_read.arbiter: ddr_read_arbiter ← 显示/BLIT的AR/R → DDR Front
 ```
 
-FILL_RECT Engine 同时承担地址生成与 AXI AW/W/B master，不存在另一个已实现的通用命令队列。CPU无DDR端口，不逐像素写 framebuffer。DDR AR/R只有Display Reader；当前没有Accelerator读master或外部读仲裁器。
+graphics_engine选择FILL或BLIT，统一AW/W/B和执行状态；BLIT另有源读AR/R。读仲裁全局一笔outstanding，按burst固定owner并单独路由R。当前无通用命令队列，CPU无DDR端口，不逐像素写framebuffer。
 
 Camera/CSI/Sensor 配置 RTL 不在活动2D链路，Bayer/Debayer不参与当前像素处理。Interface Designer 保留原 Camera D-PHY、DSI、相关 PLL、端口和 pin assignment；不能根据模块名称删除仍供 core/video 使用的时钟。
 
@@ -66,11 +68,11 @@ H active/front/sync/back=1920/88/44/148，V=1080/4/5/36；总计2200×1125，148
 
 ## Accelerator
 
-当前唯一命令FILL_RECT。参数`x/y/width/height/color`在接收时快照；尺寸非零、完全在1920×1080内，不裁剪，33位坐标相加检查溢出。
+当前命令FILL_RECT和Front→Back BLIT。APB START快照`op/x/y/width/height/color/src_addr/src_stride`；manager accept锁Back与源范围结果，engine下一拍检查源。尺寸非零、完全在1920×1080内，不裁剪，33位坐标相加检查溢出。
 
 `fill_rect_writer`逐行生成相对byte地址；每burst最多32个128-bit beats、一个outstanding，不跨4KiB。边缘使用每pixel四byte的WSTRB，不修改矩形外像素。状态机为IDLE→PREP→ADDR→DATA→RESP；当前调用`SETTLE_FRAMES=0`，最后成功B后DONE，不等显示扫描。软件另外检查BUSY=0、WRITER_OWNED已释放。错误命令也可能DONE，必须检查ERROR_CODE。
 
-27位无进展watchdog不撤回已出现的AWVALID/WVALID；先排空事务再报错。如果DDR完全不响应，不能假称已经安全退出BUSY。当前没有BLIT、Line、Alpha、命令FIFO或中断。
+BLIT源为Front绝对地址，16byte对齐、stride7680，目标x/width为4像素倍数；读最多32beats、不跨4KiB，缓存读段后再写Back。27位无进展watchdog不撤回已出现的AR/AW/W VALID，排空后退出；协议FAULT保留BUSY/Back及原读owner，只平台复位恢复。当前没有Line、Alpha、命令FIFO或中断。
 
 ## DDR Access and Initialization
 
@@ -101,7 +103,7 @@ INIT_DONE前START拒绝，读不启动。成功后总写owner永久由TPG切到A
 
 复位Front0、Back1、FRONT_VALID=0；INIT_DONE后Front有效。manager的command_accept锁存当前back_base为command_base，与engine参数同一命令生效。实际AW地址=`command_base + engine_awaddr`，直到命令完成保持。
 
-Front≠Back；Reader只得到Front，Accelerator只得到锁存Back。BUSY、writer_owned或swap_pending阻止新命令。多条FILL完成后由软件显式swap，不能每条矩形自动交换。Swap只交换角色，软件每轮全屏重建，没有隐式Front→Back复制。
+Front≠Back；显示与BLIT只读Front，Accelerator只写锁存Back。BUSY、writer_owned、swap_pending或共享读故障阻止新命令。多条绘图完成后由软件显式swap，不能每条矩形自动交换。Swap只交换角色，不隐式复制；BLIT必须单独提交。
 
 ## VBlank-safe Swap
 

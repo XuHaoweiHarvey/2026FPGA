@@ -53,6 +53,10 @@
         <efx:design_file name="rtl/control/sapphire_control.v" version="default" library="default"/>
         <efx:design_file name="rtl/framebuffer/init_write_monitor.v" version="default" library="default"/>
         <efx:design_file name="rtl/accelerator/fill_rect_writer.v" version="default" library="default"/>
+        <efx:design_file name="rtl/accelerator/blit_engine.v" version="default" library="default"/>
+        <efx:design_file name="rtl/accelerator/graphics_engine.v" version="default" library="default"/>
+        <efx:design_file name="rtl/framebuffer/blit_source_guard.v" version="default" library="default"/>
+        <efx:design_file name="rtl/framebuffer/ddr_read_arbiter.v" version="default" library="default"/>
         <efx:design_file name="rtl/framebuffer/buffer_manager.v" version="default" library="default"/>
         <efx:design_file name="rtl/framebuffer/video_frame_cdc.v" version="default" library="default"/>
         <efx:design_file name="rtl/framebuffer/read_frame_guard.v" version="default" library="default"/>

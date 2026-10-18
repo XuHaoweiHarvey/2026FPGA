@@ -49,6 +49,6 @@ try {
         }
         Write-Host 'PASS routing negative control: swapped client responses detected.'
     } finally { Pop-Location }
-    Write-Host 'PASS independent read arbiter checks. Formal framebuffer/Efinity/DDR/HDMI integration pending.'
+    Write-Host 'PASS independent read arbiter checks. System tests run separately with run_d_checks.py --graphics; Efinity/board verification pending.'
     Write-Host "Log: $logPath"
 } finally { Stop-Transcript | Out-Null }

@@ -14,16 +14,19 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 | D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
 | E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
 
-当前正式系统支持 **FILL_RECT**。Block Copy / BLIT、FILL/BLIT 统一执行入口与 [源窗口检查器](docs/BLIT_SOURCE_GUARD.md) 已通过仿真，另完成真实buffer_manager/源检查器与双槽模拟内存的绘制→复制→换帧闭环；尚未接入正式 APB 命令、DDR读仲裁和 HDMI；Line、Alpha Blend 尚未实现。统一入口、双缓冲分步图的运行与限制见 [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md)。基础框架完成不代表赛题全部功能完成。验证范围见 [VALIDATION](docs/VALIDATION.md)。
+正式源码现已接入 **FILL_RECT + Front→Back BLIT**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。新增v4代码尚待Efinity综合/时序和实板验收；上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，基础框架不代表赛题全部功能完成。接线、运行及边界见 [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md)。
 
-[显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已实现并通过独立协议仿真，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。正式framebuffer接线、显示统计/写准入适配、综合时序与实板联调仍待完成。
+[显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已加入正式framebuffer及工程清单，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。v4寄存器为VERSION=0x00040000、CAPABILITIES=0x7B；必须重新构建匹配软件，不能使用旧v3 ELF。
 
 ## 框架
 
 ```mermaid
 flowchart TD
     CPU["Sapphire RISC-V / OCRAM Software"] -->|APB3| REG[accel_regs]
-    REG --> ACC["2D Accelerator / FILL_RECT Engine"]
+    REG --> ACC["2D Accelerator / FILL + BLIT"]
+    ACC -->|源读| ARB[DDR Read Arbiter]
+    READER --> ARB
+    ARB --> FRONT
     ACC --> ADMIT["AXI Writer + Display-protection Admission"]
     ADMIT --> BACK[DDR Back Buffer]
     BACK --> SWAP["VBlank-safe Swap: exchange roles"]
@@ -59,7 +62,7 @@ CPU 不逐像素绘图，也没有直接连接 DDR framebuffer 的外部 AXI 端
 | Ownership | Display Reader 只读 Front；Accelerator 每命令锁存 Back 地址 |
 | Swap | 软件显式请求，安全 VS/frame boundary、旧 R 完成与 FIFO 清空确认后交换 |
 | DONE | 最后一个成功 AXI B response 后完成；软件还检查 BUSY=0、writer ownership 释放 |
-| 当前命令 / 通知 | FILL_RECT；polling，无 Accelerator interrupt |
+| 当前源码命令 / 通知 | FILL_RECT、BLIT；polling，无 Accelerator interrupt；BLIT待板级验证 |
 | 连续性保护 | 真实 R handshake quota + Display FIFO 低/高水位控制新写 burst 准入 |
 | Camera / Bayer / Debayer | 不在正式 2D 数据路径；部分旧文件和 physical blocks 保留作参考/兼容 |
 

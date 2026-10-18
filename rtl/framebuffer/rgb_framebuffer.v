@@ -9,7 +9,7 @@ module rgb_framebuffer #(
     parameter WR_FIFO_DEPTH = 1024,
     parameter RD_FIFO_DEPTH = 1024,
     parameter BURST_LEN = 127,
-    parameter C_MODE = 0, SETTLE_FRAMES = 2, D_MODE = 0,
+    parameter C_MODE = 0, SETTLE_FRAMES = 2, D_MODE = 0, BLIT_ENABLE = 0,
     parameter WRITE_SERVICE_ENABLE=1, WRITE_READ_QUOTA=128,
     parameter WRITE_FIFO_LOW=RD_FIFO_DEPTH*3/8, WRITE_FIFO_HIGH=RD_FIFO_DEPTH/2,
     parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000
@@ -44,6 +44,7 @@ module rgb_framebuffer #(
     output wire [31:0] diag_wr_base, output wire [31:0] diag_rd_base,
     input wire source_done, input wire [1:0] bresp,
     input wire cmd_start, input wire [31:0] cmd_x,cmd_y,cmd_width,cmd_height,cmd_color,
+    input wire [31:0] cmd_op,cmd_src_addr,cmd_src_stride,
     output wire init_done, output wire [31:0] init_error,
     output wire engine_busy,engine_done,output wire [31:0] engine_error,command_count,
     output wire [31:0] init_data_beats,init_aw_bursts,init_wlast_bursts,init_b_responses,init_aw_beats,
@@ -72,6 +73,11 @@ always @(posedge axi_clk or negedge axi_rst_n)
 wire d_flush,d_launch,d_boundary,d_blank,d_safe,d_active,d_reader_idle,d_fifo_empty;
 wire d_command_accept,d_front_index,d_back_index,d_front_valid,d_owned,d_pending,d_done;
 wire [31:0] d_front_base,d_back_base,d_command_base;
+wire manager_draw_ready;
+wire [31:0] display_error;
+wire read_fault;
+// Block new commands and publication on a read fault; never cancel DMA.
+wire read_healthy = !BLIT_ENABLE || reader_error==0;
 wire rd_fifo_reset = !axi_rst_n || (D_MODE ? d_flush : rd_period_sync[2:1] == 2'b01);
 wire [31:0] wr_base, rd_base;
 // APB read-only ownership addresses (D uses the manager, legacy uses banks).
@@ -96,7 +102,18 @@ end else begin: fixed_init_bank
 end endgenerate
 wire [5:0] wr_id, rd_id;
 assign awid = wr_id[AXI_ID_WIDTH-1:0];
-assign arid = rd_id[AXI_ID_WIDTH-1:0];
+wire [31:0] display_araddr,b_araddr;
+wire [7:0] display_arlen,b_arlen;
+wire [2:0] display_arsize,display_arprot;
+wire [1:0] display_arburst;
+wire [3:0] display_arcache;
+wire display_arlock,display_arvalid,display_arready;
+wire [127:0] display_rdata,b_rdata;
+wire [AXI_ID_WIDTH-1:0] display_rid;
+wire [3:0] b_rid;
+wire [1:0] display_rresp,b_rresp;
+wire display_rlast,display_rvalid,display_rready;
+wire b_arvalid,b_arready,b_rlast,b_rvalid,b_rready;
 wire [31:0] t_awaddr,a_awaddr;
 wire [7:0] t_awlen,a_awlen;
 wire [127:0] t_wdata,a_wdata;
@@ -155,6 +172,27 @@ generate if(C_MODE) begin: c_control
         .init_done(init_done),.init_error(init_error),.data_beats(init_data_beats),
         .aw_bursts(init_aw_bursts),.wlast_bursts(init_wlast_bursts),
         .b_responses(init_b_responses),.aw_reserved_beats(init_aw_beats));
+    if(BLIT_ENABLE) begin: graphics
+        wire source_valid;
+        blit_source_guard #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
+            .FRAME_STRIDE(FRAME_WIDTH*4)) source_guard (
+            .clk(axi_clk),.rst_n(axi_rst_n),.command_accept(d_command_accept),
+            .front_base(d_front_base),.back_base(d_back_base),
+            .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),
+            .width(cmd_width),.height(cmd_height),.src_range_valid(source_valid));
+        graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
+            .FRAME_STRIDE(FRAME_WIDTH*4)) engine (
+            .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
+            .op(cmd_op),.x(cmd_x),.y(cmd_y),.width(cmd_width),.height(cmd_height),.color(cmd_color),
+            .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),.src_range_valid(source_valid),.accept(),
+            .busy(engine_busy),.done(engine_done),.error_code(engine_error),.command_count(command_count),
+            .araddr(b_araddr),.arlen(b_arlen),.arvalid(b_arvalid),.arready(b_arready),
+            .rdata(b_rdata),.rid(b_rid),.rresp(b_rresp),.rlast(b_rlast),.rvalid(b_rvalid),.rready(b_rready),
+            .awaddr(a_awaddr),.awlen(a_awlen),.awvalid(a_awvalid),.awready(a_awready),
+            .wdata(a_wdata),.wstrb(a_wstrb),.wlast(a_wlast),.wvalid(a_wvalid),.wready(a_wready),
+            .bid(bid),.bresp(bresp),.bvalid(a_bvalid),.bready(a_bready));
+    end else begin: fill_only
+    assign b_araddr=0;assign b_arlen=0;assign b_arvalid=0;assign b_rready=0;
     fill_rect_writer #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
         .FRAME_STRIDE(FRAME_WIDTH*4),.SETTLE_FRAMES(D_MODE ? 0 : SETTLE_FRAMES)) engine (
         .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(D_MODE ? d_command_accept : cmd_start),
@@ -164,6 +202,7 @@ generate if(C_MODE) begin: c_control
         .awaddr(a_awaddr),.awlen(a_awlen),.awvalid(a_awvalid),.awready(a_awready),
         .wdata(a_wdata),.wstrb(a_wstrb),.wlast(a_wlast),.wvalid(a_wvalid),.wready(a_wready),
         .bid(bid),.bresp(bresp),.bvalid(a_bvalid),.bready(a_bready));
+    end
 end else begin: legacy_mode
     assign init_done=0;assign init_error=0;
     assign init_data_beats=0;assign init_aw_bursts=0;assign init_wlast_bursts=0;
@@ -171,6 +210,7 @@ end else begin: legacy_mode
     assign engine_busy=0;assign engine_done=0;assign engine_error=0;assign command_count=0;
     assign a_awaddr=0;assign a_awlen=0;assign a_awvalid=0;
     assign a_wdata=0;assign a_wstrb=0;assign a_wlast=0;assign a_wvalid=0;assign a_bready=0;
+    assign b_araddr=0;assign b_arlen=0;assign b_arvalid=0;assign b_rready=0;
 end endgenerate
 reg read_armed=0;
 always @(posedge axi_clk or negedge axi_rst_n)
@@ -188,20 +228,45 @@ ddr_rd_buffer #(.AXI_DATA_WIDTH(128), .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
     .rd_fifo_rddata(rd_fifo_data), .rd_fifo_rdempty(rd_fifo_empty),
     .rd_fifo_rden(rd_fifo_read),
     .diag_idle(d_reader_idle),.diag_fifo_empty(d_fifo_empty),.diag_fifo_level(reader_fifo_level),
-    .arid(rd_id), .araddr(araddr), .arlen(arlen), .arsize(arsize),
-    .arburst(arburst), .arcache(arcache), .arprot(arprot), .arlock(arlock),
-    .arvalid(arvalid), .arready(arready),
-    .rid({{(6-AXI_ID_WIDTH){1'b0}},rid}), .rdata(rdata),
-    .rlast(rlast), .rvalid(rvalid), .rready(rready), .rresp(rresp)
+    .arid(rd_id), .araddr(display_araddr), .arlen(display_arlen), .arsize(display_arsize),
+    .arburst(display_arburst), .arcache(display_arcache), .arprot(display_arprot), .arlock(display_arlock),
+    .arvalid(display_arvalid), .arready(display_arready),
+    .rid({{(6-AXI_ID_WIDTH){1'b0}},display_rid}), .rdata(display_rdata),
+    .rlast(display_rlast), .rvalid(display_rvalid), .rready(display_rready), .rresp(display_rresp)
 );
+generate if(BLIT_ENABLE) begin: shared_read
+    ddr_read_arbiter #(.FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH)) arbiter (
+        .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),
+        .display_active(d_active),.display_launch(d_launch),.display_flush(d_flush),.display_fifo_level(reader_fifo_level),
+        .display_araddr(display_araddr),.display_arlen(display_arlen),.display_arvalid(display_arvalid),.display_arready(display_arready),
+        .display_rdata(display_rdata),.display_rid(display_rid),.display_rresp(display_rresp),
+        .display_rlast(display_rlast),.display_rvalid(display_rvalid),.display_rready(display_rready),
+        .blit_araddr(b_araddr),.blit_arlen(b_arlen),.blit_arvalid(b_arvalid),.blit_arready(b_arready),
+        .blit_rdata(b_rdata),.blit_rid(b_rid),.blit_rresp(b_rresp),.blit_rlast(b_rlast),.blit_rvalid(b_rvalid),.blit_rready(b_rready),
+        .araddr(araddr),.arlen(arlen),.arid(arid),.arsize(arsize),.arburst(arburst),
+        .arcache(arcache),.arprot(arprot),.arlock(arlock),.arqos(),.arvalid(arvalid),.arready(arready),
+        .rdata(rdata),.rid(rid),.rresp(rresp),.rlast(rlast),.rvalid(rvalid),.rready(rready),
+        .fault(read_fault),.fault_code(),.address_pending(),.read_active(),.owner_blit(),.busy(),.display_urgent(),
+        .beats_left(),.display_bursts(),.blit_bursts(),.display_beats(),.blit_beats());
+end else begin: display_only
+    assign araddr=display_araddr;assign arlen=display_arlen;assign arid=rd_id[AXI_ID_WIDTH-1:0];
+    assign arsize=display_arsize;assign arburst=display_arburst;assign arcache=display_arcache;
+    assign arprot=display_arprot;assign arlock=display_arlock;assign arvalid=display_arvalid;assign display_arready=arready;
+    assign display_rdata=rdata;assign display_rid=rid;assign display_rresp=rresp;
+    assign display_rlast=rlast;assign display_rvalid=rvalid;assign rready=display_rready;
+    assign b_arready=0;assign b_rdata=0;assign b_rid=0;assign b_rresp=0;assign b_rlast=0;assign b_rvalid=0;
+    assign read_fault=0;
+end endgenerate
 generate if(D_MODE) begin: d_buffers
+    assign reader_error=read_fault ? 32'h2004 : display_error;
+    assign draw_ready=manager_draw_ready && read_healthy;
     ddr_write_admission #(.ENABLE(WRITE_SERVICE_ENABLE),.READ_QUOTA(WRITE_READ_QUOTA),
         .FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH)) write_service (
         .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),
         .raw_awvalid(a_awvalid),.ddr_awready(awready),.bvalid(a_bvalid),.bready(a_bready),
         .reader_active(d_active),.reader_safe(d_safe),.reader_launch(d_launch),.fifo_flush(d_flush),
         .fifo_level(reader_fifo_level),.reader_error(reader_error),
-        .arvalid(arvalid),.arready(arready),.rvalid(rvalid),.rready(rready),.reader_outstanding(reader_outstanding),
+        .arvalid(display_arvalid),.arready(display_arready),.rvalid(display_rvalid),.rready(display_rready),.reader_outstanding(reader_outstanding),
         .admit_aw(writer_admit),.service_status(service_status),
         .throttle_cycles(writer_throttle_cycles),.writer_bursts(writer_bursts),
         .ar_stall_cycles(reader_ar_stall_cycles),.ar_max_stall(reader_ar_max_stall),
@@ -217,21 +282,22 @@ generate if(D_MODE) begin: d_buffers
         .core_clk(axi_clk),.core_rst_n(axi_rst_n),.boundary_tick(d_boundary),.blank_active(d_blank));
     read_frame_guard #(.FRAME_BEATS(FRAME_BEATS)) guard (
         .clk(axi_clk),.rst_n(axi_rst_n),.launch(d_launch),.frame_base(reader_frame_base),
-        .reader_idle(d_reader_idle),.araddr(araddr),.arlen(arlen),.arsize(arsize),.arburst(arburst),
-        .arvalid(arvalid),.arready(arready),.rvalid(rvalid),.rready(rready),.rlast(rlast),.rid(rid),.rresp(rresp),
+        .reader_idle(d_reader_idle),.araddr(display_araddr),.arlen(display_arlen),.arsize(display_arsize),.arburst(display_arburst),
+        .arvalid(display_arvalid),.arready(display_arready),.rvalid(display_rvalid),.rready(display_rready),
+        .rlast(display_rlast),.rid(display_rid),.rresp(display_rresp),
         .safe(d_safe),.active(d_active),.outstanding(reader_outstanding),.data_beats(reader_data_beats),
-        .reserved_beats(reader_reserved_beats),.error_code(reader_error));
+        .reserved_beats(reader_reserved_beats),.error_code(display_error));
     buffer_manager #(.BUFFER0_BASE(BUFFER0_BASE),.BUFFER1_BASE(BUFFER1_BASE)) manager (
-        .clk(axi_clk),.rst_n(axi_rst_n),.init_done(init_done),.cmd_request(cmd_start),
+        .clk(axi_clk),.rst_n(axi_rst_n),.init_done(init_done),.cmd_request(cmd_start && read_healthy),
         .writer_busy(engine_busy),.writer_done(engine_done),.writer_error(engine_error),
         .swap_request(swap_request),.clear_done(clear_swap_done),
-        .boundary_tick(d_boundary),.blank_active(d_blank),.reader_safe(d_safe),.reader_fifo_empty(d_fifo_empty),
-        .command_accept(d_command_accept),.draw_ready(draw_ready),.writer_owned(d_owned),
+        .boundary_tick(d_boundary),.blank_active(d_blank),.reader_safe(d_safe && read_healthy),.reader_fifo_empty(d_fifo_empty),
+        .command_accept(d_command_accept),.draw_ready(manager_draw_ready),.writer_owned(d_owned),
         .front_index(d_front_index),.back_index(d_back_index),.front_valid(d_front_valid),
         .swap_pending(d_pending),.swap_done(d_done),.front_base(d_front_base),.back_base(d_back_base),
         .command_base(d_command_base),.reader_base(reader_frame_base),.reader_flush(d_flush),.reader_launch(d_launch),
         .boundary_count(boundary_count),.swap_count(swap_count),.missed_boundary_count(missed_boundary_count));
-    assign buffer_status={24'b0,d_safe,d_active,d_owned,d_front_valid,d_done,d_pending,d_back_index,d_front_index};
+    assign buffer_status={24'b0,(d_safe && read_healthy),d_active,d_owned,d_front_valid,d_done,d_pending,d_back_index,d_front_index};
 end else begin: no_swaps
     assign writer_admit=1;assign service_status=0;assign writer_throttle_cycles=0;assign writer_bursts=0;
     assign reader_ar_stall_cycles=0;assign reader_ar_max_stall=0;assign reader_r_stall_cycles=0;assign reader_r_max_stall=0;
@@ -256,6 +322,7 @@ rgb_unpack128_to64 #(.FRAME_WIDTH(FRAME_WIDTH), .FRAME_HEIGHT(FRAME_HEIGHT)) u_u
 initial if(D_MODE && (WRITE_FIFO_HIGH>=RD_FIFO_DEPTH || WRITE_FIFO_LOW<16))
     $fatal(1,"Display service watermarks must fit the actual FIFO depth");
 initial begin
+    if(BLIT_ENABLE && (!C_MODE || !D_MODE)) $fatal(1,"BLIT requires the double-buffered platform");
     if(D_MODE && (!C_MODE || AXI_ID_WIDTH!=4 || AXI_ADDR_WIDTH!=32 || BUFFER0_BASE!=0 ||
        BUFFER1_BASE!=32'h00800000 || FRAME_WIDTH*FRAME_HEIGHT*4>32'h00800000))
         $fatal(1,"Unsupported D slot geometry");

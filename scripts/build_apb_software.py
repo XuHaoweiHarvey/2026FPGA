@@ -8,6 +8,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--ide-root', type=Path, default=Path('D:/Efinity/efinity-riscv-ide-2026.1'))
+parser.add_argument('--toolchain-prefix',type=Path,
+                    help='Optional complete GNU cross-tool prefix, ending in a hyphen; default uses the formal IDE')
 parser.add_argument('--output', type=Path, default=ROOT / 'software/apb_reg_test/build')
 parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
                     help='Optional C macro override, e.g. TEST_RECT_X=320; tests use a temporary output')
@@ -24,7 +26,7 @@ assert conf['CpuCount'] == '1' and conf['OCRSize'] == '65536'
 assert value('SYSTEM_RISCV_ISA_RV32I') == 1 and value('SYSTEM_RISCV_ISA_EXT_M') == 1
 for extension in ('A', 'C', 'F', 'D'):
     assert value('SYSTEM_RISCV_ISA_EXT_' + extension) == 0, 'Recheck generated ISA before rebuilding'
-assert value('IO_APB_SLAVE_0_INPUT_SIZE') >= 0xBC
+assert value('IO_APB_SLAVE_0_INPUT_SIZE') >= 0xC8
 assert value('SYSTEM_RAM_A_SIZE') == value('SYSTEM_RAM_A_CTRL_SIZE') == 65536
 linker = bsp / 'linker/default.ld'
 text = linker.read_text(encoding='utf8')
@@ -34,10 +36,11 @@ assert origin == value('SYSTEM_RAM_A_CTRL') and length == value('SYSTEM_RAM_A_CT
 out = args.output.resolve()
 out.mkdir(parents=True, exist_ok=True)
 bin_dir = args.ide_root / 'toolchain/bin'
-gcc = bin_dir / 'riscv-none-elf-gcc.exe'
-objcopy = bin_dir / 'riscv-none-elf-objcopy.exe'
-objdump = bin_dir / 'riscv-none-elf-objdump.exe'
-nm = bin_dir / 'riscv-none-elf-nm.exe'
+tool_prefix = str(args.toolchain_prefix or (bin_dir / 'riscv-none-elf-'))
+gcc = Path(tool_prefix+'gcc.exe')
+objcopy = Path(tool_prefix+'objcopy.exe')
+objdump = Path(tool_prefix+'objdump.exe')
+nm = Path(tool_prefix+'nm.exe')
 flags = ['-march=rv32im_zicsr_zifencei', '-mabi=ilp32', '-Og', '-g3', '-ffreestanding',
          '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror',
          '-DUSE_GP', '-DNO_LIBC_INIT_ARRAY', '-I' + str(bsp / 'include')]
@@ -63,7 +66,7 @@ for line in selected:
     address = int(line.split()[0], 16)
     assert origin <= address <= origin + length - 1024, line
 # PT_LOAD segments must all lie in the formal on-chip RAM, never the DDR.
-readelf = bin_dir / 'riscv-none-elf-readelf.exe'
+readelf = Path(tool_prefix+'readelf.exe')
 segments = subprocess.check_output([str(readelf), '-l', '-W', str(elf)], text=True)
 for line in segments.splitlines():
     fields = line.split()
