@@ -67,7 +67,7 @@ python scripts/run_rgb_checks.py --quick
 | 工程一致性 | 55个现存且唯一源文件；RTL/头文件/寄存器表50个offset一致 |
 | 软件构建 | 本机没有默认路径的Efinix IDE工具链，使用已安装Xilinx GNU RISC-V GCC13.3.0、正式Sapphire BSP和RV32IM配置构建RAM ELF，LOAD/关键符号位于64KiB OCRAM；另以保留全部inline函数方式编译，确认BLIT API也生成目标代码 |
 | BLIT演示软件（错误处理修正前） | 默认FILL和DEMO_MODE=2均构建通过；Unicorn 2.1.4执行真实RV32 ELF，旧FILL连续1000轮/4000命令/1000次swap，BLIT两轮14命令/2次BLIT/4次swap；编译默认模式、60周期保持、计数回绕和另一初始Front通过 |
-| 软件错误边界复验 | 补充BLIT错误注入时，成功完成计数断言失败；已增加DONE后的ERROR_CODE复查，并保留读/写错误回归和实际计数输出。最终修正版尚待重新构建及完整软件回归，不能以此前正常流程结果代替复验 |
+| 软件错误边界复验 | 发现并修正DONE与ERROR_CODE分次读取的竞争；最终修正版完整行为检查通过。BLIT读错误0x22、写错误0x23分别停止运行并计入诊断，源Front保持、失败Back不换帧；其他初始化/超时/显示故障用例通过 |
 
 软件产物位于忽略目录`output/graphics/software/`，未提交。使用替代GNU工具链的命令：
 

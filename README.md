@@ -175,4 +175,4 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 - Alpha Blend、Color Keying 与后续高负载互动 Demo。
 - Line、进一步命令扩展，以及依据测量决定的 FIFO / line buffer / cache 优化。
 
-BLIT 独立原型已通过单元仿真，完整系统集成与其余扩展仍待完成。赛题来源、前置设计决策和验收条件见 [ROADMAP](docs/ROADMAP.md)。
+BLIT 已接入正式v4系统并通过模块、共享DDR系统与软件行为仿真；Efinity资源/时序和实板验收仍待完成。性能对照、图片资源加载、Alpha/Color Key和互动Demo仍按 [ROADMAP](docs/ROADMAP.md) 规划。

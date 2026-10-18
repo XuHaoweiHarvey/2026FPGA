@@ -2,9 +2,9 @@
 
 ## Starting Point
 
-Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双缓冲、safe swap和显示保护已实现，不是TODO。** 后续 BLIT 已新增独立 RTL 原型和单元仿真，运行及限制见 [BLIT](BLIT.md)；正式系统和实板集成仍待完成。
+Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双缓冲、safe swap和显示保护已实现，不是TODO。** BLIT现已接入v4正式工程、软件API和演示流程，模块/共享DDR系统/软件行为仿真通过；Efinity综合时序和新v4实板验收仍待完成，见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。
 
-B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md) 已按A/C反馈支持最终accept、src_range_valid和0x26，通过85个混合命令用例；[C侧源窗口检查器](BLIT_SOURCE_GUARD.md) 已实现并接入仿真，两组各426个源矩形测试、17个真实manager合同场景通过。另通过两组各11场景的双缓冲绘制/复制/换帧闭环，每组20条命令与8次换帧。[读仲裁器](DDR_READ_ARBITER.md) 已通过独立协议仿真；正式寄存器/顶层/检查器/读仲裁的连接尚未完成，闭环中的边界/reader-safe/内存为模型。
+B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md)、[C侧源窗口检查器](BLIT_SOURCE_GUARD.md) 和 [显示/BLIT读仲裁器](DDR_READ_ARBITER.md) 已接入正式Framebuffer/APB/top工程。独立模块、双缓冲闭环和带真实显示Reader/FIFO的共享DDR系统仿真通过；软件 `DEMO_MODE=2` 的实际RV32 ELF行为检查通过。全帧DDR/HDMI IP、综合时序和v4硬件尚未实测。
 
 依据仓库 [2026 FPGA赛道选题指南（易灵思）](../docs_reference/全国大学生嵌入式芯片与系统设计竞赛'2026FPGA赛道选题指南-易灵思.pdf) 的“赛题二”，PDF第7～9页：基础要求含Block Copy/Solid Fill、总线burst/FIFO、双缓冲驱动与软硬渲染对比；高阶含Alpha、Color Keying和高负载互动Demo。Line属于团队可选扩展，不是该段列明的基础必做项。
 
@@ -13,8 +13,8 @@ B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md) 已按A/C反馈支持最终ac
 | 优先级 | 工作 | 当前状态 / 完成出口 |
 |---|---|---|
 | 基线 | Solid Fill / FILL_RECT、DDR显示、RISC-V/APB、Front/Back、safe swap、连续性保护 | **Done，A～E实板通过** |
-| Phase 3首要 | Block Copy / BitBlt / BLIT | 独立 RTL 原型已通过单元仿真；仍需完成 DDR 源图、软件配置、显示仲裁和实板验收 |
-| Phase 3前置 | Accelerator DDR read与Display Reader仲裁 | 独立RTL/协议仿真通过；正式接线/并发/时序待验收，低水位显示优先、健康状态轮流，已提交响应归属保持 |
+| Phase 3首要 | Block Copy / BitBlt / BLIT | 正式v4工程、软件API/演示已接线；模块/共享DDR和CPU行为仿真通过；Efinity资源/时序及实板验收待完成 |
+| Phase 3前置 | Accelerator DDR read与Display Reader仲裁 | 已接入正式Framebuffer；共享显示并发与故障保护仿真通过；需A/C在正式工具链与板卡验证 |
 | Phase 3演示/测量 | 资源图像加载、纯软件/硬件渲染对照与板级性能统计 | Not implemented；测量条件/耗时/像素工作量可复现，不把仿真速度当实测 |
 | 后续高阶 | Alpha Blend、Color Keying | Not implemented；透明/不透明端点、舍入/饱和/色键跳过与Back ownership均验证 |
 | 后续可选 | Line与进一步命令扩展 | Not implemented；独立确定几何/边界、接口与测试 |
@@ -23,15 +23,15 @@ B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md) 已按A/C反馈支持最终ac
 
 ## Phase 3: Block Copy / BLIT
 
-### 开码前必须约定
+### 已冻结的首轮接口与后续待办
 
-1. 命令类型、source/destination地址或slot含义、width/height、src/dst stride，所有DDR地址继续用byte单位；既有CSR不重排，新接口走团队变更流程。
-2. source图像存放范围与加载方式。当前CPU没有DDR端口，不能假定已有图片资源上传路径。
-3. source/destination对齐、每行padding、越界检查、重叠区域语义（拒绝还是memmove式处理）。**TODO / Needs confirmation：未定义，不假设已支持。**
-4. 新AR/R master与Display Reader的仲裁、ID/响应归属、outstanding上界、FIFO容量、低水位urgent及公平性；不能直接OR两个master。
-5. DONE需涵盖所有读/写事务与最后成功B；超时不撤回VALID。Back base在命令开始时锁存，pending阻止新命令。
+1. 已采用 `op=1`、Front绝对byte地址、`width/height`和`src_stride=7680`；目的地为锁存Back，FILL/BLIT共用既有寄存器/执行入口，契约见 [REGISTER_MAP](REGISTER_MAP.md)。
+2. 当前源图由软件通过FILL在Back构造后swap到Front；CPU没有DDR端口。通用图片资源加载路径仍未实现。
+3. 当前BLIT约束为16-byte源地址对齐、有效Front窗口内不跨源行；目的x/width四像素对齐；目的矩形越界拒绝。任意源/目的stride与重叠复制未作为正式平台能力开放。
+4. 显示Reader和BLIT读master已由共享读仲裁器接线，限定burst、固定响应owner、FIFO低水位显示优先和健康状态轮转；系统并发已仿真，板级最坏等待/实时性仍待测。
+5. DONE覆盖读/写事务与最后成功B，超时不撤回VALID；Back base在接收时锁存，pending阻止新命令。新v4软件会检查版本并等待完成后显式swap。
 
-### 分工和验收
+### 后续分工和验收
 
 A整理新命令API/驱动/资源与对照Demo；B实现复制执行和读写流水线；C负责DDR read服务仲裁、显示保护与诊断。三人先审接口再各自实现。
 
