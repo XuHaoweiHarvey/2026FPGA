@@ -20,6 +20,14 @@
 
 ## Simulation Results
 
+### B统一入口可选色键（2026-10-18）
+
+`graphics_engine` 增加默认关闭的 `COLOR_KEY_ENABLE`，开启时通过实验操作类型和锁存的 `color[23:0]` 使用同一 BLIT DMA 进行色键复制。正式 v4 APB/Framebuffer/软件未开启该能力，VERSION/CAPABILITIES 不变。色键独立模块及原有53场景记录保留；本轮统一入口关闭配置44/43场景、开启配置76/74场景通过，含混合绘制、完整像素比较、参数快照、源范围拒绝、反压/错误/超时排空及故障复位。仅在bench绕过色键时，独立参考检查按预期发现背景被覆盖。
+
+原真实manager/源检查器合同17场景、双缓冲两组各11场景、852个源矩形、读仲裁27场景及既有负对照通过。正式默认配置的共享DDR系统复验WAIT1：4次swap、27完整帧/916257次像素比较，正常复制underflow/missed增量0；RGB quick与当前正式顶层端口展开通过。Icarus原有FIFO constant-select、继承timescale和顶层位宽提示保留。
+
+色键混合场景使用DDR和接收沿寄存的C范围结果模型，未执行CPU或实际显示/换帧；默认关闭配置的系统回归只证明原v4兼容性，不证明色键系统并发通过。复现命令、实验编码、图像和剩余系统/软件/硬件工作见[COLOR_KEY](COLOR_KEY.md)。尚无色键Efinity综合时序、板级带宽或HDMI验收。
+
 ### v4正式BLIT接线（2026-10-18）
 
 APB→graphics_engine→源检查/读仲裁→真实Display Reader/FIFO/CVO/serializer的512×64系统仿真已通过WAIT0/1/3，每组4次swap、27完整帧/916257次像素比较；正常拷贝underflow/missed增量0，参数快照、CPU reset、最后B/最后R保护和共享故障0x2004通过。两种故意误接显示数据/读quota的临时副本均被测试拒绝。旧D WAIT1、RGB回归/正式v4顶层端口展开、原独立图形测试、APB兼容及v4寄存器测试通过。

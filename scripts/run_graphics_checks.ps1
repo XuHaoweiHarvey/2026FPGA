@@ -87,6 +87,14 @@ try {
         '-Ptb_graphics_engine.MAX_BURST_BEATS=1',
         '-Ptb_graphics_engine.OP_FILL=7', '-Ptb_graphics_engine.OP_BLIT=9'
     )
+    Invoke-GraphicsSimulation -Name 'color_key_dispatch' -Overrides @(
+        '-Ptb_graphics_engine.COLOR_KEY_ENABLE=1'
+    ) -Wave:(-not $NoWave) -PassPattern '^PASS COLOR KEY DISPATCH:'
+    Invoke-GraphicsSimulation -Name 'color_key_dispatch_single_beat' -Overrides @(
+        '-Ptb_graphics_engine.COLOR_KEY_ENABLE=1', '-Ptb_graphics_engine.MAX_BURST_BEATS=1',
+        '-Ptb_graphics_engine.OP_FILL=7', '-Ptb_graphics_engine.OP_BLIT=9',
+        '-Ptb_graphics_engine.OP_COLOR_KEY=11'
+    ) -PassPattern '^PASS COLOR KEY DISPATCH:'
     Invoke-GraphicsSimulation -Name 'manager_contract' -Overrides @() `
         -Top 'tb_graphics_contract' -PassPattern '^PASS GRAPHICS CONTRACT:'
     Invoke-GraphicsSimulation -Name 'double_buffer' -Overrides @() -Wave:(-not $NoWave) `
@@ -106,6 +114,19 @@ try {
         throw 'The scoreboard did not reject the deliberately corrupted pixel.'
     }
     Write-Host 'PASS scoreboard negative control: incorrect pixel detected.'
+
+    Write-Host 'Check color-key negative control: bypass transparency and require a pixel failure'
+    Push-Location -LiteralPath (Join-Path $outputPath 'color_key_dispatch')
+    try {
+        $guardOutput = @(& $vvpExe (Join-Path $outputPath 'color_key_dispatch/graphics.vvp') '+BYPASS_COLOR_KEY')
+        $guardExit = $LASTEXITCODE
+    } finally { Pop-Location }
+    $guardOutput | Set-Content -LiteralPath (Join-Path $outputPath 'color_key_expected_failure.log') -Encoding UTF8
+    if ($guardExit -eq 0 -or -not ($guardOutput -match 'key scene 3: color-key') -or
+        -not ($guardOutput -match 'Target pixel')) {
+        throw 'The color-key scene did not reject the deliberately bypassed transparency.'
+    }
+    Write-Host 'PASS color-key negative control: overwritten background detected.'
 
     Write-Host 'Check source guard negative control: bypass policy and require rejection'
     Push-Location -LiteralPath (Join-Path $outputPath 'manager_contract')
@@ -170,14 +191,19 @@ try {
                 03_cleared_back 04_pending_front 05_copy_front 06_return_front 07_overlay_front |
             ForEach-Object { Write-Host $_ }
         if ($LASTEXITCODE -ne 0) { throw 'Double-buffer PNG preview conversion failed.' }
+        & $PythonExe @pythonArgs (Join-Path $PSScriptRoot 'render_blit_preview.py') `
+            (Join-Path $outputPath 'color_key_dispatch') --names ck_sprite_source ck_01_background `
+                ck_02_blit ck_03_color_key ck_04_overlay | ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) { throw 'Color-key dispatcher PNG preview conversion failed.' }
     } else {
         Write-Host 'PNG previews skipped: optional Python 3 not found. PPMs and RTL checks are available.'
     }
-    Write-Host 'PASS independent read arbiter, source guard, graphics dispatcher and double-buffer checks. Run run_d_checks.py --graphics for system integration; Efinity/board verification pending.'
+    Write-Host 'PASS independent read arbiter, source guard, graphics/color-key dispatcher and double-buffer checks. Color key is B-local opt-in, not formal v4 APB support; Efinity/board verification pending.'
     if (-not $NoWave) {
         Write-Host ('Source guard waveform: ' + (Join-Path $outputPath 'source_guard_1080p/graphics.vcd'))
         Write-Host ('Waveform: ' + (Join-Path $outputPath 'basic/graphics.vcd'))
         Write-Host ('Double-buffer waveform: ' + (Join-Path $outputPath 'double_buffer/graphics.vcd'))
+        Write-Host ('Color-key waveform: ' + (Join-Path $outputPath 'color_key_dispatch/graphics.vcd'))
     }
     Write-Host "Log: $logPath"
 } finally { Stop-Transcript | Out-Null }

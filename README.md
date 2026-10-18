@@ -162,7 +162,7 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [ROADMAP](docs/ROADMAP.md) | 按赛题实际要求安排的后续任务与验收出口 |
 | [BLIT](docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
 | [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md) | FILL/BLIT统一入口、混合场景仿真与三步结果图 |
-| [COLOR_KEY](docs/COLOR_KEY.md) | 色键透明复制独立模块、运行方法与普通/透明复制对比图；尚未接正式系统 |
+| [COLOR_KEY](docs/COLOR_KEY.md) | 色键独立模块及B统一入口可选命令、混合绘制与对比图；正式v4默认关闭，待系统接入 |
 | [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | 按A/C反馈确定的首轮接口、实施状态与验收步骤 |
 | [BLIT_SOURCE_GUARD](docs/BLIT_SOURCE_GUARD.md) | C侧源窗口检查、accept时序、边界用例及对接限制 |
 | [DDR_READ_ARBITER](docs/DDR_READ_ARBITER.md) | 显示/BLIT读仲裁、响应归属、故障保留及独立测试 |

@@ -1,10 +1,12 @@
-# B：FILL / BLIT 统一执行入口
+# B：FILL / BLIT 与可选色键统一执行入口
 
 ## 这一步完成什么
 
 对应赛题二基础要求第1项：硬件根据操作类型执行 Solid Fill 或 Block Copy。`graphics_engine.v` 在 B 内部接收一条命令，保存参数，选择现有 `fill_rect_writer` 或 `blit_engine`，并提供一套公共状态和写接口。
 
 当前B执行层已通过独立仿真、真实manager/源检查器合同测试和双槽绘制/复制/换帧仿真。2026-10-18已接入正式APB、framebuffer、源检查器、DDR读仲裁及工程清单，系统验证和软件兼容见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。v4尚待Efinity综合时序和实板验收。下文独立模块/双槽测试的范围保持原样，不应将它们当作整机证据。
+
+同日增加 B 侧可选色键命令：`COLOR_KEY_ENABLE=1` 时第三种命令使用 `color[23:0]` 作为 RGB 色键，复用原 BLIT DMA。该配置默认关闭，正式 v4 APB/Framebuffer/软件尚未开放；混合场景、运行和验证结果见 [COLOR_KEY](COLOR_KEY.md)。
 
 ```text
 仿真命令（未来由 A 提供）
@@ -30,7 +32,7 @@
 | `sim/tb_graphics_double_buffer.v` | 真实 manager+B 的成功换帧、双向复制、最后 B 延迟、独立双槽像素检查 |
 | `sim/graphics_double_buffer_memory.v` | 仅仿真使用的双槽 AXI 内存，两槽均可读写，换帧不搬动内存内容 |
 | `sim/tb_blit_engine.v` | 复用其中的 `blit_test_memory`；新增可选 byte strobe 支持，BLIT 默认仍要求全 strobe |
-| `scripts/run_graphics_checks.ps1` | 两组源检查器、两组执行层仿真、manager 合同测试、两组双缓冲闭环、负对照、可选波形和 PNG |
+| `scripts/run_graphics_checks.ps1` | 两组源检查器、四组执行层仿真（色键关闭/开启）、manager 合同测试、两组双缓冲闭环、负对照、可选波形和 PNG |
 | `scripts/run_read_arbiter_checks.ps1` | 独立C侧读仲裁单测；统一入口也会运行；系统并发另见run_d_checks.py --graphics |
 | `scripts/render_blit_preview.py` | 共用 PPM→PNG 转换，新增可选 `--names`，原 BLIT 调用方式保留 |
 
@@ -93,9 +95,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_graphics_c
 |---|---|
 | `start` | 接 manager 最终产生的一拍 `command_accept`，不能直接接原始 APB 请求 |
 | `enabled` | 平台接收使能，最终 accept 时必须为1；不用于中途取消 |
-| `op[31:0]` | 团队编码0=FILL、1=BLIT；参数 `OP_FILL/OP_BLIT` 仅用于复用/测试配置 |
+| `op[31:0]` | 正式0=FILL、1=BLIT；B 可选色键命令实验编码2，仅 `COLOR_KEY_ENABLE=1` 时支持，尚未发布为正式 APB 命令；三个 OP 参数支持测试重映射 |
 | `x/y/width/height[31:0]` | 目标位置和矩形大小，单位像素 |
-| `color[31:0]` | FILL 的 XRGB8888 颜色，BLIT 不使用 |
+| `color[31:0]` | FILL 的 XRGB8888 颜色；普通 BLIT 不使用；可选色键命令使用低24位 RGB，高8位忽略 |
 | `src_addr[31:0]` | BLIT 绝对源字节地址，FILL 不使用 |
 | `src_stride[31:0]` | BLIT 源行距，单位字节，FILL 不使用 |
 | `src_range_valid` | C 用最终 accept 的参数/Front 检查后锁存的结果；B 在下一拍 `CHECK_SOURCE` 采样；FILL 忽略 |
@@ -103,6 +105,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_graphics_c
 `accept` 是 B 的组合输出，表示本拍 `rst_n && start && enabled && !busy`，不是另一根启动输入。集成时应让它与 manager 的 `command_accept` 一致，可用于观察/断言，不能回接参与生成同一个 manager accept 而形成组合环。忙时请求不排队，disabled 请求不清结果/计数。
 
 接受命令当拍锁存参数和操作选择、清旧结果并增加公共计数。FILL 顺序为 `IDLE → LAUNCH → RUN → IDLE`，BLIT 为 `IDLE → CHECK_SOURCE → LAUNCH → RUN → IDLE`。`LAUNCH` 只启动一次子模块；`RUN` 才采集结果，隔离旧 sticky DONE。
+
+色键复制使用同一 BLIT 顺序和源检查，命令类型及颜色在公共 accept 时锁存；写出时按 RGB24 比较生成逐像素 WSTRB，透明位置保留 Back。全透明拍仍走完 W/B，FILL 的边缘 strobe 和普通复制不受前一条色键命令影响。没有新增端口、DMA、APB offset 或正式 capability；默认关闭配置的执行和错误语义保持不变。
 
 ### C 范围结果的时序
 
@@ -169,3 +173,5 @@ FILL 固定使用 `SETTLE_FRAMES=0`，与现有双缓冲正式模式一致：完
 后续C侧 [读仲裁器](DDR_READ_ARBITER.md) 已通过独立协议测试，统一入口也会执行该单测。该项使用测试客户端/DDR，未插入这里的B/manager/双缓冲路径；不能将两项独立通过当作共享显示链路已连接。
 
 正式接线现已完成，系统并发验证单独记录于 [SYSTEM_BLIT](SYSTEM_BLIT.md)。本页的合同/双缓冲测试仍使用DDR与reader-safe模型输入，只证明所列模块合同；最大板级等待、Efinity资源时序和实板显示连续性仍需测量。
+
+2026-10-18色键入口更新：关闭色键两组执行层44/43场景，开启色键两组76/74场景通过；沿用真实manager合同17场景及两组双缓冲各11场景。新增色键旁路负对照按预期检测到背景被覆盖。两组启用配置均输出“FILL背景→普通复制→色键复制→非对齐FILL”的独立参考像素结果，新增图像在 `output/graphics/color_key_dispatch/`。色键场景中的 C 范围判定仍是接收沿锁存的模型，不把该结果扩展为正式色键显示系统通过。

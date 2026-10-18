@@ -16,7 +16,7 @@ B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md)、[C侧源窗口检查器](BL
 | Phase 3首要 | Block Copy / BitBlt / BLIT | 正式v4工程、软件API/演示已接线；模块/共享DDR和CPU行为仿真通过；Efinity资源/时序及实板验收待完成 |
 | Phase 3前置 | Accelerator DDR read与Display Reader仲裁 | 已接入正式Framebuffer；共享显示并发与故障保护仿真通过；需A/C在正式工具链与板卡验证 |
 | Phase 3演示/测量 | 资源图像加载、纯软件/硬件渲染对照与板级性能统计 | Not implemented；测量条件/耗时/像素工作量可复现，不把仿真速度当实测 |
-| 高阶独立原型 | Color Keying | 独立色键BLIT执行层与53场景RTL仿真通过；尚未接入正式命令/系统，无综合或实板验收，见[COLOR_KEY](COLOR_KEY.md) |
+| 高阶B侧实现 | Color Keying | 独立执行层及统一入口可选命令/混合场景通过；统一入口默认关闭，正式APB/显示系统与综合、实板待接入验收，见[COLOR_KEY](COLOR_KEY.md) |
 | 后续高阶 | Alpha Blend | Not implemented；透明/不透明端点、舍入/饱和与Back ownership均验证 |
 | 后续可选 | Line与进一步命令扩展 | Not implemented；独立确定几何/边界、接口与测试 |
 | 依测量决定 | FIFO/burst调优、line buffer/cache、DDR带宽优化 | Planned；有性能瓶颈证据后再做，保留显示保护 |
@@ -50,7 +50,7 @@ A整理新命令API/驱动/资源与对照Demo；B实现复制执行和读写流
 
 当前XRGB8888的X被忽略，不能直接称为Alpha。**TODO / Needs confirmation：未来Alpha来源、输入格式、混合范围、整数精度/舍入/饱和规则。** 先保持现有framebuffer契约，必要的新资源格式单独定义。Color Keying应有明确色键比较和跳写语义，矩形外/透明像素保持不变。
 
-Color Keying的独立执行层已实现：精确比较RGB24、忽略X，透明像素关闭四个byte strobe，保留Back内容；全透明拍仍完成总线握手。复用原BLIT且不增加目的读通道，53场景仿真通过。正式APB/graphics_engine/显示系统尚未接入，接口与板级验收待完成，见[COLOR_KEY](COLOR_KEY.md)。
+Color Keying已完成独立执行层和B统一入口的可选命令：精确比较RGB24、忽略X，透明像素关闭四个byte strobe，保留Back内容；全透明拍仍完成总线握手。复用原BLIT且不增加目的读通道，独立53场景、统一入口启用两组76/74场景通过，另有默认关闭兼容检查和色键旁路负对照。正式v4配置仍关闭色键，APB/显示系统接入、软件接口与板级验收待完成，见[COLOR_KEY](COLOR_KEY.md)。
 
 Line应作为独立图元规定端点包含、方向、裁剪或拒绝、颜色和错误语义；不是借规划顺手修改现有FILL。line buffer/cache只在真实瓶颈和资源预算明确后采用。
 

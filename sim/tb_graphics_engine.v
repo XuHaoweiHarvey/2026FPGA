@@ -3,10 +3,15 @@
 module tb_graphics_engine;
 parameter MAX_BURST_BEATS = 32;
 parameter [31:0] OP_FILL = 0, OP_BLIT = 1;
+parameter COLOR_KEY_ENABLE = 0;
+parameter [31:0] OP_COLOR_KEY = 2;
 localparam FRAME_WIDTH = 64, FRAME_HEIGHT = 48;
 localparam SOURCE_WORDS = 32768, TARGET_WORDS = FRAME_WIDTH * FRAME_HEIGHT;
 localparam [31:0] SOURCE_BASE = 32'h01000000, BACK_BASE = 32'h00800000;
 localparam [31:0] ERR_OPCODE = 32'h26;
+localparam [23:0] MAGENTA = 24'hff00ff;
+localparam [31:0] SPRITE_BASE = SOURCE_BASE + 32'h1000;
+localparam FINAL_B_BEATS = MAX_BURST_BEATS < 8 ? MAX_BURST_BEATS : 8;
 reg clk = 0, rst_n = 0, enabled = 0, start = 0;
 reg range_decision = 1, src_range_valid = 0;
 always #5 clk = ~clk;
@@ -30,6 +35,8 @@ wire memory_idle;
 reg [31:0] saved_source [0:SOURCE_WORDS-1];
 reg [31:0] expected_target [0:TARGET_WORDS-1];
 integer case_count = 0;
+integer key_zero_beats = 0, key_mixed_beats = 0;
+reg accepted_key_command = 0;
 
 // C's validator registers its result on the final ACCEPT edge, not earlier.
 // This makes the previous command's result visible at that edge and detects
@@ -42,7 +49,8 @@ end
 graphics_engine #(
     .FRAME_WIDTH(FRAME_WIDTH), .FRAME_HEIGHT(FRAME_HEIGHT),
     .FRAME_STRIDE(FRAME_WIDTH*4), .MAX_BURST_BEATS(MAX_BURST_BEATS),
-    .WATCHDOG_BITS(9), .OP_FILL(OP_FILL), .OP_BLIT(OP_BLIT)
+    .WATCHDOG_BITS(9), .OP_FILL(OP_FILL), .OP_BLIT(OP_BLIT),
+    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE), .OP_COLOR_KEY(OP_COLOR_KEY)
 ) dut (
     .clk(clk), .rst_n(rst_n), .enabled(enabled), .start(start),
     .op(cmd_op), .x(cmd_x), .y(cmd_y),
@@ -87,10 +95,14 @@ always @(posedge clk) begin
     if (!rst_n) begin
         held_ar_stall <= 0; held_aw_stall <= 0; held_w_stall <= 0; was_busy <= 0;
         accepted_requests <= 0;
+        accepted_key_command <= 0;
     end else begin
         if (command_count !== accepted_requests)
             $fatal(1, "COUNT did not match the actual ACCEPT events");
-        if (accept) accepted_requests <= accepted_requests + 1'b1;
+        if (accept) begin
+            accepted_requests <= accepted_requests + 1'b1;
+            accepted_key_command <= COLOR_KEY_ENABLE && cmd_op == OP_COLOR_KEY;
+        end
         if (accept && (busy || !enabled || !start))
             $fatal(1, "ACCEPT without an enabled idle START");
         if (checking_range_rejection && (arvalid || awvalid || wvalid || dut.blit_unit.start))
@@ -115,6 +127,10 @@ always @(posedge clk) begin
         if ((arvalid && arlen >= MAX_BURST_BEATS) ||
             (awvalid && awlen >= MAX_BURST_BEATS))
             $fatal(1, "Configured burst cap exceeded");
+        if (accepted_key_command && wvalid && wready) begin
+            if (wstrb == 0) key_zero_beats = key_zero_beats + 1;
+            else if (wstrb != 16'hffff) key_mixed_beats = key_mixed_beats + 1;
+        end
         was_busy <= busy; previous_owner <= dut.selected_blit;
     end
 end
@@ -180,6 +196,50 @@ begin
         for (col=0; col<ww; col=col+1)
             expected_target[(yy+row)*FRAME_WIDTH+xx+col] =
                 saved_source[(ss-SOURCE_BASE)/4+row*(stride/4)+col];
+end
+endtask
+
+task expect_key_copy;
+input [31:0] ss, stride;
+input integer xx, yy, ww, hh;
+input [23:0] key;
+integer row, col;
+reg [31:0] pixel;
+begin
+    for (row=0; row<hh; row=row+1)
+        for (col=0; col<ww; col=col+1) begin
+            pixel = saved_source[(ss-SOURCE_BASE)/4+row*(stride/4)+col];
+            if (pixel[23:0] != key)
+                expected_target[(yy+row)*FRAME_WIDTH+xx+col] = pixel;
+        end
+end
+endtask
+
+task initialize_key_memory;
+integer i, xx, yy;
+reg [31:0] pixel;
+begin
+    initialize_memory();
+    for (i=0; i<SOURCE_WORDS; i=i+1) begin
+        pixel = 32'ha5000000 ^ (i*32'h010203);
+        if (pixel[23:0] == MAGENTA) pixel = pixel ^ 1;
+        // First 16 beats cover every combination of four transparent pixels.
+        if ((i<64 && ((i/4) & (1 << (i%4)))!=0) || (i>=64 && i<96))
+            pixel = {8'h80,MAGENTA} ^ ((i%256) << 24);
+        if (i>=128 && i<144) pixel = (i%256) << 24;
+        if (i>=192 && i<208) pixel = 32'h00ffffff ^ ((i%256) << 24);
+        if (i>=1024 && i<2048) begin
+            xx=(i-1024)%32; yy=(i-1024)/32;
+            pixel=32'h80ff00ff;
+            if ((xx>=8 && xx<24 && yy>=6 && yy<24) ||
+                (xx>=15 && xx<17 && yy>=2 && yy<6) ||
+                (yy>=24 && yy<30 && ((xx>=8 && xx<13) || (xx>=19 && xx<24))))
+                pixel=32'h00ffc040;
+            if (yy>=10 && yy<14 && ((xx>=10 && xx<13) || (xx>=19 && xx<22)))
+                pixel=32'h00203040;
+        end
+        saved_source[i]=pixel; memory.source_mem[i]=pixel;
+    end
 end
 endtask
 
@@ -265,7 +325,28 @@ begin
 end
 endtask
 
+task key_copy_case;
+input [8*100-1:0] name;
+input [31:0] ss, stride;
+input integer xx, yy, ww, hh;
+input [31:0] key;
+integer old_cmd, old_r, old_w, old_ar, old_aw, old_b;
+begin
+    announce(name); enabled=1; range_decision=1;
+    old_cmd=command_count; old_r=r_count; old_w=w_count;
+    old_ar=ar_count; old_aw=aw_count; old_b=b_count;
+    expect_key_copy(ss,stride,xx,yy,ww,hh,key[23:0]);
+    submit(OP_COLOR_KEY,xx,yy,ww,hh,key,ss,stride);
+    poison_inputs(); await_done(0); enabled=1; range_decision=1;
+    if (command_count!=old_cmd+1 || r_count-old_r!=ww*hh/4 || w_count-old_w!=ww*hh/4 ||
+        ar_count-old_ar!=aw_count-old_aw || aw_count-old_aw!=b_count-old_b)
+        $fatal(1,"Color-key dispatch count, beat or response mismatch");
+    check_memory();
+end
+endtask
+
 task disabled_case;
+input [31:0] operation;
 reg old_done;
 reg [31:0] old_error;
 integer old_cmd, old_ar, old_aw;
@@ -273,7 +354,7 @@ begin
     announce("disabled request preserves the previous public result");
     old_done=done; old_error=error_code; old_cmd=command_count;
     old_ar=ar_count; old_aw=aw_count; enabled=0;
-    submit(OP_FILL,0,0,4,1,0,SOURCE_BASE,128);
+    submit(operation,0,0,4,1,0,SOURCE_BASE,128);
     repeat (8) @(negedge clk);
     if (busy || done !== old_done || error_code !== old_error ||
         command_count != old_cmd || ar_count != old_ar || aw_count != old_aw)
@@ -297,22 +378,26 @@ endtask
 
 task response_error_case;
 input integer kind;
+input [31:0] operation;
 integer old_cmd, old_ar, old_aw, first_pixels;
 begin
-    announce("BLIT response error routes only to the active command");
+    announce("copy response error routes only to the active command");
     $display("  error kind=%0d (RRESP/RID/BRESP/BID=0/1/2/3)",kind);
     initialize_memory(); old_cmd=command_count; old_ar=ar_count; old_aw=aw_count;
     case (kind)
         0:inject_rresp=1; 1:inject_rid=1; 2:inject_bresp=1; 3:inject_bid=1;
     endcase
-    submit(OP_BLIT,8,5,32,2,0,SOURCE_BASE,128);
+    submit(operation,8,5,32,2,32'h00eeeeee,SOURCE_BASE,128);
     if (kind<2) begin
         wait (rvalid && rready); @(negedge clk); inject_rresp=0; inject_rid=0;
     end
     await_done(kind<2 ? 32'h22 : 32'h23);
     inject_rresp=0; inject_rid=0; inject_bresp=0; inject_bid=0;
     first_pixels = MAX_BURST_BEATS<8 ? MAX_BURST_BEATS*4 : 32;
-    if (kind>=2) expect_copy(SOURCE_BASE,128,8,5,first_pixels,1);
+    if (kind>=2) begin
+        if (operation==OP_COLOR_KEY) expect_key_copy(SOURCE_BASE,128,8,5,first_pixels,1,24'heeeeee);
+        else expect_copy(SOURCE_BASE,128,8,5,first_pixels,1);
+    end
     if (command_count != old_cmd+1 || ar_count != old_ar+1 || aw_count != old_aw+(kind>=2))
         $fatal(1, "Response error did not stop after the current burst");
     check_memory();
@@ -320,13 +405,14 @@ end
 endtask
 
 task rejected_source_case;
+input [31:0] operation;
 integer old_cmd, old_ar, old_aw, old_child_count;
 begin
     announce("invalid source range counts once and uses C's accepted snapshot");
     old_cmd=command_count; old_ar=ar_count; old_aw=aw_count;
     old_child_count=dut.blit_unit.command_count;
     checking_range_rejection=1; range_decision=0;
-    submit(OP_BLIT,8,5,32,2,0,SOURCE_BASE,128);
+    submit(operation,8,5,32,2,32'h00ff00ff,SOURCE_BASE,128);
     // Restore live inputs before CHECK_SOURCE. C holds this command's result.
     range_decision=1;
     await_done(32'h21);
@@ -350,7 +436,7 @@ begin
     case (channel)
         0:stall_ar=1; 1:stall_r=1; 2:stall_aw=1; 3:stall_w=1; 4:stall_b=1;
     endcase
-    submit(op,0,5,32,2,32'h00ffcc00,SOURCE_BASE,128);
+    submit(op,0,5,32,2,op==OP_COLOR_KEY ? 32'h00eeeeee : 32'h00ffcc00,SOURCE_BASE,128);
     case (channel)
         0:wait(arvalid); 1:wait(rready); 2:wait(awvalid); 3:wait(wvalid); 4:wait(bready);
     endcase
@@ -364,15 +450,17 @@ begin
     first_pixels = MAX_BURST_BEATS<8 ? MAX_BURST_BEATS*4 : 32;
     if (channel>=2) begin
         if (op==OP_FILL) expect_fill(0,5,first_pixels,1,32'h00ffcc00);
+        else if (op==OP_COLOR_KEY) expect_key_copy(SOURCE_BASE,128,0,5,first_pixels,1,24'heeeeee);
         else expect_copy(SOURCE_BASE,128,0,5,first_pixels,1);
     end
-    if (ar_count != old_ar+(op==OP_BLIT) || aw_count != old_aw+(channel>=2))
+    if (ar_count != old_ar+(op!=OP_FILL) || aw_count != old_aw+(channel>=2))
         $fatal(1, "Timeout did not drain exactly one transaction");
     check_memory();
 end
 endtask
 
 task fault_case;
+input [31:0] operation;
 input integer early;
 integer old_cmd, old_aw, cycles;
 begin
@@ -380,7 +468,7 @@ begin
     $display("  early=%0d",early);
     initialize_memory(); old_cmd=command_count; old_aw=aw_count;
     early_rlast=early; missing_rlast=!early;
-    submit(OP_BLIT,8,5,32,2,0,SOURCE_BASE,128);
+    submit(operation,8,5,32,2,32'h00eeeeee,SOURCE_BASE,128);
     cycles=0;
     while (error_code != 32'h25) begin
         @(negedge clk); cycles=cycles+1;
@@ -418,12 +506,93 @@ begin
 end
 endtask
 
+task export_key_source;
+integer fd, i;
+begin
+    fd=$fopen("ck_sprite_source.ppm","w"); if (!fd) $fatal(1,"Cannot create sprite preview");
+    $fdisplay(fd,"P3\n32 32\n255");
+    for (i=1024; i<2048; i=i+1)
+        $fdisplay(fd,"%0d %0d %0d",saved_source[i][23:16],saved_source[i][15:8],saved_source[i][7:0]);
+    $fclose(fd);
+end
+endtask
+
+task run_color_key_cases;
+integer old_cmd, old_w, old_b, n;
+begin
+    initialize_key_memory(); export_key_source();
+    // Negative control is confined to this bench and takes effect only when
+    // the new scene begins. It must fail the independent target-pixel check.
+    if ($test$plusargs("BYPASS_COLOR_KEY")) force dut.selected_color_key=0;
+    fill_case("key scene 1: FILL sky background",0,0,64,48,32'h00182838);
+    fill_case("key scene 1: FILL ground background",0,24,64,24,32'h00285840);
+    export_target("ck_01_background.ppm");
+    copy_case("key scene 2: ordinary BLIT robot on the left",SPRITE_BASE,128,0,8,32,32);
+    export_target("ck_02_blit.ppm");
+    key_copy_case("key scene 3: color-key robot on the right",SPRITE_BASE,128,32,8,32,32,32'haaff00ff);
+    export_target("ck_03_color_key.ppm");
+    fill_case("key scene 4: unaligned FILL across both copies",19,32,26,5,32'h00e04040);
+    export_target("ck_04_overlay.ppm");
+
+    key_copy_case("all 16 lane masks and nonzero source X",SOURCE_BASE,256,0,0,64,1,32'h00ff00ff);
+    key_copy_case("consecutive color-key command ignores old DONE",SPRITE_BASE,128,8,5,32,32,32'h00ff00ff);
+    key_copy_case("new black key replaces magenta",SOURCE_BASE+32'h200,64,4,3,16,1,32'h55000000);
+    key_copy_case("new white key replaces black",SOURCE_BASE+32'h300,64,4,4,16,1,32'hccffffff);
+    copy_case("ordinary BLIT after keyed copy must write magenta",SOURCE_BASE+32'h100,128,8,5,32,1);
+    fill_case("FILL of the previous key color is never masked",3,9,7,2,32'haaffffff);
+    key_copy_case("keyed copy at the right/bottom corner",SOURCE_BASE,16,60,47,4,1,32'h00ff00ff);
+
+    invalid_case("keyed copy rejects unaligned target x",OP_COLOR_KEY,1,0,4,1,SOURCE_BASE,32'h21);
+    invalid_case("keyed copy rejects zero dimensions",OP_COLOR_KEY,0,0,0,1,SOURCE_BASE,32'h21);
+    rejected_source_case(OP_COLOR_KEY);
+    disabled_case(OP_COLOR_KEY);
+    key_copy_case("keyed copy samples new valid C result after rejection",SOURCE_BASE,256,0,0,64,1,32'h00ff00ff);
+
+    announce("key snapshot survives AR/W stalls and competing STARTs");
+    initialize_key_memory(); old_cmd=command_count;
+    stall_ar=1; stall_w=1;
+    expect_key_copy(SOURCE_BASE,64,8,5,16,1,MAGENTA);
+    submit(OP_COLOR_KEY,8,5,16,1,32'h00ff00ff,SOURCE_BASE,64);
+    wait(arvalid);
+    submit(OP_BLIT,0,0,4,1,32'h00123456,SOURCE_BASE,16);
+    repeat(12) @(negedge clk); stall_ar=0;
+    wait(wvalid);
+    submit(OP_COLOR_KEY,0,0,4,1,32'h002040c0,SOURCE_BASE,16);
+    repeat(20) begin
+        @(negedge clk); cmd_color=~cmd_color; enabled=~enabled;
+    end
+    stall_w=0; await_done(0); enabled=1;
+    if (command_count!=old_cmd+1) $fatal(1,"Busy color-key command accepted another START");
+    check_memory();
+
+    announce("all-transparent command retains BUSY until final B");
+    old_cmd=command_count; old_w=w_count; old_b=b_count; stall_b=1;
+    submit(OP_COLOR_KEY,8,5,4*FINAL_B_BEATS,1,32'h00ff00ff,SOURCE_BASE+32'h100,128);
+    wait(bready); repeat(30) @(negedge clk);
+    if (!busy || done || command_count!=old_cmd+1 ||
+        w_count-old_w!=FINAL_B_BEATS || b_count!=old_b)
+        $fatal(1,"All-transparent dispatch finished early or dropped beats");
+    stall_b=0; await_done(0); check_memory();
+
+    for(n=0; n<4; n=n+1) response_error_case(n,OP_COLOR_KEY);
+    for(n=0; n<5; n=n+1) timeout_case(OP_COLOR_KEY,n);
+    if(MAX_BURST_BEATS>1) fault_case(OP_COLOR_KEY,1);
+    fault_case(OP_COLOR_KEY,0);
+    key_copy_case("keyed copy recovers after platform reset",SOURCE_BASE,128,8,5,32,2,32'h00eeeeee);
+    copy_case("ordinary BLIT clears keyed mode after reset",SOURCE_BASE,128,0,0,8,1);
+    fill_case("FILL works after color-key errors and reset",1,2,7,2,32'h00aabbcc);
+    if(key_zero_beats==0 || key_mixed_beats==0) $fatal(1,"Missing transparent/mixed beat coverage");
+    $display("PASS COLOR KEY DISPATCH: zero/mixed beats=%0d/%0d; mixed scene and rejection/drain/reset checks passed",
+        key_zero_beats,key_mixed_beats);
+end
+endtask
+
 integer old_cmd, old_ar, old_aw, n, first_pixels;
 initial begin
     if ($test$plusargs("VCD")) begin
         $dumpfile("graphics.vcd"); $dumpvars(0,dut); $dumpvars(1,tb_graphics_engine);
     end
-    platform_reset(); initialize_memory(); disabled_case();
+    platform_reset(); initialize_memory(); disabled_case(OP_FILL);
 
     fill_case("scene 1: FILL the full background",0,0,64,48,32'h00102050);
     export_target("01_fill.ppm"); export_source();
@@ -441,11 +610,11 @@ initial begin
     invalid_case("FILL target outside frame",OP_FILL,63,0,2,1,SOURCE_BASE,32'h11);
     invalid_case("BLIT alignment differs from FILL",OP_BLIT,1,0,4,1,SOURCE_BASE,32'h21);
     invalid_case("BLIT source address misaligned",OP_BLIT,0,0,4,1,SOURCE_BASE+4,32'h21);
-    disabled_case();
+    disabled_case(OP_FILL);
     fill_case("FILL success after BLIT parameter error",3,7,9,2,32'h007799aa);
     copy_case("BLIT clears its own stale parameter error",SOURCE_BASE,128,4,4,8,2);
-    rejected_source_case();
-    disabled_case(); // An unaccepted START cannot clear 0x21.
+    rejected_source_case(OP_BLIT);
+    disabled_case(OP_FILL); // An unaccepted START cannot clear 0x21.
     copy_case("a newly accepted BLIT clears the source-range error",SOURCE_BASE,128,4,4,8,2);
     range_decision=0;
     invalid_case("unknown opcode wins over invalid source range",32'hffffffff,0,0,4,1,SOURCE_BASE,ERR_OPCODE);
@@ -475,7 +644,7 @@ initial begin
     if (!busy || done) $fatal(1,"Public DONE before B");
     stall_b=0; await_done(0); check_memory();
 
-    for (n=0; n<4; n=n+1) response_error_case(n);
+    for (n=0; n<4; n=n+1) response_error_case(n,OP_BLIT);
     announce("FILL B error is forwarded without using stale BLIT error");
     initialize_memory(); old_cmd=command_count; old_ar=ar_count; old_aw=aw_count;
     inject_bresp=1;
@@ -489,13 +658,16 @@ initial begin
 
     for (n=2; n<5; n=n+1) timeout_case(OP_FILL,n);
     for (n=0; n<5; n=n+1) timeout_case(OP_BLIT,n);
-    if (MAX_BURST_BEATS>1) fault_case(1);
-    fault_case(0);
+    if (MAX_BURST_BEATS>1) fault_case(OP_BLIT,1);
+    fault_case(OP_BLIT,0);
     fill_case("FILL works after platform reset",1,2,7,2,32'h00aabbcc);
     copy_case("BLIT works after platform reset",SOURCE_BASE,128,8,5,8,2);
 
-    $display("PASS GRAPHICS: %0d cases, MAX_BURST_BEATS=%0d, OP_FILL=%0d, OP_BLIT=%0d",
-        case_count,MAX_BURST_BEATS,OP_FILL,OP_BLIT);
+    if (COLOR_KEY_ENABLE) run_color_key_cases();
+    else invalid_case("disabled color-key opcode remains unsupported in v4",OP_COLOR_KEY,0,0,4,1,SOURCE_BASE,ERR_OPCODE);
+
+    $display("PASS GRAPHICS: %0d cases, MAX_BURST_BEATS=%0d, OP_FILL=%0d, OP_BLIT=%0d, COLOR_KEY_ENABLE=%0d, OP_COLOR_KEY=%0d",
+        case_count,MAX_BURST_BEATS,OP_FILL,OP_BLIT,COLOR_KEY_ENABLE,OP_COLOR_KEY);
     $finish;
 end
 initial begin #60000000; $fatal(1,"Global graphics test watchdog"); end
