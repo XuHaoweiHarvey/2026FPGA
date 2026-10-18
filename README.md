@@ -92,7 +92,7 @@ Bayer 适合摄像头原始采样，2D 图元需要明确的 R/G/B 颜色。Pack
 | 命令 | 参数 | 状态 / 语义 |
 |---|---|---|
 | **FILL_RECT：已实现、已上板** | `x, y, width, height, color` | START 接收时快照参数；BUSY 执行；成功 DONE 以最后 B 完成为准 |
-| Block Copy / BLIT | 独立原型：`src_addr, src_stride, dst_x, dst_y, width, height` | 单元仿真通过；正式系统接口和实板待集成 |
+| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统，RTL及CPU行为仿真通过；`DEMO_MODE=2`运行复制演示，综合/时序及实板待验收，见[SYSTEM_BLIT](docs/SYSTEM_BLIT.md) |
 | Line | Planned / Not implemented | 可选图元扩展 |
 | Alpha Blend | Planned / Not implemented | 后续混合管线 |
 

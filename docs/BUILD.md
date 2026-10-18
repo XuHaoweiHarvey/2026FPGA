@@ -1,6 +1,6 @@
 # Build and Debug
 
-当前Phase 2基线已由负责人完成A～E实板验收。本指南供团队从仓库复现：Efinity Compile → Programmer → RISC-V IDE Build → Hard JTAG Debug → HDMI Demo。正常流程无需重新Generate IP，也不依赖UART。
+原FILL基线已由负责人完成A～E实板验收；新增v4 BLIT仍待Efinity综合、时序和实板验收。本指南供团队从仓库复现：Efinity Compile → Programmer → RISC-V IDE Build → Hard JTAG Debug → HDMI Demo。正常流程无需重新Generate IP，也不依赖UART。
 
 ## Environment and Inputs
 
@@ -19,7 +19,7 @@
 
 ## 1. Efinity Compile
 
-1. Efinity2026.1 → File → Open Project → 根`ti60f225_oob.xml`。确认top仍ti60f225_oob_top，51个design entries及单独soc_control IP。
+1. Efinity2026.1 → File → Open Project → 根`ti60f225_oob.xml`。确认top仍ti60f225_oob_top，55个design entries及单独soc_control IP。
 2. 当前生成文件齐全，**无需Generate Sapphire或修改Interface Designer**。如工具确切提示interface output缺失，才打开根peri、保持参数原值Generate Interface Output Files；不要导入另一Demo整板配置。
 3. 从Synthesis开始运行完整flow，经Place and Route、Timing至Bitstream。保存资源和时序报告；不拿仿真stub代替真实IP。
 4. 核对100MHz、74.25MHz、148.5MHz相关路径与CDC；missing/duplicate module、黑盒、license、RAM init、latch、多驱动、地址截断、资源/时序失败必须定位。旧常量位宽提示单独核对，不加全局false path掩盖问题。
@@ -30,9 +30,9 @@
 
 Tools → Open Programmer → 使用已验证USB Target，下载本次Compile生成的`outflow/ti60f225_oob.bit`，确认来源/时间。本流程不默认烧录SPI Flash。
 
-复位后等待DDR/video初始化：CPU程序尚未启动时，HDMI应稳定显示红、绿、蓝、白四条竖条。TPG只初始化Front0一帧，完成排空后退出；Back1需软件完整重建。
+复位后等待DDR/video初始化：CPU程序尚未启动时，HDMI应稳定显示红、绿、蓝、白四条竖条。TPG只初始化Front0一帧，完成排空后退出；Back1需软件完整重建。BLIT版硬件应读回VERSION=`0x00040000`、CAPABILITIES=`0x0000007B`；A～E旧板级记录使用的是BLIT前硬件，不代表v4已上板通过。
 
-VERSION=00030000不能区分修复前/后D bit，另核对SERVICE_STATUS bit5=1、SERVICE_READ_QUOTA=128、SERVICE_WATERMARKS=02000180，确保有正式写准入保护。
+历史VERSION=00030000不能区分修复前/后D bit。当前v4仍须核对SERVICE_STATUS bit5=1、SERVICE_READ_QUOTA=128、SERVICE_WATERMARKS=02000180，确保有正式写准入保护。
 
 ## 3. Workspace / BSP / Import
 
@@ -82,7 +82,7 @@ PC前缀重复、FTDI配置来源和GDB连接后退出的已验证故障见[TROU
 
 ## 6. Run Demo
 
-在main确认`g_demo_mode=0`、`g_frame_limit=0`、`g_hold_frames=60`、`g_validation_target=1000`。取消scene_begin/back_ready/frame_presented断点后Resume；可保留仅失败或显式有限停止进入的apb_test_done断点。
+原FILL演示使用`g_demo_mode=0`、`g_frame_limit=0`、`g_hold_frames=60`、`g_validation_target=1000`。取消scene_begin/back_ready/frame_presented断点后Resume；可保留仅失败或显式有限停止进入的apb_test_done断点。
 
 启动先检查初始化/ID/配置/SCRATCH，等待旧BUSY/owned/pending结束及3个显示周期，再建立固定baseline。每轮全屏FILL、三个矩形逐条wait_done、一次显式swap/wait，再保持约60个边界周期。
 
@@ -93,11 +93,19 @@ PC前缀重复、FTDI配置来源和GDB连接后退出的已验证故障见[TROU
 
 默认每场景4命令/1swap。g_frame_limit=0无限，非0为显示场景数；target1000只是里程碑，达到后继续运行。CPU暂停不暂停视频/DMA，Debug重跑不清平台owner/计数。不能用暂停CPU或增hold代替连续显示验收。
 
+### BLIT Copy Demo
+
+将`software/apb_reg_test/demo_config.h`中的`DEMO_MODE`设为`2`后Build，并下载匹配的v4 FPGA配置和新ELF。也可以从仓库根目录用`python scripts/build_apb_software.py --define DEMO_MODE=2 --output output/graphics/blit-demo`生成独立ELF，再让IDE使用该ELF。不要拿旧v3 ELF测试v4硬件。
+
+模式2每轮先清Back并在左上角画红、绿、蓝、黄四个16×16色块，换帧显示源图；再清新的Back，用`src=当前Front`、stride=7680执行32×32 BLIT到`(64,64)`，最后换帧显示复制结果。无限运行时会在源图/复制图之间交替。保留`g_demo_mode=2`，可查看`blit_commands_issued/completed`、`source_swaps_completed`、`blit_source_base`及`blit_target_*`；成功时BLIT计数持续一致增长，error/underflow/missed增量应为0。该软件行为检查通过仍不等于Efinity时序或实板验收通过。
+
+首次联调可在main断点设置`g_frame_limit=2`，两轮后在`apb_test_done`停止：`iterations=2`、`commands_issued=commands_completed=14`、`blit_commands_issued=blit_commands_completed=2`、`swaps_requested=swaps_completed=4`、`source_swaps_completed=2`、`pass=1`、`errors=0`。模式2的iteration/frame_limit统计一次完整复制流程，包含源图和复制图两次换帧；`g_hold_frames`保持最终复制画面。
+
 ### Five-parameter Test
 
-只修改`software/apb_reg_test/demo_config.h`的TEST_RECT_X/Y/W/H/COLOR，Build新ELF并Debug；main处设`g_demo_mode=1`，两场景都变为黑底单参数矩形。比如321/123/137/89/00123456应对应移动/缩放/颜色变化，无需重编FPGA。
+只修改`software/apb_reg_test/demo_config.h`的TEST_RECT_X/Y/W/H/COLOR，Build新ELF并Debug；`g_demo_mode=1`时两场景都变为黑底单参数矩形。比如321/123/137/89/00123456应对应移动/缩放/颜色变化，无需重编FPGA。
 
-可在main编辑g_test_rectangle；每轮在scene_begin hook之前快照，所以在该hook修改应按下一轮生效理解。尺寸非零、矩形不越界，默认多矩形模式要注意遮挡。这里是后续复验操作，本次文档整理未改五参数或任何软件。
+可在main编辑g_test_rectangle；每轮在scene_begin hook之前快照，所以在该hook修改应按下一轮生效理解。尺寸非零、矩形不越界，默认多矩形模式要注意遮挡。
 
 ## 7. Variables / Breakpoints
 
@@ -105,11 +113,11 @@ PC前缀重复、FTDI配置来源和GDB连接后退出的已验证故障见[TROU
 
 | 观察 | 正常解释 |
 |---|---|
-| id/version | 4143434C / 00030000 |
-| pass/errors/running | 两次成功swap后pass1，errors0；无限模式running1，出错pass回0 |
+| id/version | 当前v4为4143434C / 00040000 |
+| pass/errors/running | 两轮完整演示后pass1，errors0；无限模式running1，出错pass回0 |
 | iterations/target_reached | 持续增加，>=1000后里程碑1，继续循环 |
-| commands_issued/completed | 每正常场景各+4，back_ready时相等；绘制中可差1 |
-| swaps_requested/completed | 每场景+1，pending时可差1 |
+| commands_issued/completed | 模式0每轮+4，模式1每轮+2，模式2每轮+7；back_ready时相等，绘制中可差1 |
+| swaps_requested/completed | 模式0/1每轮+1，模式2每轮+2；pending时可差1 |
 | command_delta/swap_delta | 原始硬件计数减启动baseline；与本次成功API统计对照 |
 | underflow/missed baseline、value、delta | 启动历史可非0；稳定期两项delta保持0 |
 | errors/timeouts/rejected_*、diagnostics.error_code/reader_error | 正常均0；故障保留failure_phase/failure_code |

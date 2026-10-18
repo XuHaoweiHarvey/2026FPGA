@@ -1,9 +1,13 @@
 #ifndef DEMO_CONFIG_H
 #define DEMO_CONFIG_H
 
-/* Edit these five values, Build, then Debug the new ELF. Scene A shows this
- * rectangle. g_demo_mode=1 draws only this rectangle on black in both scenes.
- * Units are pixels, color is 0x00RRGGBB; hardware does not clip rectangles. */
+/* Edit these values, Build, then Debug the new ELF. Scene A shows this
+ * rectangle. g_demo_mode=1 draws only this rectangle on black in both scenes;
+ * g_demo_mode=2 runs the Front->Back BLIT demo. Units are pixels, color is
+ * 0x00RRGGBB; hardware does not clip rectangles. */
+#ifndef DEMO_MODE
+#define DEMO_MODE 0u
+#endif
 #ifndef TEST_RECT_X
 #define TEST_RECT_X 240u
 #endif

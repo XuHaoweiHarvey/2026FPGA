@@ -90,7 +90,12 @@ static inline uint32_t accel_wait_done(void) {
         e=accel_error();if(e) return e;
         s=accel_read(ACCEL_STATUS);
         if((s&(ACCEL_BUSY|ACCEL_DONE))==ACCEL_DONE &&
-           !(accel_read(ACCEL_BUFFER_STATUS)&FRAME_WRITER_OWNED)) return 0;
+           !(accel_read(ACCEL_BUFFER_STATUS)&FRAME_WRITER_OWNED)) {
+            /* Completion may arrive after the earlier ERROR_CODE read.
+             * Recheck after DONE/ownership so a failed final response cannot
+             * be reported as successful completion. */
+            return accel_error();
+        }
     }
     return UINT32_C(0xE101);
 }

@@ -14,12 +14,17 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--unicorn-path',type=Path)
+parser.add_argument('--toolchain-prefix',type=Path,
+                    help='GNU cross-tool prefix ending in a hyphen; default uses the formal IDE')
+parser.add_argument('--elf',type=Path,default=ROOT/'software/apb_reg_test/build/apb_reg_test.elf',
+                    help='Freshly built default DEMO_MODE=0 ELF to check')
 args=parser.parse_args()
 if args.unicorn_path:
     sys.path.insert(0,str(args.unicorn_path))
 from unicorn import Uc,UC_ARCH_RISCV,UC_MODE_RISCV32,UC_HOOK_MEM_READ,UC_HOOK_MEM_WRITE,UC_HOOK_CODE
 
-TOOL=Path('D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin')
+TOOL_PREFIX=str(args.toolchain_prefix or
+                Path('D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/riscv-none-elf-'))
 APB=0xF8100000
 RAM=0xF9000000
 MASK=0xffffffff
@@ -29,6 +34,8 @@ print('Artifacts:',temp,flush=True)
 def build(name,defines):
     out=temp/name
     command=[sys.executable,str(ROOT/'scripts/build_apb_software.py'),'--output',str(out)]
+    if args.toolchain_prefix:
+        command.extend(['--toolchain-prefix',str(args.toolchain_prefix)])
     for d in defines:
         command.extend(['--define',d])
     run=subprocess.run(command,cwd=ROOT,text=True,capture_output=True)
@@ -51,7 +58,7 @@ result_fields=fields(ROOT/'software/apb_reg_test/main.c','demo_result_t')
 diag_fields=fields(ROOT/'software/apb_reg_test/accel_api.h','accel_diagnostics_t')
 
 class Machine:
-    def __init__(self,elf,case='normal',limit=2,mode=0,hold=0,target=2,wrap=False):
+    def __init__(self,elf,case='normal',limit=2,mode=None,hold=0,target=2,wrap=False):
         self.case=case;self.limit=limit;self.mode=mode;self.hold=hold;self.target=target
         self.uc=Uc(UC_ARCH_RISCV,UC_MODE_RISCV32)
         self.uc.mem_map(RAM,0x10000);self.uc.mem_map(APB,0x10000)
@@ -63,7 +70,7 @@ class Machine:
             if typ==1:
                 assert RAM<=va and va+memsz<=RAM+0xFC00
                 self.uc.mem_write(va,data[off:off+filesz])
-        symbols=subprocess.check_output([str(TOOL/'riscv-none-elf-nm.exe'),'-n',str(elf)],text=True)
+        symbols=subprocess.check_output([TOOL_PREFIX+'nm.exe','-n',str(elf)],text=True)
         self.symbols={parts[-1]:int(parts[0],16) for line in symbols.splitlines()
                       if len(parts:=line.split())>=3}
         self.entry=struct.unpack_from('<I',data,24)[0]
@@ -74,11 +81,12 @@ class Machine:
                          0x5c:0xfffffffc if wrap else 37,0x64:0x12,
                          0x80:0xfffffffe if wrap else 11,0x84:3,0x88:0x30,
                          0xa4:7,0xac:512,0xb4:128,0xb8:0x02000180})
-        self.remaining=0;self.pending=0;self.commands=[];self.writes=[]
+        self.remaining=0;self.pending=0;self.commands=[];self.ops=[];self.writes=[]
         self.front=0;self.swaps=0;self.stopped=False;self.presented=0
-        self.recorded_commands=[];self.startup_command=False;self.startup_swap=False
+        self.recorded_commands=[];self.recorded_ops=[];self.startup_command=False;self.startup_swap=False
         if case=='init_timeout': self.reg[0xc]=0
         if case=='bad_id': self.reg[0]=0
+        if case=='bad_version': self.reg[4]=0x30000
         if case=='policy_disabled': self.reg[0x88]=0
         if case=='resume_busy':
             self.reg[0xc]=0x19;self.reg[0x64]|=0x20
@@ -95,6 +103,9 @@ class Machine:
 
     def put(self,name,value): self.uc.mem_write(self.symbols[name],struct.pack('<I',value))
     def main(self,uc,address,size,data):
+        # Keep the ELF's compiled default unless a test explicitly selects a mode.
+        if self.mode is None:
+            self.mode=struct.unpack('<I',uc.mem_read(self.symbols['g_demo_mode'],4))[0]
         for name,value in [('g_frame_limit',self.limit),('g_hold_frames',self.hold),
                            ('g_demo_mode',self.mode),('g_validation_target',self.target)]:
             self.put(name,value)
@@ -106,11 +117,16 @@ class Machine:
                 self.reg[0xc]=0x1a;self.reg[0x64]&=~0x20
                 if self.case=='b_error': self.reg[0x24]=0x12;self.reg[0xc]|=4
                 if self.case=='reader_error': self.reg[0x24]=0x2003;self.reg[0x78]=0x2003
+                if not self.startup_command and self.ops[-1][0]==1:
+                    if self.case=='blit_read_error': self.reg[0x24]=0x22;self.reg[0xc]|=4
+                    if self.case=='blit_write_error': self.reg[0x24]=0x23;self.reg[0xc]|=4
                 if self.case=='underflow': self.reg[0xa4]+=1
                 if self.case=='missed': self.reg[0x84]+=1
                 self.reg[0x8c]=(self.reg[0x8c]+10000)&MASK
                 self.reg[0x90]=(self.reg[0x90]+32)&MASK
-                if not self.startup_command: self.recorded_commands.append(self.commands[-1])
+                if not self.startup_command:
+                    self.recorded_commands.append(self.commands[-1])
+                    self.recorded_ops.append(self.ops[-1])
                 self.startup_command=False
         if self.pending and self.case!='swap_timeout':
             self.pending-=1
@@ -140,14 +156,22 @@ class Machine:
         if offset==8:
             assert value==1,'software must never reset/clear an in-flight transaction'
             assert not self.remaining and not(self.reg[0x64]&0x24)
-            assert self.reg[0xbc]==0,'FILL demo must explicitly select FILL for every command'
+            op=self.reg[0xbc]
+            assert op in (0,1),'software must explicitly select a supported operation'
             command=tuple(self.reg[o] for o in (0x10,0x14,0x18,0x1c,0x20))
             self.commands.append((self.reg[0x30],*command))
+            self.ops.append((op,self.reg[0xc0],self.reg[0xc4]))
             if self.case=='ack_timeout': return
             self.reg[0x5c]=(self.reg[0x5c]+1)&MASK
             x,y,w,h,color=command
             if not(w and h and x<1920 and y<1080 and x+w<=1920 and y+h<=1080):
                 self.reg[0x24]=0x11;self.reg[0xc]=0x1e;return
+            if op==0:
+                assert self.ops[-1][1:]==(0,0),'FILL must clear stale BLIT source parameters'
+            else:
+                assert self.ops[-1][1:]==(self.front*0x800000,7680)
+                assert (x%4)==0 and (w%4)==0
+                assert (x,y,w,h,color)==(64,64,32,32,0)
             self.remaining=12;self.reg[0xc]=0x19;self.reg[0x64]|=0x20
         elif offset==0x60:
             assert value==3 and not self.remaining and not self.pending
@@ -160,11 +184,29 @@ class Machine:
     def back_ready(self,uc,address,size,data):
         assert self.reg[0x2c]==self.front*0x800000 and self.reg[0x68]==self.reg[0x2c]
         assert len(self.recorded_commands)==len(self.commands)
-        assert all(c[0]==self.reg[0x30] for c in self.recorded_commands[-(2 if self.mode==1 else 4):])
+        if self.mode==2:
+            count=len(self.recorded_commands)-self.presented*7
+            assert count in (5,7),'BLIT scene must complete source build, then clear/copy'
+            group=5 if count==5 else 2
+            recent=self.recorded_commands[-group:]
+            recent_ops=self.recorded_ops[-group:]
+            assert all(c[0]==self.reg[0x30] for c in recent)
+            if group==5:
+                assert all(op[0]==0 for op in recent_ops)
+                assert [c[1:] for c in recent]==[
+                    (0,0,1920,1080,0),(0,0,16,16,0xff0000),
+                    (16,0,16,16,0x00ff00),(0,16,16,16,0x0000ff),
+                    (16,16,16,16,0xffff00)]
+            else:
+                assert [op[0] for op in recent_ops]==[0,1]
+                assert [c[1:] for c in recent]==[(0,0,1920,1080,0),(64,64,32,32,0)]
+                assert recent_ops[-1]==(1,self.front*0x800000,7680)
+        else:
+            assert all(c[0]==self.reg[0x30] for c in self.recorded_commands[-(2 if self.mode==1 else 4):])
 
     def frame_presented(self,uc,address,size,data):
         self.presented+=1
-        assert self.swaps==self.presented
+        assert self.swaps==self.presented*(2 if self.mode==2 else 1)
         if self.limit==0 and self.presented==1000:
             # Prove no built-in finite limit: the milestone was reached and
             # the default continuous configuration remains enabled.
@@ -184,7 +226,8 @@ class Machine:
 def good(machine):
     r=machine.result
     assert r['pass']==1 and r['errors']==r['underflow_delta']==r['missed_delta']==0,r
-    assert r['iterations']==r['swaps_completed']==r['swaps_requested']==machine.presented
+    assert r['iterations']==machine.presented
+    assert r['swaps_completed']==r['swaps_requested']==machine.swaps
     assert r['commands_issued']==r['commands_completed']==len(machine.commands)
     assert r['command_delta']==r['commands_issued'] and r['swap_delta']==machine.swaps
     assert r['underflow_baseline']==7 and r['missed_baseline']==3
@@ -203,10 +246,24 @@ def scene_commands(machine,test=(240,180,360,240,0xff0000)):
                       (960,130,220,410,0x00ffff),(1300,500,370,330,0xff00ff)]
         assert actual==expected,(index,actual,expected)
 
+def blit_demo_commands(machine):
+    assert machine.presented==2
+    assert len(machine.recorded_commands)==len(machine.recorded_ops)==14
+    assert [op[0] for op in machine.recorded_ops].count(1)==2
+    assert machine.result['blit_commands_issued']==machine.result['blit_commands_completed']==2
+    assert machine.result['source_swaps_requested']==machine.result['source_swaps_completed']==2
+    assert machine.result['swaps_requested']==machine.result['swaps_completed']==4
+    for start in (0,7):
+        assert [op[0] for op in machine.recorded_ops[start:start+7]]==[0,0,0,0,0,0,1]
+        source_base=machine.recorded_commands[start][0]
+        assert machine.recorded_ops[start+6]==(1,source_base,7680)
+        assert machine.recorded_commands[start+6][0]==(source_base^0x800000)
+        assert machine.recorded_commands[start+6][1:]==(64,64,32,32,0)
+
 # Test the actual default artifact first; fault tests use only a shortened
 # software poll limit in a separate temporary ELF. Hardware settings unchanged.
-elf=ROOT/'software/apb_reg_test/build/apb_reg_test.elf'
-m=Machine(elf,limit=0,target=1000).run();good(m);scene_commands(m)
+elf=args.elf.resolve()
+m=Machine(elf,limit=0,target=1000).run();assert m.mode==0;good(m);scene_commands(m)
 assert m.result['target_reached']==1 and m.result['running']==1
 print('PASS E default ELF: 1000 continuous scenes / 4000 completed FILL_RECT / 1000 safe-swap acknowledgments; CPU only OCRAM/APB',flush=True)
 m=Machine(elf,hold=60,wrap=True).run();good(m);scene_commands(m)
@@ -217,13 +274,32 @@ print('PASS E CPU rerun waits for existing writer or pending swap before baselin
 changed=build('parameter-change',['TEST_RECT_X=321','TEST_RECT_Y=123','TEST_RECT_W=137','TEST_RECT_H=89','TEST_RECT_COLOR=0x00123456'])
 m=Machine(changed,mode=1).run();good(m);scene_commands(m,(321,123,137,89,0x123456))
 print('PASS E rebuilt five-parameter single-rectangle mode changes exact submitted geometry/color',flush=True)
+blit_elf=build('blit-demo',['DEMO_MODE=2'])
+m=Machine(blit_elf,hold=60,wrap=True).run();assert m.mode==2;good(m);blit_demo_commands(m)
+m=Machine(blit_elf,case='resume_swap').run();good(m);blit_demo_commands(m)
+print('PASS E v4 BLIT demo: builds four-color Front source, clears Back, copies 32x32 to (64,64), and presents via four safe swaps',flush=True)
+print('PASS E BLIT compiled mode, 60-period hold, counter wrap, and alternate initial Front after pending swap',flush=True)
+for case,expected,direction in [('blit_read_error',0x22,'read'),('blit_write_error',0x23,'write')]:
+    m=Machine(blit_elf,case=case).run()
+    print('BLIT fault diagnostics:',case,m.result,flush=True)
+    assert m.result['failure_code']==expected and m.result['failure_phase']==3
+    assert m.result['errors']==1 and m.result['pass']==m.result['running']==m.result['iterations']==0
+    # The model completes with an error on the STATUS read immediately after
+    # an ERROR_CODE read returned zero; wait_done must recheck the error.
+    assert m.result['commands_issued']==7 and m.result['commands_completed']==6, m.result
+    assert m.result['blit_commands_issued']==1 and m.result['blit_commands_completed']==0
+    assert m.result['command_delta']==len(m.commands)==7
+    assert m.result['source_swaps_completed']==m.result['swaps_requested']==m.result['swaps_completed']==1
+    assert m.result['axi_'+direction+'_error_observations']==1 and m.front==1
+    assert all(value==1 for offset,value in m.writes if offset==8)
+    print(f'PASS E {case}: {expected:#x}, source remains Front; failed Back never presented or reset',flush=True)
 invalid=build('invalid-geometry',['TEST_RECT_W=0'])
 m=Machine(invalid,mode=1).run()
 assert m.result['failure_code']==0x11 and m.result['commands_completed']==1 and len(m.commands)==2
 assert m.result['errors']==1 and m.result['pass']==0 and m.result['swaps_requested']==0
 print('PASS E invalid rectangle retains hardware geometry error and never presents failed Back',flush=True)
 fault_elf=build('bounded-faults',['ACCEL_POLL_LIMIT=64'])
-faults={'bad_id':0xe000,'policy_disabled':0xe003,'init_timeout':0xe001,'ack_timeout':0xe103,
+faults={'bad_id':0xe000,'bad_version':0xe000,'policy_disabled':0xe003,'init_timeout':0xe001,'ack_timeout':0xe103,
         'done_timeout':0xe101,'swap_timeout':0xe105,'hold_timeout':0xe106,'rejected':0xe102,
         'b_error':0x12,'reader_error':0x2003,'underflow':0xe109,'missed':0xe109}
 for case,expected in faults.items():
