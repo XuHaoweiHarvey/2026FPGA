@@ -1,6 +1,8 @@
 // CPU/APB control island. Commands/status connect to the platform-owned DMA.
 // Sapphire itself has no DDR-facing port.
-module sapphire_control (
+module sapphire_control #(
+    parameter COLOR_KEY_ENABLE = 0
+)(
     input wire core_clk,
     input wire platform_rst_n,
     input wire jtag_tck, input wire jtag_tdi, output wire jtag_tdo,
@@ -48,7 +50,7 @@ soc_control u_soc_control (
     .io_apbSlave_0_PWDATA(apb_wdata), .io_apbSlave_0_PRDATA(apb_rdata),
     .io_apbSlave_0_PREADY(apb_ready), .io_apbSlave_0_PSLVERROR(apb_error)
 );
-accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1)) u_accel_regs (
+accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)) u_accel_regs (
     .PCLK(core_clk), .PRESETn(soc_rst_n && !system_reset),
     .PADDR({16'b0,apb_addr}), .PSEL(apb_sel), .PENABLE(apb_enable), .PWRITE(apb_write),
     .PWDATA(apb_wdata), .PRDATA(apb_rdata), .PREADY(apb_ready), .PSLVERROR(apb_error),

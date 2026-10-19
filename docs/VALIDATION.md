@@ -20,7 +20,30 @@
 
 ## Simulation Results
 
+### v5色键正式系统/API/演示（2026-10-18）
+
+顶层同一`COLOR_KEY_ENABLE=1`传到sapphire_control/accel_regs和rgb_framebuffer/graphics_engine，发布VERSION=0x00050000、CAPABILITIES=0xFB（新增bit7）。op2复用RECT_COLOR低24位作RGB key，使用原Front检查、同一BLIT DMA、Back锁存、读仲裁和写准入；部分/全零WSTRB保留目标，仍完整完成W/B。参数默认关闭时保留旧v4。
+
+| 检查 | 本轮结果 / 边界 |
+|---|---|
+| 正式色键共享显示系统，APB WAIT0/1/3 | 各6次swap、42个完整受检帧及部分帧，共1,407,777次显示像素比较；正常普通/色键复制underflow/missed增量0 |
+| 色键目标及源完整XRGB | 每配置3次完整512×64内存检查，共98,304个32bit像素；独立坐标参考验证源图、目标背景及源未被改写 |
+| 掩码/并发覆盖 | 每配置160个全零strobe拍、20个部分strobe拍；关键色键命令及最后B等待期间显示接受111笔AR。这是覆盖计数，不是带宽 |
+| 保护/切换 | Back源拒绝、普通BLIT/非对齐FILL清除旧色键模式、全透明命令等B、命令后改key/op/source、CPU reset、最后B/pending与安全换帧、最后R恢复、0x2004故障保护通过 |
+| 故意破坏色键掩码 | 临时源码副本禁用透明掩码，系统检查按预期失败；正式源码保持正确 |
+| APB | 旧B WAIT0/1/3各113 accesses，旧v4各39，v5各47；版本/能力、8字段快照（含key高位）、拒绝和CPU reset通过 |
+| RGB/顶层 | RGB quick回归与当前v5顶层端口展开通过；使用DDR/HDMI端口stub，不是综合/板卡运行 |
+| 旧配置兼容 | 关闭色键的v4 WAIT1：4次swap、27完整帧/916257像素比较，op2仍被拒绝；旧D WAIT1：5次swap、29完整帧/981792像素比较，均通过 |
+| 工程 | 55个现存且唯一源文件、RTL/活动头文件/文档50个offset一致 |
+| 软件构建 | 正式Sapphire BSP配已安装GNU RISC-V GCC13.3.0，默认模式、DEMO_MODE=3、带高8位key的模式3均构建通过；LOAD与关键符号位于64KiB OCRAM，保留OpenOCD空间 |
+| 当前CPU指令行为检查 | **未执行**。已有Unicorn依赖目录因访问权限不可读，本轮跳过该入口；新增模型/用例只通过Python语法检查 |
+| 综合/时序/实板 | **未执行**。尚无v5 Efinity资源时序、真实DDR全零strobe验收、1080p HDMI并发及板级性能证据 |
+
+结果图由系统RTL写入的模型内存导出，见[COLOR_KEY](COLOR_KEY.md)。软件模式3为128×128机器人左右普通/透明复制，每轮预期13条命令和2次swap；系统testbench使用32×32机器人及512×64画布，不执行Sapphire CPU。下方v4及更早CPU/独立模块记录属于历史证据，不代表本轮v5 ELF已执行。Icarus原有FIFO constant-select和顶层常量位宽、GNU ld原有RAM RWX段提示保留。
+
 ### B统一入口可选色键（2026-10-18）
+
+以下为正式系统接入前的独立入口记录；当前v5状态以上节为准。
 
 `graphics_engine` 增加默认关闭的 `COLOR_KEY_ENABLE`，开启时通过实验操作类型和锁存的 `color[23:0]` 使用同一 BLIT DMA 进行色键复制。正式 v4 APB/Framebuffer/软件未开启该能力，VERSION/CAPABILITIES 不变。色键独立模块及原有53场景记录保留；本轮统一入口关闭配置44/43场景、开启配置76/74场景通过，含混合绘制、完整像素比较、参数快照、源范围拒绝、反压/错误/超时排空及故障复位。仅在bench绕过色键时，独立参考检查按预期发现背景被覆盖。
 

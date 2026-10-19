@@ -1,6 +1,6 @@
 # Register Map — 当前 accel_regs
 
-本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。正式ENGINE_ENABLE=1、DOUBLE_BUFFER=1、BLIT_ENABLE=1。A～E旧v3基线已实板通过；v4新增BLIT接线需重新综合、构建软件及上板验收。
+本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。正式ENGINE_ENABLE=1、DOUBLE_BUFFER=1、BLIT_ENABLE=1、COLOR_KEY_ENABLE=1。A～E旧v3基线已实板通过；当前v5 BLIT/色键接线需重新综合、构建匹配软件及上板验收。
 
 ## Address and Access
 
@@ -21,14 +21,14 @@
 | Offset | 名称 | 访问 | 复位值 / 域 | 位域、含义与清除语义 |
 |---|---|---|---|---|
 | 00 | ACCEL_ID | RO | 0x4143434C / 常量 | ASCII ACCL |
-| 04 | ACCEL_VERSION | RO | 0x00040000 / 常量 | FILL/BLIT双缓冲版本；BLIT_ENABLE=0保留旧v3 |
+| 04 | ACCEL_VERSION | RO | 0x00050000 / 常量 | FILL/BLIT/色键双缓冲版本；关闭色键保留v4，关闭BLIT保留旧v3 |
 | 08 | CONTROL | RW/W1 | 0 / C | bit0写1请求START、读0；bit1写1清APB错误；[31:1]保存写值并可读回，其他位无功能 |
 | 0C | STATUS | RO | 0 / P输入与C错误组合 | bit0 BUSY，1 DONE，2 ERROR，3 INIT_DONE，4 OWNER_ACCEL；[31:5]=0 |
 | 10 | RECT_X | RW | 0 / C | x，pixel；新START快照，不影响在途命令 |
 | 14 | RECT_Y | RW | 0 / C | y，pixel |
 | 18 | RECT_WIDTH | RW | 0 / C | width，pixel，必须非0 |
 | 1C | RECT_HEIGHT | RW | 0 / C | height，pixel，必须非0 |
-| 20 | RECT_COLOR | RW | 0 / C | [31:24]X、[23:16]R、[15:8]G、[7:0]B，显示忽略X |
+| 20 | RECT_COLOR | RW | 0 / C | FILL使用完整XRGB；普通BLIT忽略；色键复制使用[23:0]精确RGB比较，[31:24]忽略；START快照 |
 | 24 | ERROR_CODE | RO | 0 / C及P组合 | init_error优先，其次engine_error、reader_error、APB error；清除方法见错误表 |
 | 28 | SCRATCH | RW | 0 / C | 独立32bit读写验证，不控制DDR |
 | 2C | FRONT_BUFFER_BASE | RO | 0x00000000 / P | 当前Front角色base，swap后可为00800000 |
@@ -36,7 +36,7 @@
 | 34 | FRAME_STRIDE | RO | 7680=0x1E00 / 常量 | bytes/line |
 | 38 | FRAME_WIDTH | RO | 1920=0x780 / 常量 | pixels/line |
 | 3C | FRAME_HEIGHT | RO | 1080=0x438 / 常量 | lines/frame |
-| 40 | CAPABILITIES | RO | 0x0000007B / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT；bit2=0 |
+| 40 | CAPABILITIES | RO | 0x000000FB / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT、7 Color Keying；bit2=0 |
 | 44 | INIT_DATA_BEATS | RO | 0 / P | 初始化WVALID&&WREADY数，单位128bit beat；INIT_DONE后冻结 |
 | 48 | INIT_AW_BURSTS | RO | 0 / P | 初始化AW握手数，单位burst；完成后冻结 |
 | 4C | INIT_WLAST_BURSTS | RO | 0 / P | 初始化W握手且WLAST数，单位burst；完成后冻结 |
@@ -67,7 +67,7 @@
 | B0 | WRITER_MAX_CYCLES | RO | 0 / P | 已准入AW暴露（含等AWREADY）至B结束的最大连续core周期 |
 | B4 | SERVICE_READ_QUOTA | RO | 128=0x80 / 常量 | 上一笔写B之后所需真实R handshake数 |
 | B8 | SERVICE_WATERMARKS | RO | 0x02000180 / 常量 | [31:16]HIGH512；[15:0]LOW384，单位128bit FIFO words |
-| BC | COMMAND_OP | RW | 0 / C | 0 FILL，1 BLIT；其他值接受计数后报0x26；START时快照 |
+| BC | COMMAND_OP | RW | 0 / C | 0 FILL，1 BLIT，2色键复制；其他值接受计数后报0x26；关闭色键的v4配置也拒绝2；START时快照 |
 | C0 | SRC_ADDR | RW | 0 / C | BLIT源绝对字节地址，16byte对齐，整个矩形位于当前Front有效图像 |
 | C4 | SRC_STRIDE | RW | 0 / C | BLIT源行距bytes，首轮固定7680；START时快照 |
 
@@ -78,6 +78,8 @@ SERVICE_STATUS复位healthy=0、read_credit=0、grant=0、transaction_active=0�
 ## START / DONE / Swap Semantics
 
 START有效时，先检查INIT_DONE，再BUSY/已有start_pulse，再draw_ready；成功APB access快照五个矩形字段及op/src_addr/src_stride，下一core拍manager/engine接收并锁存Back；源检查器同拍锁存结果，engine下一拍读取。width/height>0，x<1920、y<1080，33bit相加的x+width/y+height不越界，不裁剪。FILL的x/width无需4对齐；BLIT的x/width必须4像素对齐。BLIT源只能位于当前Front的0x7E9000有效图像内，不能使用8MiB槽尾padding，也不能横跨源行。FILL不使用源字段，API每次显式写op=0。
+
+色键复制继承全部BLIT几何、源窗口、完成和错误规则，使用同一个DMA。源RGB等于RECT_COLOR低24位时，对应四个byte strobe为0，保留Back完整XRGB；其他源像素完整复制。全透明拍/命令仍完成AW/W/B，不减少beat数。背景须先在Back构建，换帧不会自动复制Front背景；源X不是Alpha。新软件严格要求v5/0xFB，旧v3/v4 ELF需重新Build。
 
 70/74/6C及94..A0、读quota只观察显示客户端的AR/R；BLIT读不计入显示帧或写准入额度。全局读仲裁最多一笔outstanding。共享协议FAULT映射READER_ERROR=0x2004，阻止新START、REQUEST和提交换帧；CPU reset不能清除，也不取消在途AR/R/AW/W/B。
 

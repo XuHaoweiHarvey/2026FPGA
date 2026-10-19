@@ -14,16 +14,16 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 | D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
 | E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
 
-正式源码现已接入 **FILL_RECT + Front→Back BLIT**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。新增v4代码尚待Efinity综合/时序和实板验收；上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，基础框架不代表赛题全部功能完成。接线、运行及边界见 [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md)。
+正式源码现已接入 **FILL_RECT + Front→Back BLIT + Color Keying**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。当前v5新增色键软件API和左右对比演示，已通过共享DDR系统仿真及软件构建，CPU指令仿真本轮受依赖权限限制未执行；Efinity综合/时序和实板验收待完成。上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，接线和边界见 [COLOR_KEY](docs/COLOR_KEY.md)。
 
-[显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已加入正式framebuffer及工程清单，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。v4寄存器为VERSION=0x00040000、CAPABILITIES=0x7B；必须重新构建匹配软件，不能使用旧v3 ELF。
+[显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已加入正式framebuffer及工程清单，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。当前v5寄存器为VERSION=0x00050000、CAPABILITIES=0xFB；硬件与软件需配套重新构建，旧v3/v4 ELF与当前软件的精确版本检查不兼容。
 
 ## 框架
 
 ```mermaid
 flowchart TD
     CPU["Sapphire RISC-V / OCRAM Software"] -->|APB3| REG[accel_regs]
-    REG --> ACC["2D Accelerator / FILL + BLIT"]
+    REG --> ACC["2D Accelerator / FILL + BLIT + Color Key"]
     ACC -->|源读| ARB[DDR Read Arbiter]
     READER --> ARB
     ARB --> FRONT
@@ -62,7 +62,7 @@ CPU 不逐像素绘图，也没有直接连接 DDR framebuffer 的外部 AXI 端
 | Ownership | Display Reader 只读 Front；Accelerator 每命令锁存 Back 地址 |
 | Swap | 软件显式请求，安全 VS/frame boundary、旧 R 完成与 FIFO 清空确认后交换 |
 | DONE | 最后一个成功 AXI B response 后完成；软件还检查 BUSY=0、writer ownership 释放 |
-| 当前源码命令 / 通知 | FILL_RECT、BLIT；polling，无 Accelerator interrupt；BLIT待板级验证 |
+| 当前源码命令 / 通知 | FILL_RECT、BLIT、Color Keying；polling，无 Accelerator interrupt；复制功能待板级验证 |
 | 连续性保护 | 真实 R handshake quota + Display FIFO 低/高水位控制新写 burst 准入 |
 | Camera / Bayer / Debayer | 不在正式 2D 数据路径；部分旧文件和 physical blocks 保留作参考/兼容 |
 
@@ -92,7 +92,8 @@ Bayer 适合摄像头原始采样，2D 图元需要明确的 R/G/B 颜色。Pack
 | 命令 | 参数 | 状态 / 语义 |
 |---|---|---|
 | **FILL_RECT：已实现、已上板** | `x, y, width, height, color` | START 接收时快照参数；BUSY 执行；成功 DONE 以最后 B 完成为准 |
-| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统，RTL及CPU行为仿真通过；`DEMO_MODE=2`运行复制演示，综合/时序及实板待验收，见[SYSTEM_BLIT](docs/SYSTEM_BLIT.md) |
+| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统；v4 CPU行为检查通过，当前v5共享RTL/软件构建通过；DEMO_MODE=2，综合/时序及实板待验收，见[SYSTEM_BLIT](docs/SYSTEM_BLIT.md) |
+| Color Keying | BLIT参数加`key_rgb`，复用RECT_COLOR低24位 | v5已接APB/Framebuffer/API，`DEMO_MODE=3`左右对比；系统RTL通过、软件构建通过，CPU指令检查及综合/实板待验收，见[COLOR_KEY](docs/COLOR_KEY.md) |
 | Line | Planned / Not implemented | 可选图元扩展 |
 | Alpha Blend | Planned / Not implemented | 后续混合管线 |
 
@@ -162,7 +163,7 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [ROADMAP](docs/ROADMAP.md) | 按赛题实际要求安排的后续任务与验收出口 |
 | [BLIT](docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
 | [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md) | FILL/BLIT统一入口、混合场景仿真与三步结果图 |
-| [COLOR_KEY](docs/COLOR_KEY.md) | 色键独立模块及B统一入口可选命令、混合绘制与对比图；正式v4默认关闭，待系统接入 |
+| [COLOR_KEY](docs/COLOR_KEY.md) | v5色键命令/API、软件演示、共享显示仿真、结果图与板级待办 |
 | [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | 按A/C反馈确定的首轮接口、实施状态与验收步骤 |
 | [BLIT_SOURCE_GUARD](docs/BLIT_SOURCE_GUARD.md) | C侧源窗口检查、accept时序、边界用例及对接限制 |
 | [DDR_READ_ARBITER](docs/DDR_READ_ARBITER.md) | 显示/BLIT读仲裁、响应归属、故障保留及独立测试 |
@@ -171,9 +172,9 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 
 ## 路线图
 
-- **优先**：Block Copy / BLIT；为 Accelerator 增加受显示保护的 DDR read 服务。
+- **优先**：完成v5综合/时序和BLIT/Color Keying实板验收。
 - 建立板级性能测量及赛题要求的纯软件/硬件渲染对比方案。
-- Alpha Blend、Color Keying 与后续高负载互动 Demo。
+- Alpha Blend 与后续高负载互动 Demo。
 - Line、进一步命令扩展，以及依据测量决定的 FIFO / line buffer / cache 优化。
 
-BLIT 已接入正式v4系统并通过模块、共享DDR系统与软件行为仿真；Efinity资源/时序和实板验收仍待完成。性能对照、图片资源加载、Alpha/Color Key和互动Demo仍按 [ROADMAP](docs/ROADMAP.md) 规划。
+BLIT和Color Keying已接入当前v5系统；色键系统RTL仿真和软件构建通过，本轮CPU指令仿真未执行，v4软件行为结果保留为历史记录。Efinity资源/时序、实板验收、性能对照、图片资源加载、Alpha和互动Demo见 [ROADMAP](docs/ROADMAP.md)。

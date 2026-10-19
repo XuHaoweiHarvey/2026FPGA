@@ -4,9 +4,9 @@
 
 对应赛题二基础要求第1项：硬件根据操作类型执行 Solid Fill 或 Block Copy。`graphics_engine.v` 在 B 内部接收一条命令，保存参数，选择现有 `fill_rect_writer` 或 `blit_engine`，并提供一套公共状态和写接口。
 
-当前B执行层已通过独立仿真、真实manager/源检查器合同测试和双槽绘制/复制/换帧仿真。2026-10-18已接入正式APB、framebuffer、源检查器、DDR读仲裁及工程清单，系统验证和软件兼容见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。v4尚待Efinity综合时序和实板验收。下文独立模块/双槽测试的范围保持原样，不应将它们当作整机证据。
+当前B执行层已通过独立仿真、真实manager/源检查器合同测试和双槽绘制/复制/换帧仿真。2026-10-18已接入正式APB、framebuffer、源检查器、DDR读仲裁及工程清单，v4历史接线证据见[SYSTEM_BLIT](SYSTEM_BLIT.md)，当前v5色键集成见[COLOR_KEY](COLOR_KEY.md)。综合时序和实板验收待完成。下文独立模块/双槽测试的范围保持原样，不应将它们当作整机证据。
 
-同日增加 B 侧可选色键命令：`COLOR_KEY_ENABLE=1` 时第三种命令使用 `color[23:0]` 作为 RGB 色键，复用原 BLIT DMA。该配置默认关闭，正式 v4 APB/Framebuffer/软件尚未开放；混合场景、运行和验证结果见 [COLOR_KEY](COLOR_KEY.md)。
+同日增加色键命令：`COLOR_KEY_ENABLE=1`时op2使用`color[23:0]`作为RGB色键，复用原BLIT DMA。独立模块参数默认关闭，正式v5顶层已同步开启APB/Framebuffer并增加软件API/模式3；共享显示系统RTL与软件构建通过，CPU指令检查本轮未执行。运行和验证边界见[COLOR_KEY](COLOR_KEY.md)。
 
 ```text
 仿真命令（未来由 A 提供）
@@ -95,7 +95,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_graphics_c
 |---|---|
 | `start` | 接 manager 最终产生的一拍 `command_accept`，不能直接接原始 APB 请求 |
 | `enabled` | 平台接收使能，最终 accept 时必须为1；不用于中途取消 |
-| `op[31:0]` | 正式0=FILL、1=BLIT；B 可选色键命令实验编码2，仅 `COLOR_KEY_ENABLE=1` 时支持，尚未发布为正式 APB 命令；三个 OP 参数支持测试重映射 |
+| `op[31:0]` | 正式0=FILL、1=BLIT、2=色键复制；op2仅COLOR_KEY_ENABLE=1时支持，v5顶层已开启；三个OP参数支持独立测试重映射 |
 | `x/y/width/height[31:0]` | 目标位置和矩形大小，单位像素 |
 | `color[31:0]` | FILL 的 XRGB8888 颜色；普通 BLIT 不使用；可选色键命令使用低24位 RGB，高8位忽略 |
 | `src_addr[31:0]` | BLIT 绝对源字节地址，FILL 不使用 |
@@ -106,7 +106,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_graphics_c
 
 接受命令当拍锁存参数和操作选择、清旧结果并增加公共计数。FILL 顺序为 `IDLE → LAUNCH → RUN → IDLE`，BLIT 为 `IDLE → CHECK_SOURCE → LAUNCH → RUN → IDLE`。`LAUNCH` 只启动一次子模块；`RUN` 才采集结果，隔离旧 sticky DONE。
 
-色键复制使用同一 BLIT 顺序和源检查，命令类型及颜色在公共 accept 时锁存；写出时按 RGB24 比较生成逐像素 WSTRB，透明位置保留 Back。全透明拍仍走完 W/B，FILL 的边缘 strobe 和普通复制不受前一条色键命令影响。没有新增端口、DMA、APB offset 或正式 capability；默认关闭配置的执行和错误语义保持不变。
+色键复制使用同一BLIT顺序和源检查，命令类型及颜色在公共accept时锁存；写出时按RGB24比较生成逐像素WSTRB，透明位置保留Back。全透明拍仍走完W/B，FILL边缘strobe和普通复制不受上一条色键影响。没有新增端口、DMA或APB offset；正式v5新增CAPABILITIES bit7，默认关闭配置保持v4执行和错误语义。
 
 ### C 范围结果的时序
 

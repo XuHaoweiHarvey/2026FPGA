@@ -243,6 +243,8 @@ endfunction
 //===============================================================================
 localparam WR_FIFO_DEPTH  = 1024;
 localparam RD_FIFO_DEPTH  = 1024;
+// One switch keeps the APB capability and pixel execution path in agreement.
+localparam COLOR_KEY_ENABLE = 1;
 
 // localparam	MAX_HRES		= 12'd1920;
 // localparam	MAX_VRES		= 12'd1080;
@@ -460,7 +462,8 @@ wire [31:0] service_watermarks;
 rgb_framebuffer #(
     .FRAME_WIDTH(HACT), .FRAME_HEIGHT(VACT),
     .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH), .AXI_ID_WIDTH(AXI_ID_WIDTH),
-    .WR_FIFO_DEPTH(1024), .RD_FIFO_DEPTH(1024), .BURST_LEN(127), .C_MODE(1), .D_MODE(1), .BLIT_ENABLE(1)
+    .WR_FIFO_DEPTH(1024), .RD_FIFO_DEPTH(1024), .BURST_LEN(127), .C_MODE(1), .D_MODE(1), .BLIT_ENABLE(1),
+    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)
 ) checker0(
     .diag_wr_fifo_full(wr_fifo_full),
     .diag_wr_bank(wr_buffer_index), .diag_rd_bank(rd_buffer_index),
@@ -913,7 +916,7 @@ assign tmds_tx_data2_TX_DATA = ~tmds_data2;
 // Control-island reset never resets the platform-owned writer or video path.
 // Sapphire is the only TDO driver. EDB and the former TDI/TDO placeholder are absent.
 (* syn_keep = 1 *) wire accel_start_test_pulse;
-sapphire_control u_control (
+sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)) u_control (
     .core_clk(core_clk), .platform_rst_n(i_arstn && w_arstn),
     .jtag_tck(jtag_inst1_TCK), .jtag_tdi(jtag_inst1_TDI), .jtag_tdo(jtag_inst1_TDO),
     .jtag_sel(jtag_inst1_SEL), .jtag_capture(jtag_inst1_CAPTURE),

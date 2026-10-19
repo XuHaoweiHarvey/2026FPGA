@@ -198,7 +198,7 @@ try {
     } else {
         Write-Host 'PNG previews skipped: optional Python 3 not found. PPMs and RTL checks are available.'
     }
-    Write-Host 'PASS independent read arbiter, source guard, graphics/color-key dispatcher and double-buffer checks. Color key is B-local opt-in, not formal v4 APB support; Efinity/board verification pending.'
+    Write-Host 'PASS independent read arbiter, source guard, graphics/color-key dispatcher and double-buffer checks. For formal v5 color-key/display checks use run_d_checks.py --color-key; Efinity/board verification pending.'
     if (-not $NoWave) {
         Write-Host ('Source guard waveform: ' + (Join-Path $outputPath 'source_guard_1080p/graphics.vcd'))
         Write-Host ('Waveform: ' + (Join-Path $outputPath 'basic/graphics.vcd'))

@@ -1,6 +1,6 @@
 # Build and Debug
 
-原FILL基线已由负责人完成A～E实板验收；新增v4 BLIT仍待Efinity综合、时序和实板验收。本指南供团队从仓库复现：Efinity Compile → Programmer → RISC-V IDE Build → Hard JTAG Debug → HDMI Demo。正常流程无需重新Generate IP，也不依赖UART。
+原FILL基线已由负责人完成A～E实板验收；当前v5 BLIT/色键仍待Efinity综合、时序和实板验收。本指南供团队从仓库复现：Efinity Compile → Programmer → RISC-V IDE Build → Hard JTAG Debug → HDMI Demo。正常流程无需重新Generate IP，也不依赖UART。
 
 ## Environment and Inputs
 
@@ -30,9 +30,9 @@
 
 Tools → Open Programmer → 使用已验证USB Target，下载本次Compile生成的`outflow/ti60f225_oob.bit`，确认来源/时间。本流程不默认烧录SPI Flash。
 
-复位后等待DDR/video初始化：CPU程序尚未启动时，HDMI应稳定显示红、绿、蓝、白四条竖条。TPG只初始化Front0一帧，完成排空后退出；Back1需软件完整重建。BLIT版硬件应读回VERSION=`0x00040000`、CAPABILITIES=`0x0000007B`；A～E旧板级记录使用的是BLIT前硬件，不代表v4已上板通过。
+复位后等待DDR/video初始化：CPU程序尚未启动时，HDMI应稳定显示红、绿、蓝、白四条竖条。TPG只初始化Front0一帧，完成排空后退出；Back1需软件完整重建。当前v5硬件应读回VERSION=`0x00050000`、CAPABILITIES=`0x000000FB`；A～E旧板级记录使用的是BLIT前硬件，不代表v5已上板通过。
 
-历史VERSION=00030000不能区分修复前/后D bit。当前v4仍须核对SERVICE_STATUS bit5=1、SERVICE_READ_QUOTA=128、SERVICE_WATERMARKS=02000180，确保有正式写准入保护。
+历史VERSION=00030000不能区分修复前/后D bit。当前v5仍须核对SERVICE_STATUS bit5=1、SERVICE_READ_QUOTA=128、SERVICE_WATERMARKS=02000180，确保有正式写准入保护。新软件严格要求v5/FB；旧v3/v4 bit或ELF须配套更新。
 
 ## 3. Workspace / BSP / Import
 
@@ -95,11 +95,17 @@ PC前缀重复、FTDI配置来源和GDB连接后退出的已验证故障见[TROU
 
 ### BLIT Copy Demo
 
-将`software/apb_reg_test/demo_config.h`中的`DEMO_MODE`设为`2`后Build，并下载匹配的v4 FPGA配置和新ELF。也可以从仓库根目录用`python scripts/build_apb_software.py --define DEMO_MODE=2 --output output/graphics/blit-demo`生成独立ELF，再让IDE使用该ELF。不要拿旧v3 ELF测试v4硬件。
+将`software/apb_reg_test/demo_config.h`中的`DEMO_MODE`设为`2`后Build，并下载匹配的当前v5 FPGA配置和新ELF。也可以从仓库根目录用`python scripts/build_apb_software.py --define DEMO_MODE=2 --output output/graphics/blit-demo`生成独立ELF，再让IDE使用该ELF。旧v4行为检查保留在[SYSTEM_BLIT](SYSTEM_BLIT.md)，本轮v5的CPU指令检查受依赖权限限制未执行。
 
-模式2每轮先清Back并在左上角画红、绿、蓝、黄四个16×16色块，换帧显示源图；再清新的Back，用`src=当前Front`、stride=7680执行32×32 BLIT到`(64,64)`，最后换帧显示复制结果。无限运行时会在源图/复制图之间交替。保留`g_demo_mode=2`，可查看`blit_commands_issued/completed`、`source_swaps_completed`、`blit_source_base`及`blit_target_*`；成功时BLIT计数持续一致增长，error/underflow/missed增量应为0。该软件行为检查通过仍不等于Efinity时序或实板验收通过。
+模式2每轮先清Back并在左上角画红、绿、蓝、黄四个16×16色块，换帧显示源图；再清新的Back，用`src=当前Front`、stride=7680执行32×32 BLIT到`(64,64)`，最后换帧显示复制结果。无限运行时会在源图/复制图之间交替。保留`g_demo_mode=2`，可查看`blit_commands_issued/completed`、`source_swaps_completed`、`blit_source_base`及`blit_target_*`；成功时BLIT计数持续一致增长，error/underflow/missed增量应为0。此前v4软件行为检查通过；本轮v5未执行CPU指令，也未验收Efinity时序或实板。
 
 首次联调可在main断点设置`g_frame_limit=2`，两轮后在`apb_test_done`停止：`iterations=2`、`commands_issued=commands_completed=14`、`blit_commands_issued=blit_commands_completed=2`、`swaps_requested=swaps_completed=4`、`source_swaps_completed=2`、`pass=1`、`errors=0`。模式2的iteration/frame_limit统计一次完整复制流程，包含源图和复制图两次换帧；`g_hold_frames`保持最终复制画面。
+
+### Color Keying Compare Demo
+
+将DEMO_MODE设为3，或执行`python scripts/build_apb_software.py --define DEMO_MODE=3 --output output/graphics/color-key-demo-v5`，IDE使用对应的新ELF。9条FILL先生成128×128紫底机器人，第一次swap将它设为Front；随后画深蓝/绿色Back背景，普通复制到(384,384)，以0xFF00FF为key的透明复制到(1152,384)，第二次swap呈现左右对比。透明复制保留Back已有背景，不解释源X为Alpha。
+
+两轮有限运行预期26条完成命令、普通BLIT和色键各2条、4次swap；新增`color_key_commands_issued/completed`应一致，`color_key_rgb=0xFF00FF`。这是板级预期，尚未在板卡或本轮CPU指令模型中验收。当前软件已用正式BSP和替代GNU工具链编译通过；共享DDR显示系统的缩小场景RTL检查通过。详细约束与复现见[COLOR_KEY](COLOR_KEY.md)。
 
 ### Five-parameter Test
 
@@ -113,11 +119,11 @@ PC前缀重复、FTDI配置来源和GDB连接后退出的已验证故障见[TROU
 
 | 观察 | 正常解释 |
 |---|---|
-| id/version | 当前v4为4143434C / 00040000 |
+| id/version | 当前v5为4143434C / 00050000 |
 | pass/errors/running | 两轮完整演示后pass1，errors0；无限模式running1，出错pass回0 |
 | iterations/target_reached | 持续增加，>=1000后里程碑1，继续循环 |
-| commands_issued/completed | 模式0每轮+4，模式1每轮+2，模式2每轮+7；back_ready时相等，绘制中可差1 |
-| swaps_requested/completed | 模式0/1每轮+1，模式2每轮+2；pending时可差1 |
+| commands_issued/completed | 模式0每轮+4，模式1每轮+2，模式2每轮+7，模式3每轮+13；back_ready时相等，绘制中可差1 |
+| swaps_requested/completed | 模式0/1每轮+1，模式2/3每轮+2；pending时可差1 |
 | command_delta/swap_delta | 原始硬件计数减启动baseline；与本次成功API统计对照 |
 | underflow/missed baseline、value、delta | 启动历史可非0；稳定期两项delta保持0 |
 | errors/timeouts/rejected_*、diagnostics.error_code/reader_error | 正常均0；故障保留failure_phase/failure_code |

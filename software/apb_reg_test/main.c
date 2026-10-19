@@ -6,7 +6,7 @@ typedef struct { uint32_t x,y,width,height,color; } rectangle_t;
 volatile rectangle_t g_test_rectangle={TEST_RECT_X,TEST_RECT_Y,TEST_RECT_W,TEST_RECT_H,TEST_RECT_COLOR};
 volatile uint32_t g_hold_frames=60;
 volatile uint32_t g_frame_limit=0; /* 0 = indefinite; otherwise number of presented scenes. */
-volatile uint32_t g_demo_mode=DEMO_MODE; /* 0 = multi-rectangle; 1 = parameter rectangle; 2 = BLIT. */
+volatile uint32_t g_demo_mode=DEMO_MODE; /* 0 = rectangles; 1 = parameter rectangle; 2 = BLIT; 3 = color key. */
 volatile uint32_t g_validation_target=1000; /* Records a milestone; never stops the loop. */
 
 enum { PHASE_INIT=1,PHASE_BUILD=2,PHASE_RECT=3,PHASE_BACK_READY=4,
@@ -25,6 +25,7 @@ typedef struct {
     uint32_t blit_commands_issued,blit_commands_completed;
     uint32_t source_swaps_requested,source_swaps_completed;
     uint32_t blit_source_base,blit_target_x,blit_target_y,blit_target_width,blit_target_height;
+    uint32_t color_key_commands_issued,color_key_commands_completed,color_key_rgb;
     accel_diagnostics_t diagnostics;
 } demo_result_t;
 /* Keep the successful IDE project/result symbol. diagnostics contains raw CSR
@@ -99,6 +100,20 @@ static void blit_from_front(uint32_t x,uint32_t y,uint32_t w,uint32_t h) {
     ++g_apb_test_result.blit_commands_completed;
     check_health();
 }
+static void keyed_blit_from_front(uint32_t x,uint32_t y,uint32_t w,uint32_t h,uint32_t key) {
+    uint32_t source=display_get_front_buffer();
+    g_apb_test_result.blit_source_base=source;
+    g_apb_test_result.blit_target_x=x;g_apb_test_result.blit_target_y=y;
+    g_apb_test_result.blit_target_width=w;g_apb_test_result.blit_target_height=h;
+    g_apb_test_result.color_key_rgb=key & UINT32_C(0x00FFFFFF);
+    require(accel_color_key_blit(source,7680,x,y,w,h,key));
+    ++g_apb_test_result.commands_issued;
+    ++g_apb_test_result.color_key_commands_issued;
+    require(accel_wait_done());
+    ++g_apb_test_result.commands_completed;
+    ++g_apb_test_result.color_key_commands_completed;
+    check_health();
+}
 static void request_swap(uint32_t *ticket,uint32_t source_swap) {
     require(display_swap_request(ticket));
     ++g_apb_test_result.swaps_requested;
@@ -148,7 +163,36 @@ int main(void) {
         old_front=display_get_front_buffer();old_back=display_get_back_buffer();
         if(old_front==old_back || (old_front!=0 && old_front!=UINT32_C(0x00800000)) ||
            (old_back!=0 && old_back!=UINT32_C(0x00800000))) require(UINT32_C(0xE004));
-        if(mode==2) {
+        if(mode==3) {
+            /* Construct a 128x128 sprite using FILL; no CPU DDR port needed.
+             * Nonzero source X verifies that the key compares RGB only. */
+            g_apb_test_result.phase=PHASE_RECT;
+            fill(0,0,1920,1080,0);
+            fill(0,0,128,128,UINT32_C(0x80FF00FF));
+            fill(32,24,64,72,UINT32_C(0x00E8E8F0));
+            fill(60,8,8,16,UINT32_C(0x00E8E8F0));
+            fill(32,96,20,24,UINT32_C(0x00E8E8F0));
+            fill(76,96,20,24,UINT32_C(0x00E8E8F0));
+            fill(40,40,12,12,UINT32_C(0x00203040));
+            fill(76,40,12,12,UINT32_C(0x00203040));
+            fill(48,72,32,8,UINT32_C(0x0000D0D0));
+            equal(display_get_front_buffer(),old_front);equal(display_get_back_buffer(),old_back);
+            equal(g_apb_test_result.commands_issued,g_apb_test_result.commands_completed);
+            check_health();equal(g_apb_test_result.command_delta,g_apb_test_result.commands_issued);
+            g_apb_test_result.phase=PHASE_BACK_READY;back_ready();
+            g_apb_test_result.phase=PHASE_SWAP;request_swap(&ticket,1);
+            g_apb_test_result.phase=PHASE_RECT;
+            equal(display_get_front_buffer(),old_back);equal(display_get_back_buffer(),old_front);
+            fill(0,0,1920,1080,UINT32_C(0x00182838));
+            fill(0,448,1920,632,UINT32_C(0x00285840));
+            blit_from_front(384,384,128,128);
+            keyed_blit_from_front(1152,384,128,128,DEMO_COLOR_KEY_RGB);
+            equal(display_get_front_buffer(),old_back);equal(display_get_back_buffer(),old_front);
+            equal(g_apb_test_result.commands_issued,g_apb_test_result.commands_completed);
+            check_health();equal(g_apb_test_result.command_delta,g_apb_test_result.commands_issued);
+            g_apb_test_result.phase=PHASE_BACK_READY;back_ready();
+            g_apb_test_result.phase=PHASE_SWAP;request_swap(&ticket,0);
+        } else if(mode==2) {
             /* First build a source image in Back and publish it as Front. */
             g_apb_test_result.phase=PHASE_RECT;
             fill(0,0,1920,1080,UINT32_C(0));
@@ -194,12 +238,12 @@ int main(void) {
             g_apb_test_result.phase=PHASE_SWAP;
             request_swap(&ticket,0);
         }
-        /* Two swaps in BLIT mode restore the initial slot roles. */
-        equal(display_get_front_buffer(),mode==2 ? old_front : old_back);
-        equal(display_get_back_buffer(),mode==2 ? old_back : old_front);
+        /* Both copy demos use two swaps, restoring the initial slot roles. */
+        equal(display_get_front_buffer(),(mode==2 || mode==3) ? old_front : old_back);
+        equal(display_get_back_buffer(),(mode==2 || mode==3) ? old_back : old_front);
         equal(g_apb_test_result.commands_issued,g_apb_test_result.commands_completed);
         check_health();
-        equal(g_apb_test_result.diagnostics.reader_base,mode==2 ? old_front : old_back);
+        equal(g_apb_test_result.diagnostics.reader_base,(mode==2 || mode==3) ? old_front : old_back);
         equal(g_apb_test_result.swap_delta,g_apb_test_result.swaps_completed);
         ++g_apb_test_result.iterations;
         if(g_apb_test_result.iterations>=2) g_apb_test_result.pass=1;

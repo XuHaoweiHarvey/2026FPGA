@@ -2,7 +2,7 @@
 // One-shot TPG, real legacy engines and shared mock DDR, APB registers,
 // accelerator, CVO and serializer. No CPU or encrypted-controller simulation.
 module tb_checkpoint_d;
-parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0;
+parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0, COLOR_KEY=0;
 localparam INIT_ONLY=0;
 localparam BEATS=WIDTH*HEIGHT/4;
 reg axi_clk=0, i_clk=0, o_clk=0, rst_n=0;
@@ -25,7 +25,7 @@ integer image_tag[0:1];
 wire [31:0] init_error,engine_error,commands,beats,aws,lasts,bs,reserved;
 wire [31:0] cx,cy,cw,ch,cc;
 wire [31:0] cop,csrc,cstride;
-accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.WAIT_CYCLES(APB_WAITS),
+accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.COLOR_KEY_ENABLE(COLOR_KEY),.WAIT_CYCLES(APB_WAITS),
  .FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.FRAME_STRIDE(WIDTH*4)) regs (
  .PCLK(axi_clk),.PRESETn(apb_reset),.PADDR(paddr),.PWDATA(pwdata),.PSEL(psel),.PENABLE(penable),.PWRITE(pwrite),
  .PRDATA(prdata),.PREADY(pready),.PSLVERROR(pslverror),.display_buffer_base(front_base),.tpg_write_buffer_base(back_base),
@@ -78,7 +78,7 @@ wire [63:0] axis_data;
 wire axis_valid,axis_last,axis_user,full;
 wire axis_ready;
 wire [1:0] wr_bank,rd_bank;
-rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),.RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS)) dut (
+rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),.RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS),.COLOR_KEY_ENABLE(COLOR_KEY)) dut (
     .axi_clk(axi_clk),.rst_n(rst_n),.i_clk(i_clk),.i_frame_start(frame_start),
     .i_de(source_de),.vin(vin),.o_clk(o_clk),.fifo_rd_period(period),
     .display_underflow(underflow),
@@ -115,6 +115,36 @@ rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_
     .diag_wr_base(back_base),.diag_rd_base(front_base),
     .diag_wr_fifo_full(full),.diag_wr_bank(wr_bank),.diag_rd_bank(rd_bank));
 reg [127:0] memory [0:2*BEATS-1];
+// Independent coordinate references. They do not inspect DMA state or masks.
+function [31:0] robot_pixel;
+input integer xx,yy;
+begin
+ robot_pixel=32'h80ff00ff;
+ if((xx>=8 && xx<24 && yy>=6 && yy<24) ||
+    (xx>=15 && xx<17 && yy>=2 && yy<6) ||
+    (yy>=24 && yy<30 && ((xx>=8 && xx<13) || (xx>=19 && xx<24))))
+  robot_pixel=32'h00e8e8f0;
+ if(yy>=10 && yy<13 && ((xx>=10 && xx<13) || (xx>=19 && xx<22))) robot_pixel=32'h00203040;
+ if(xx>=12 && xx<20 && yy>=18 && yy<20) robot_pixel=32'h0000d0d0;
+end endfunction
+function [31:0] key_scene_pixel;
+input integer tag,xx,yy;
+reg [31:0] sprite;
+begin
+ key_scene_pixel=0;
+ if(tag==5) begin
+  if(xx<32 && yy<32) key_scene_pixel=robot_pixel(xx,yy);
+ end else begin
+  key_scene_pixel=yy<32 ? 32'h00182838 : 32'h00285840;
+  if(xx>=64 && xx<96 && yy>=16 && yy<48) key_scene_pixel=robot_pixel(xx-64,yy-16);
+  if(xx>=128 && xx<160 && yy>=16 && yy<48) begin
+   sprite=robot_pixel(xx-128,yy-16);
+   if(sprite[23:0]!=24'hff00ff) key_scene_pixel=sprite;
+  end
+  if(xx>=192 && xx<224 && yy==56) key_scene_pixel=32'h80ff00ff;
+  if(xx>=123 && xx<130 && yy>=51 && yy<54) key_scene_pixel=32'h00e04040;
+ end
+end endfunction
 function integer mem_index;
 input [31:0] a;
 begin mem_index=(a>=32'h00800000)?BEATS+(a-32'h00800000)/16:a/16;end
@@ -230,6 +260,7 @@ always @(posedge pixel_clk) begin
         if(x>=64 && x<96 && y>=16 && y<48)
             color=y<32 ? (x<80?24'hff0000:24'h00ff00) : (x<80?24'h0000ff:24'hffffff);
        end
+    5,6: color=key_scene_pixel(frame_tag,x,y);
     default: $fatal(1,"Displayed unbuilt Back");
    endcase
    if(checking && (frame_index!=buffer_status[0] || {red,green,blue}!==color))
@@ -275,11 +306,15 @@ begin
 end endtask
 task start_blit;
 input integer source,stride,xx,yy,ww,hh;
+begin start_copy(1,source,stride,xx,yy,ww,hh,0);end endtask
+task start_copy;
+input integer opcode,source,stride,xx,yy,ww,hh,key;
 integer previous_count;
 begin
  previous_count=commands;
- access('hBC,1,1,0);access('hC0,1,source,0);access('hC4,1,stride,0);
+ access('hBC,1,opcode,0);access('hC0,1,source,0);access('hC4,1,stride,0);
  access('h10,1,xx,0);access('h14,1,yy,0);access('h18,1,ww,0);access('h1C,1,hh,0);
+ access('h20,1,key,0);
  access(8,1,1,0);wait(commands==previous_count+1);@(negedge axi_clk);
 end endtask
 task wait_fill;
@@ -300,7 +335,7 @@ initial begin
  wait(final_b_pending);repeat(80) @(negedge axi_clk);
  if(init_done || beats!=BEATS || aws!=lasts || bs!=aws-1 || tpg_frames!=1) $fatal(1,"early handoff");
  release_final_b=1;wait(init_done);wait(draw_ready);
- access(8,1,2,0);access(4,0,0,0);if(prdata!=(GRAPHICS?'h40000:'h30000))$fatal(1,"D VERSION");
+ access(8,1,2,0);access(4,0,0,0);if(prdata!=(COLOR_KEY?'h50000:GRAPHICS?'h40000:'h30000))$fatal(1,"D VERSION");
  access('h64,1,0,1);access('h24,0,0,0);if(prdata!=3)$fatal(1,"BUFFER_STATUS RO");
  access('hBC,0,0,GRAPHICS?0:1);access(8,1,2,0);
  wait(frames>=1);
@@ -327,6 +362,7 @@ initial begin
   access('h60,1,2,0);repeat(3) @(negedge axi_clk);if(buffer_status[3])$fatal(1,"CLEAR_DONE failed");
  end
  if(GRAPHICS) graphics_round;
+ if(COLOR_KEY) color_key_round;
  // Hold the last R of a frame across two boundaries. Last AR is NOT completion.
  // Build Back first: the read-service policy correctly refuses unlimited
  // writes while this test deliberately withholds all further read service.
@@ -347,7 +383,9 @@ initial begin
  $finish;
 end
 integer display_during_blit=0,blit_during_display=0,contention=0;
+integer key_zero_beats=0,key_partial_beats=0;
 reg copy_in_progress=0;
+reg key_in_progress=0;
 wire shared_busy;
 generate if(GRAPHICS) begin: graphics_checks
  assign shared_busy=dut.shared_read.arbiter.busy;
@@ -361,6 +399,10 @@ generate if(GRAPHICS) begin: graphics_checks
   if(dut.b_arvalid && dut.display_arvalid) contention=contention+1;
   if(copy_in_progress && busy && dut.display_arvalid && dut.display_arready) display_during_blit=display_during_blit+1;
   if(dut.d_active && dut.b_arvalid && dut.b_arready) blit_during_display=blit_during_display+1;
+  if(key_in_progress && wvalid && wready) begin
+   if(wstrb==0) key_zero_beats=key_zero_beats+1;
+   else if(wstrb!=16'hffff) key_partial_beats=key_partial_beats+1;
+  end
  end
 end else begin: no_graphics_checks
  assign shared_busy=0;
@@ -368,7 +410,7 @@ end endgenerate
 task graphics_round;
 integer before_ar,before_aw,before_commands,underflow_before,missed_before,saved_front,k;
 begin
- access('h40,0,0,0);if(prdata!='h7b) $fatal(1,"Graphics capabilities");
+ access('h40,0,0,0);if(prdata!=(COLOR_KEY?'hfb:'h7b)) $fatal(1,"Graphics capabilities");
  // Reject a source in Back without any memory traffic from the accelerator.
  expect_engine_error=1;
  before_aw=aw_count;before_commands=commands;
@@ -377,6 +419,10 @@ begin
   $fatal(1,"Invalid source did not retire safely");
  access('hBC,1,99,0);access(8,1,1,0);wait_fill;
  if(engine_error!='h26 || aw_count!=before_aw) $fatal(1,"Invalid opcode touched DDR");
+ if(!COLOR_KEY) begin
+  access('hBC,1,2,0);access(8,1,1,0);wait_fill;
+  if(engine_error!='h26 || aw_count!=before_aw) $fatal(1,"v4 accepted color-key opcode");
+ end
  // Build a reference sprite with real FILL commands, then publish it.
  back_slot=buffer_status[1];old_sw=swap_count;
  start_rect(0,0,WIDTH,HEIGHT,0);wait_fill;
@@ -415,6 +461,97 @@ begin
  if(!display_during_blit || !blit_during_display || !contention)
   $fatal(1,"Missing concurrent read coverage display=%0d blit=%0d contention=%0d",display_during_blit,blit_during_display,contention);
  $display("PASS shared BLIT: APB snapshot/reset, four-color copy, final B/pending swap, concurrent display=%0d blit=%0d contention=%0d, underflow/missed delta=0",display_during_blit,blit_during_display,contention);
+end endtask
+task check_key_memory;
+input integer slot,tag;
+integer xx,yy,index;
+reg [31:0] actual,expected;
+begin
+ for(yy=0;yy<HEIGHT;yy=yy+1) for(xx=0;xx<WIDTH;xx=xx+1) begin
+  index=slot*BEATS+(yy*WIDTH+xx)/4;
+  actual=memory[index][(xx%4)*32+:32];expected=key_scene_pixel(tag,xx,yy);
+  if(actual!==expected)
+   $fatal(1,"Color-key full-memory mismatch tag=%0d x=%0d y=%0d got=%h expected=%h",tag,xx,yy,actual,expected);
+ end
+end endtask
+task export_key_memory;
+input integer slot;
+input [255:0] name;
+integer fd,xx,yy,index;
+reg [31:0] pixel_value;
+reg [2047:0] preview_dir;
+begin
+ if($value$plusargs("PREVIEW_DIR=%s",preview_dir)) begin
+  fd=$fopen($sformatf("%0s/%0s.ppm",preview_dir,name),"w");
+  if(!fd) $fatal(1,"Cannot open system preview");
+  $fdisplay(fd,"P3\n%0d %0d\n255",WIDTH,HEIGHT);
+  for(yy=0;yy<HEIGHT;yy=yy+1) for(xx=0;xx<WIDTH;xx=xx+1) begin
+   index=slot*BEATS+(yy*WIDTH+xx)/4;pixel_value=memory[index][(xx%4)*32+:32];
+   $fdisplay(fd,"%0d %0d %0d",pixel_value[23:16],pixel_value[15:8],pixel_value[7:0]);
+  end
+  $fclose(fd);
+ end
+end endtask
+task color_key_round;
+integer before_aw,before_commands,underflow_before,missed_before,saved_front,k,zero_before,display_before;
+begin
+ underflow_before=display_underflow_count;missed_before=missed_boundary_count;
+ expect_engine_error=1;before_aw=aw_count;before_commands=commands;
+ start_copy(2,back_base,WIDTH*4,128,16,32,32,'hff00ff);wait_fill;
+ if(engine_error!='h21 || aw_count!=before_aw || commands!=before_commands+1 || dut.b_arvalid || buffer_status[5])
+  $fatal(1,"Keyed copy bypassed Front source guard");
+ back_slot=buffer_status[1];old_sw=swap_count;
+ start_rect(0,0,WIDTH,HEIGHT,0);wait_fill;expect_engine_error=0;
+ start_rect(0,0,32,32,'h80ff00ff);wait_fill;
+ start_rect(8,6,16,18,'he8e8f0);wait_fill;start_rect(15,2,2,4,'he8e8f0);wait_fill;
+ start_rect(8,24,5,6,'he8e8f0);wait_fill;start_rect(19,24,5,6,'he8e8f0);wait_fill;
+ start_rect(10,10,3,3,'h203040);wait_fill;start_rect(19,10,3,3,'h203040);wait_fill;
+ start_rect(12,18,8,2,'h00d0d0);wait_fill;
+ check_key_memory(back_slot,5);export_key_memory(back_slot,"color_key_source");
+ image_tag[back_slot]=5;request_swap;wait_swap(old_sw);
+ old_frames=frames;wait(frames>=old_frames+2);
+ back_slot=buffer_status[1];old_sw=swap_count;saved_front=front_base;
+ start_rect(0,0,WIDTH,HEIGHT,'h182838);wait_fill;
+ start_rect(0,32,WIDTH,HEIGHT-32,'h285840);wait_fill;
+ start_blit(front_base,WIDTH*4,64,16,32,32);wait_fill;
+ // A completely transparent one-burst copy must still await its B response.
+ key_in_progress=1;zero_before=key_zero_beats;hold_b=1;
+ start_copy(2,front_base,WIDTH*4,256,56,32,1,'haaff00ff);
+ wait(bvalid);repeat(20)@(negedge axi_clk);
+ if(done || !busy || !buffer_status[5] || key_zero_beats-zero_before!=8)
+  $fatal(1,"All-transparent copy dropped W/B or finished early");
+ hold_b=0;wait_fill;key_in_progress=0;
+ for(k=256;k<288;k=k+1)
+  if(memory[back_slot*BEATS+(56*WIDTH+k)/4][(k%4)*32+:32]!==32'h00285840)
+   $fatal(1,"All-transparent copy overwrote background");
+ // Ordinary copy and unaligned FILL must clear the preceding key mode.
+ start_blit(front_base,WIDTH*4,192,56,32,1);wait_fill;
+ start_rect(123,51,7,3,'he04040);wait_fill;
+ wait(dut.d_active && reader_fifo_level>=128);
+ copy_in_progress=1;key_in_progress=1;stall_read=1;
+ display_before=display_during_blit;
+ start_copy(2,front_base,WIDTH*4,128,16,32,32,'haaff00ff);
+ wait(dut.b_arvalid && dut.display_arvalid);repeat(3)@(negedge axi_clk);stall_read=0;
+ access('h20,1,'he8e8f0,0);access('hBC,1,0,0);access('hC0,1,back_base,0);access('hC4,1,16,0);
+ wait(wvalid && wlast && wready && w_index%BEATS==(47*WIDTH/4+39));
+ @(negedge axi_clk);hold_b=1;wait(bvalid);repeat(4)@(negedge axi_clk);
+ if(done || !busy || !buffer_status[5]) $fatal(1,"Keyed copy finished before final B");
+ request_swap;
+ @(negedge axi_clk);apb_reset=0;repeat(10)@(negedge axi_clk);apb_reset=1;
+ access('h20,0,0,0);if(prdata!=0) $fatal(1,"Key register reset");
+ old_boundary=boundary_count;wait(boundary_count>=old_boundary+2);
+ if(front_base!=saved_front || swap_count!=old_sw || !busy || !buffer_status[5])
+  $fatal(1,"CPU reset cancelled keyed copy or presented incomplete Back");
+ check_key_memory(back_slot,6);check_key_memory(buffer_status[0],5);
+ export_key_memory(back_slot,"color_key_scene");
+ image_tag[back_slot]=6;hold_b=0;wait_fill;wait_swap(old_sw);
+ copy_in_progress=0;key_in_progress=0;
+ old_frames=frames;wait(frames>=old_frames+3);
+ if(engine_error || reader_error || display_underflow_count!=underflow_before || missed_boundary_count!=missed_before)
+  $fatal(1,"Keyed shared display failed underflow=%0d missed=%0d",display_underflow_count-underflow_before,missed_boundary_count-missed_before);
+ if(!key_zero_beats || !key_partial_beats || display_during_blit==display_before)
+  $fatal(1,"Missing keyed mask/concurrent display coverage");
+ $display("PASS shared color key: source guard, full XRGB/source preservation, ordinary/key/FILL switching, all-transparent/final B, APB key snapshot/reset, safe swap; zero=%0d partial=%0d display=%0d, underflow/missed delta=0",key_zero_beats,key_partial_beats,display_during_blit-display_before);
 end endtask
 task graphics_fault;
 integer saved_sw,saved_commands;

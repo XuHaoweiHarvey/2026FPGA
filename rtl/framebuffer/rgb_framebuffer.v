@@ -12,7 +12,8 @@ module rgb_framebuffer #(
     parameter C_MODE = 0, SETTLE_FRAMES = 2, D_MODE = 0, BLIT_ENABLE = 0,
     parameter WRITE_SERVICE_ENABLE=1, WRITE_READ_QUOTA=128,
     parameter WRITE_FIFO_LOW=RD_FIFO_DEPTH*3/8, WRITE_FIFO_HIGH=RD_FIFO_DEPTH/2,
-    parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000
+    parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000,
+    parameter COLOR_KEY_ENABLE=0
 )(
     input wire axi_clk, input wire rst_n,
     input wire i_clk, input wire i_frame_start, input wire i_de,
@@ -181,7 +182,7 @@ generate if(C_MODE) begin: c_control
             .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),
             .width(cmd_width),.height(cmd_height),.src_range_valid(source_valid));
         graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
-            .FRAME_STRIDE(FRAME_WIDTH*4)) engine (
+            .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)) engine (
             .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
             .op(cmd_op),.x(cmd_x),.y(cmd_y),.width(cmd_width),.height(cmd_height),.color(cmd_color),
             .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),.src_range_valid(source_valid),.accept(),
@@ -323,6 +324,7 @@ initial if(D_MODE && (WRITE_FIFO_HIGH>=RD_FIFO_DEPTH || WRITE_FIFO_LOW<16))
     $fatal(1,"Display service watermarks must fit the actual FIFO depth");
 initial begin
     if(BLIT_ENABLE && (!C_MODE || !D_MODE)) $fatal(1,"BLIT requires the double-buffered platform");
+    if(COLOR_KEY_ENABLE && !BLIT_ENABLE) $fatal(1,"Color key requires BLIT support");
     if(D_MODE && (!C_MODE || AXI_ID_WIDTH!=4 || AXI_ADDR_WIDTH!=32 || BUFFER0_BASE!=0 ||
        BUFFER1_BASE!=32'h00800000 || FRAME_WIDTH*FRAME_HEIGHT*4>32'h00800000))
         $fatal(1,"Unsupported D slot geometry");

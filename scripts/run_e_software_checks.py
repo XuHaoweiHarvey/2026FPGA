@@ -4,6 +4,7 @@ Requires unicorn==2.1.4 (can be installed in a temporary --unicorn-path).
 This tests software, NOT DDR timing, HDL, Sapphire debug, or HDMI pixels.
 """
 import argparse
+from array import array
 import re
 import struct
 import subprocess
@@ -75,8 +76,8 @@ class Machine:
                       if len(parts:=line.split())>=3}
         self.entry=struct.unpack_from('<I',data,24)[0]
         self.reg={i:0 for i in range(0,0xc8,4)}
-        self.reg.update({0:0x4143434C,4:0x40000,0xc:0x1a,0x2c:0,0x30:0x800000,
-                         0x34:7680,0x38:1920,0x3c:1080,0x40:0x7b,0x44:518400,
+        self.reg.update({0:0x4143434C,4:0x50000,0xc:0x1a,0x2c:0,0x30:0x800000,
+                         0x34:7680,0x38:1920,0x3c:1080,0x40:0xfb,0x44:518400,
                          0x48:4050,0x4c:4050,0x50:4050,0x54:518400,0x58:1,
                          0x5c:0xfffffffc if wrap else 37,0x64:0x12,
                          0x80:0xfffffffe if wrap else 11,0x84:3,0x88:0x30,
@@ -84,9 +85,11 @@ class Machine:
         self.remaining=0;self.pending=0;self.commands=[];self.ops=[];self.writes=[]
         self.front=0;self.swaps=0;self.stopped=False;self.presented=0
         self.recorded_commands=[];self.recorded_ops=[];self.startup_command=False;self.startup_swap=False
+        self.pixels=None;self.pixel_checks=0
         if case=='init_timeout': self.reg[0xc]=0
         if case=='bad_id': self.reg[0]=0
-        if case=='bad_version': self.reg[4]=0x30000
+        if case=='bad_version': self.reg[4]=0x40000
+        if case=='missing_color_key': self.reg[0x40]=0x7b
         if case=='policy_disabled': self.reg[0x88]=0
         if case=='resume_busy':
             self.reg[0xc]=0x19;self.reg[0x64]|=0x20
@@ -109,6 +112,8 @@ class Machine:
         for name,value in [('g_frame_limit',self.limit),('g_hold_frames',self.hold),
                            ('g_demo_mode',self.mode),('g_validation_target',self.target)]:
             self.put(name,value)
+        if self.mode==3:
+            self.pixels=[array('I',[0])*(1920*1080) for _ in range(2)]
 
     def advance(self):
         if self.remaining and self.case!='done_timeout':
@@ -120,11 +125,16 @@ class Machine:
                 if not self.startup_command and self.ops[-1][0]==1:
                     if self.case=='blit_read_error': self.reg[0x24]=0x22;self.reg[0xc]|=4
                     if self.case=='blit_write_error': self.reg[0x24]=0x23;self.reg[0xc]|=4
+                if not self.startup_command and self.ops[-1][0]==2:
+                    if self.case=='color_key_read_error': self.reg[0x24]=0x22;self.reg[0xc]|=4
+                    if self.case=='color_key_write_error': self.reg[0x24]=0x23;self.reg[0xc]|=4
                 if self.case=='underflow': self.reg[0xa4]+=1
                 if self.case=='missed': self.reg[0x84]+=1
                 self.reg[0x8c]=(self.reg[0x8c]+10000)&MASK
                 self.reg[0x90]=(self.reg[0x90]+32)&MASK
                 if not self.startup_command:
+                    if self.pixels is not None and self.reg[0x24]==0:
+                        self.apply_pixels()
                     self.recorded_commands.append(self.commands[-1])
                     self.recorded_ops.append(self.ops[-1])
                 self.startup_command=False
@@ -157,7 +167,7 @@ class Machine:
             assert value==1,'software must never reset/clear an in-flight transaction'
             assert not self.remaining and not(self.reg[0x64]&0x24)
             op=self.reg[0xbc]
-            assert op in (0,1),'software must explicitly select a supported operation'
+            assert op in (0,1,2),'software must explicitly select a supported operation'
             command=tuple(self.reg[o] for o in (0x10,0x14,0x18,0x1c,0x20))
             self.commands.append((self.reg[0x30],*command))
             self.ops.append((op,self.reg[0xc0],self.reg[0xc4]))
@@ -171,7 +181,11 @@ class Machine:
             else:
                 assert self.ops[-1][1:]==(self.front*0x800000,7680)
                 assert (x%4)==0 and (w%4)==0
-                assert (x,y,w,h,color)==(64,64,32,32,0)
+                if self.mode==2:
+                    assert (x,y,w,h,color)==(64,64,32,32,0) and op==1
+                else:
+                    assert self.mode==3
+                    assert (x,y,w,h,color)==((384,384,128,128,0) if op==1 else (1152,384,128,128,0xff00ff))
             self.remaining=12;self.reg[0xc]=0x19;self.reg[0x64]|=0x20
         elif offset==0x60:
             assert value==3 and not self.remaining and not self.pending
@@ -181,10 +195,63 @@ class Machine:
     def scene_begin(self,uc,address,size,data):
         if self.case=='rejected': self.reg[0x64]|=4
 
+    def apply_pixels(self):
+        # Execute completed commands only in this software/MMIO model. This is
+        # not an HDL simulation; the separate shared-DDR test covers real RTL.
+        base,x,y,w,h,color=self.commands[-1]
+        op,source,stride=self.ops[-1]
+        target=self.pixels[base//0x800000]
+        if op==0:
+            row=array('I',[color])*w
+            for yy in range(y,y+h): target[yy*1920+x:yy*1920+x+w]=row
+        else:
+            origin=self.pixels[self.front]
+            offset=(source-self.front*0x800000)//4
+            for yy in range(h):
+                src=offset+yy*(stride//4);dst=(y+yy)*1920+x
+                if op==1: target[dst:dst+w]=origin[src:src+w]
+                else:
+                    for xx in range(w):
+                        pixel=origin[src+xx]
+                        if pixel&0xffffff!=color: target[dst+xx]=pixel
+
+    def check_key_pixels(self,source_only):
+        def sprite(xx,yy):
+            value=0x80ff00ff
+            if ((32<=xx<96 and 24<=yy<96) or (60<=xx<68 and 8<=yy<24) or
+                (96<=yy<120 and (32<=xx<52 or 76<=xx<96))): value=0xe8e8f0
+            if 40<=yy<52 and (40<=xx<52 or 76<=xx<88): value=0x203040
+            if 48<=xx<80 and 72<=yy<80: value=0x00d0d0
+            return value
+        expected_source=array('I',[0])*(1920*1080)
+        for yy in range(128):
+            for xx in range(128): expected_source[yy*1920+xx]=sprite(xx,yy)
+        if source_only:
+            assert self.pixels[1-self.front]==expected_source,'software built an incorrect source sprite'
+        else:
+            assert self.pixels[self.front]==expected_source,'copy modified the source Front'
+            expected=array('I',[0x182838])*(1920*448)+array('I',[0x285840])*(1920*632)
+            for yy in range(128):
+                for xx in range(128):
+                    pixel=sprite(xx,yy)
+                    expected[(384+yy)*1920+384+xx]=pixel
+                    if pixel&0xffffff!=0xff00ff:
+                        expected[(384+yy)*1920+1152+xx]=pixel
+            assert self.pixels[1-self.front]==expected,'software color-key scene overwrote background or used wrong geometry'
+        self.pixel_checks+=1
+
     def back_ready(self,uc,address,size,data):
         assert self.reg[0x2c]==self.front*0x800000 and self.reg[0x68]==self.reg[0x2c]
         assert len(self.recorded_commands)==len(self.commands)
-        if self.mode==2:
+        if self.mode==3:
+            count=len(self.recorded_commands)-self.presented*13
+            assert count in (9,13),'key scene must build/publish source, then prepare/copy Back'
+            group=9 if count==9 else 4
+            recent=self.recorded_commands[-group:];recent_ops=self.recorded_ops[-group:]
+            assert all(c[0]==self.reg[0x30] for c in recent)
+            assert [op[0] for op in recent_ops]==([0]*9 if group==9 else [0,0,1,2])
+            self.check_key_pixels(source_only=group==9)
+        elif self.mode==2:
             count=len(self.recorded_commands)-self.presented*7
             assert count in (5,7),'BLIT scene must complete source build, then clear/copy'
             group=5 if count==5 else 2
@@ -206,7 +273,7 @@ class Machine:
 
     def frame_presented(self,uc,address,size,data):
         self.presented+=1
-        assert self.swaps==self.presented*(2 if self.mode==2 else 1)
+        assert self.swaps==self.presented*(2 if self.mode in (2,3) else 1)
         if self.limit==0 and self.presented==1000:
             # Prove no built-in finite limit: the milestone was reached and
             # the default continuous configuration remains enabled.
@@ -277,8 +344,35 @@ print('PASS E rebuilt five-parameter single-rectangle mode changes exact submitt
 blit_elf=build('blit-demo',['DEMO_MODE=2'])
 m=Machine(blit_elf,hold=60,wrap=True).run();assert m.mode==2;good(m);blit_demo_commands(m)
 m=Machine(blit_elf,case='resume_swap').run();good(m);blit_demo_commands(m)
-print('PASS E v4 BLIT demo: builds four-color Front source, clears Back, copies 32x32 to (64,64), and presents via four safe swaps',flush=True)
+print('PASS E v5 ordinary BLIT demo: builds four-color Front source, clears Back, copies 32x32 to (64,64), and presents via four safe swaps',flush=True)
 print('PASS E BLIT compiled mode, 60-period hold, counter wrap, and alternate initial Front after pending swap',flush=True)
+key_elf=build('color-key-demo',['DEMO_MODE=3'])
+def key_demo_commands(machine):
+    good(machine)
+    r=machine.result
+    assert machine.mode==3 and len(machine.commands)==26 and machine.pixel_checks==4
+    assert r['color_key_commands_issued']==r['color_key_commands_completed']==2
+    assert r['blit_commands_issued']==r['blit_commands_completed']==2 and r['color_key_rgb']==0xff00ff
+    assert r['source_swaps_completed']==2 and r['swaps_completed']==4
+    for start in (0,13):
+        assert [op[0] for op in machine.recorded_ops[start:start+13]]==[0]*11+[1,2]
+        source=machine.recorded_commands[start][0]
+        assert machine.recorded_ops[start+11:start+13]==[(1,source,7680),(2,source,7680)]
+m=Machine(key_elf,hold=60,wrap=True).run();key_demo_commands(m)
+m=Machine(key_elf,case='resume_swap').run();key_demo_commands(m)
+key_high_x=build('color-key-high-x',['DEMO_MODE=3','DEMO_COLOR_KEY_RGB=0xAAFF00FF'])
+m=Machine(key_high_x).run();key_demo_commands(m)
+print('PASS E v5 color key: two scenes / 26 commands / four swaps; full 1080p XRGB source/target checks, blue/green background preservation, key X masking, wrap and alternate Front',flush=True)
+for case,expected,direction in [('color_key_read_error',0x22,'read'),('color_key_write_error',0x23,'write')]:
+    m=Machine(key_elf,case=case).run();r=m.result
+    assert r['failure_code']==expected and r['failure_phase']==3 and r['errors']==1
+    assert r['pass']==r['running']==r['iterations']==0
+    assert r['commands_issued']==13 and r['commands_completed']==12
+    assert r['color_key_commands_issued']==1 and r['color_key_commands_completed']==0
+    assert r['blit_commands_completed']==1 and r['swaps_requested']==r['swaps_completed']==1
+    assert r['axi_'+direction+'_error_observations']==1 and m.front==1
+    assert all(value==1 for offset,value in m.writes if offset==8)
+    print(f'PASS E {case}: {expected:#x}; source remains Front, failed Back never presented',flush=True)
 for case,expected,direction in [('blit_read_error',0x22,'read'),('blit_write_error',0x23,'write')]:
     m=Machine(blit_elf,case=case).run()
     print('BLIT fault diagnostics:',case,m.result,flush=True)
@@ -299,7 +393,7 @@ assert m.result['failure_code']==0x11 and m.result['commands_completed']==1 and 
 assert m.result['errors']==1 and m.result['pass']==0 and m.result['swaps_requested']==0
 print('PASS E invalid rectangle retains hardware geometry error and never presents failed Back',flush=True)
 fault_elf=build('bounded-faults',['ACCEL_POLL_LIMIT=64'])
-faults={'bad_id':0xe000,'bad_version':0xe000,'policy_disabled':0xe003,'init_timeout':0xe001,'ack_timeout':0xe103,
+faults={'bad_id':0xe000,'bad_version':0xe000,'missing_color_key':0xe003,'policy_disabled':0xe003,'init_timeout':0xe001,'ack_timeout':0xe103,
         'done_timeout':0xe101,'swap_timeout':0xe105,'hold_timeout':0xe106,'rejected':0xe102,
         'b_error':0x12,'reader_error':0x2003,'underflow':0xe109,'missed':0xe109}
 for case,expected in faults.items():

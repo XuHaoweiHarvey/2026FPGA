@@ -8,8 +8,8 @@ module graphics_engine #(
     parameter MAX_BURST_BEATS = 32, WATCHDOG_BITS = 27,
     parameter [31:0] OP_FILL = 32'd0, OP_BLIT = 32'd1,
     parameter [31:0] ERR_OPCODE = 32'h26,
-    // B-local opt-in only. Formal v4 leaves this disabled; OP_COLOR_KEY is
-    // not an assigned APB opcode. The key uses the accepted color[23:0].
+    // Formal v5 enables opcode 2. Default off retains the v4 contract.
+    // The key uses the accepted color[23:0]; X is ignored.
     parameter COLOR_KEY_ENABLE = 0,
     parameter [31:0] OP_COLOR_KEY = 32'd2
 )(

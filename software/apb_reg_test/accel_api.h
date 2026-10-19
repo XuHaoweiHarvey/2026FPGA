@@ -73,7 +73,7 @@ static inline uint32_t accel_init(void) {
     }
     if(i==ACCEL_POLL_LIMIT) return UINT32_C(0xE001);
     if(accel_read(ACCEL_WIDTH)!=1920 || accel_read(ACCEL_HEIGHT)!=1080 ||
-       accel_read(ACCEL_STRIDE)!=7680 || accel_read(ACCEL_CAPABILITIES)!=0x7Bu ||
+       accel_read(ACCEL_STRIDE)!=7680 || accel_read(ACCEL_CAPABILITIES)!=ACCEL_CAPABILITIES_EXPECTED ||
        accel_read(ACCEL_SERVICE_READ_QUOTA)!=128 ||
        accel_read(ACCEL_SERVICE_WATERMARKS)!=UINT32_C(0x02000180) ||
        !(accel_read(ACCEL_SERVICE_STATUS)&(1u<<5))) return UINT32_C(0xE003);
@@ -128,6 +128,13 @@ static inline uint32_t accel_fill_rect(uint32_t x,uint32_t y,uint32_t width,uint
 static inline uint32_t accel_blit(uint32_t src_addr,uint32_t src_stride,uint32_t x,uint32_t y,
                                 uint32_t width,uint32_t height) {
     return accel_submit(ACCEL_OP_BLIT,src_addr,src_stride,x,y,width,height,0);
+}
+/* Same source/alignment/completion contract as BLIT. Matching RGB pixels leave
+ * the existing Back pixel untouched. Prepare Back's background first; X is not
+ * alpha. No implicit wait, swap, image loading, or destination-background read. */
+static inline uint32_t accel_color_key_blit(uint32_t src_addr,uint32_t src_stride,uint32_t x,uint32_t y,
+                                          uint32_t width,uint32_t height,uint32_t key_rgb) {
+    return accel_submit(ACCEL_OP_COLOR_KEY,src_addr,src_stride,x,y,width,height,key_rgb & UINT32_C(0x00FFFFFF));
 }
 static inline uint32_t frame_swap_request(uint32_t *ticket) {
     uint32_t e=accel_error(),bs=accel_read(ACCEL_BUFFER_STATUS);

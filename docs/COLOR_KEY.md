@@ -1,6 +1,54 @@
-# B：Color Keying 独立模块与统一命令入口
+# Color Keying：v5系统、软件与独立模块
 
-2026-10-18：赛题二高阶 Color Keying 已完成独立复制执行层，并接入 B 的 `graphics_engine` 可选命令路径；独立及统一入口混合场景仿真通过。统一入口的 `COLOR_KEY_ENABLE` 默认关闭，正式 v4 APB、Framebuffer、工程源清单和软件 API 尚未开启色键功能；没有色键综合时序或实板验收，v4 VERSION/CAPABILITIES 保持原值。
+2026-10-18：赛题二高阶 Color Keying 已从独立复制/统一入口接入正式v5 APB、Framebuffer、顶层与软件API。顶层同一`COLOR_KEY_ENABLE=1`同时开启控制和执行路径，VERSION=0x00050000、CAPABILITIES=0xFB；独立模块参数默认0，保留旧v4配置。共享显示系统RTL检查和当前软件构建通过；本轮CPU指令行为检查因已有Unicorn依赖目录受权限限制未执行，不以旧v4结果代替。综合时序和实板验收待完成。
+
+## v5正式命令与软件接口
+
+| 项目 | 合同 |
+|---|---|
+| 识别 | VERSION 0x00050000，CAPABILITIES bit7=1；完整值0xFB |
+| 操作 | COMMAND_OP=2；0和1仍分别为FILL与普通BLIT |
+| 色键 | 复用RECT_COLOR[23:0]，按0xRRGGBB精确比较，[31:24]忽略 |
+| 参数快照 | APB成功START保存op、色键、几何、源地址/stride；engine accept再次保存执行参数 |
+| 源/目标 | 当前Front内的绝对源byte地址、stride7680、16byte对齐；目标x/width为四像素倍数，写锁存Back |
+| 透明像素 | 保留Back完整32bit值；不读取目的背景，不把X当Alpha |
+| 完成/错误 | 与BLIT共用DMA及0x21..0x25错误规则；最后B完成后才能成功DONE并释放Back |
+| API | accel_color_key_blit(src_addr,src_stride,x,y,width,height,key_rgb) |
+
+API屏蔽key_rgb高8位，每条命令显式写op和参数。返回0只代表COMMAND_COUNT确认接收，随后必须`accel_wait_done()`；准备好全部Back内容后再显式swap/wait。任何错误均停止提交，不把失败Back呈现。完整寄存器及复位语义见[REGISTER_MAP](REGISTER_MAP.md)。新软件严格要求v5/0xFB，硬件和ELF须同时重建，旧v3/v4软件不能直接配套当前配置。
+
+## 软件左右对比演示
+
+设置`software/apb_reg_test/demo_config.h`的`DEMO_MODE=3`后Build；或在仓库根目录执行：
+
+```powershell
+python scripts/build_apb_software.py --define DEMO_MODE=3 --output output/graphics/color-key-demo-v5
+```
+
+每轮9条FILL构建128×128紫底机器人，源背景为`0x80FF00FF`，然后swap把它置为Front。再在新的Back画深蓝背景及y=448起的绿色地面，普通BLIT将机器人复制到`(384,384)`，色键BLIT将同一源图复制到`(1152,384)`，key=0xFF00FF。左右机器人都跨过蓝绿分界，右侧透明位置应分别保留两种背景。完成后第二次swap显示对比结果，保持`g_hold_frames`个边界周期。
+
+CPU仍只写寄存器，图片由FILL生成，没有添加CPU DDR端口或PNG加载。源图换帧期间也会短暂可见；不保证“源图永不上屏”。可以在main断点设置`g_frame_limit=2`：预期26条完成命令，其中普通BLIT和色键BLIT各2条、4次swap、source_swaps_completed=2、iterations=2、pass=1、errors=0，underflow/missed增量应为0。它是板级验收预期，本轮仅确认软件成功构建，未执行其CPU指令。
+
+调试观察`g_apb_test_result.color_key_commands_issued/completed`、`color_key_rgb`以及原诊断。模式0/1/2继续保留，模式3每轮13命令和2次swap；两次swap后恢复该轮初始物理槽角色。
+
+## 共享DDR与显示系统检查
+
+```powershell
+python scripts/run_d_checks.py --color-key --apb-waits 0 1 3 --output output/graphics/color_key_system
+python scripts/run_d_checks.py --color-key --apb-waits 1 --negative-control color-key-mask
+python scripts/run_apb_checks.py
+python scripts/run_rgb_checks.py --quick
+```
+
+`--color-key`隐含`--graphics`，连接真实APB、源检查器、B执行层、DDR读仲裁、显示Reader/FIFO、写准入、manager、CVO和串行器。DDR为双槽内存模型，分辨率缩小为512×64、stride2048、FIFO256，APB由testbench驱动，不执行Sapphire指令或加密PHY/HDMI IP。
+
+系统场景先保留原FILL/普通BLIT，再通过FILL构造32×32紫底机器人并swap；在新Back画蓝绿背景，左侧普通复制、右侧色键复制。整帧XRGB参考逐像素检查目标及源未被修改，显示端也检查完整RGB帧。另覆盖Back源拒绝、全透明命令等待B、普通BLIT/FILL清除旧色键模式、APB色键改写/CPU reset不改变在途命令、最后B前保持Back并阻止swap，以及共享故障0x2004保护。原故意延迟最后R用例仍单独保留。
+
+本轮WAIT0/1/3每组均通过6次swap、42完整帧及1,407,777次显示像素比较；正常绘制underflow/missed增量0。每组另有98,304个完整XRGB内存像素受检，160个全零和20个部分WSTRB拍。故意绕过色键掩码的负对照被系统检查拒绝；RGB quick/正式v5顶层端口展开、APB兼容测试通过。精确证据见[VALIDATION](VALIDATION.md)。
+
+结果图由实际RTL写入的模型内存导出，不是Python重新绘图：`output/graphics/color_key_system/wait1/color_key_source_6x.png`、`color_key_scene_6x.png`。对比图中红条检查非对齐FILL，底部紫条检查普通BLIT在色键之后仍复制背景。软件128×128演示和这个32×32系统场景使用对应缩放坐标，两者不混作CPU/RTL联合仿真。
+
+CPU/MMIO脚本`run_e_software_checks.py`已增加v5/色键用例、完整1080p模型像素检查、高8位屏蔽、错误后不换帧、计数回绕与另一初始Front；本轮该入口未运行。拥有可读Unicorn 2.1.4依赖和工具链时，先构建默认模式ELF，再按[SYSTEM_BLIT](SYSTEM_BLIT.md)的软件检查命令指定该ELF和依赖路径。
 
 ## 功能与用途
 
@@ -23,7 +71,7 @@
 
 ## 独立执行模块接口与规则
 
-原 BLIT 的参数、状态、AXI AR/R/AW/W/B 接口和错误码不变；增加以下两个独立模块输入，尚不分配共享 APB offset 或 opcode：
+原 BLIT 的参数、状态、AXI AR/R/AW/W/B 接口和错误码不变；以下两个输入属于独立包装原型。正式v5复用统一入口，不实例化这个包装器：
 
 | 输入 | 含义 |
 |---|---|
@@ -43,13 +91,13 @@
 
 ## B 统一入口的可选色键命令
 
-统一入口保持现有端口，增加配置参数 `COLOR_KEY_ENABLE=0`、`OP_COLOR_KEY=2`。只有显式开启前者才识别第三种命令；默认仍仅支持 FILL/BLIT，实验色键 opcode 按未知操作返回 0x26、计数一次且不访问 AXI。实验编码 2 不是已发布的正式 APB 命令。
+统一入口保持现有端口，配置参数为 `COLOR_KEY_ENABLE=0`、`OP_COLOR_KEY=2`。只有显式开启前者才识别第三种命令；默认关闭配置仍仅支持FILL/BLIT，op2返回0x26、计数一次且不访问AXI。正式v5在顶层开启此配置并发布op2。
 
 开启后，色键命令使用既有 `src_addr/src_stride/x/y/width/height`，`color[23:0]` 表示色键 RGB，`color[31:24]` 忽略。命令接收沿锁存“本条是否色键”和颜色；普通 BLIT 不使用 color，FILL 仍按完整 XRGB 颜色绘制。后续的参数写入、enabled 改变和忙时 START 不改变本条选择或掩码。
 
 普通 BLIT 和色键复制共享同一 `blit_engine`、缓存和读写/错误状态机，没有多实例化一套 DMA。掩码在 B 的公共写出口生成，FILL 的边缘 WSTRB 不受影响。两种复制均经过原来的 `CHECK_SOURCE`，在接收后的下一拍采样 C 寄存的结果；源范围不通过则报 0x21，不启动读写。
 
-正式系统要使用色键，还需完成后文的寄存器/软件/Framebuffer 接入。仅在 APB 的 COMMAND_OP 写入 2 不会使当前 v4 开始透明复制。
+正式v5的寄存器/软件/Framebuffer已接通；旧v4默认关闭配置仍不会因写入COMMAND_OP=2而启动透明复制。
 
 ### 运行统一入口混合场景
 
@@ -99,7 +147,7 @@ python scripts/render_blit_preview.py output/graphics/color_key/basic --names sp
 
 图像来自执行后的仿真内存，完整像素比较通过后才导出。PNG 转换只负责格式转换与最近邻放大。
 
-## 本轮验证
+## 独立模块及统一入口历史验证
 
 | 组 | 结果 |
 |---|---|
@@ -123,10 +171,10 @@ python scripts/render_blit_preview.py output/graphics/color_key/basic --names sp
 
 统一入口仍检查完整目标缓冲和源图，覆盖全 16 种掩码、黑白色键、普通复制/FILL 清除上一条色键模式、参数快照、源范围拒绝、disabled/busy、最后 B、R/B 响应与 ID 错误、五通道超时排空、RLAST 故障锁定和平台复位恢复。单拍缓存不具备“提前末拍”场景，因此两种配置场景数不同。原真实 manager/源检查器 17 个合同场景、两组各 11 个双缓冲场景及原负对照也通过；这些旧系统测试使用默认关闭的色键配置。
 
-## 后续接入
+## 剩余验收
 
-1. 正式发布色键命令编码、颜色传递方法、能力标识和软件 API；本页实验 op/color 用法先用于 B 开发，不能直接当正式软件兼容合同。
-2. 在 Framebuffer 正式配置中启用 B 能力，核对 APB 参数快照、Front 源窗口检查、Back 锁存、读仲裁和写准入；准备 Back 背景后再画精灵，完成后显式换帧。
-3. 加入色键系统并发/换帧演示与测试，随后综合布局布线，检查比较/掩码路径时序；在真实 DDR 上验收部分/全零 WSTRB 与 B 响应。
+1. 在依赖可读的环境执行当前v5 ELF的CPU/MMIO行为检查；本轮受权限限制跳过。
+2. A使用正式Efinity工具链重新综合布局布线，核对比较/掩码、源窗口及仲裁路径的100MHz时序和资源，再构建匹配软件。
+3. A/C在真实DDR验收部分/全零WSTRB与B响应、1080p显示并发、模式3左右对比、underflow/missed与诊断；保留旧FILL回归。
 
-当前交付已完成独立执行层和 B 统一入口的可选色键能力，结果图属于 RTL 仿真，不是 HDMI 实测。
+源码已完成系统接线/API/演示，图像和并发检查属于RTL仿真，尚无v5 HDMI实测或板级性能数据。

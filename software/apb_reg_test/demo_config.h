@@ -3,7 +3,8 @@
 
 /* Edit these values, Build, then Debug the new ELF. Scene A shows this
  * rectangle. g_demo_mode=1 draws only this rectangle on black in both scenes;
- * g_demo_mode=2 runs the Front->Back BLIT demo. Units are pixels, color is
+ * g_demo_mode=2 runs the Front->Back BLIT demo; 3 compares ordinary and keyed
+ * copies of a 128x128 robot against the same blue/green background. Units are pixels, color is
  * 0x00RRGGBB; hardware does not clip rectangles. */
 #ifndef DEMO_MODE
 #define DEMO_MODE 0u
@@ -25,4 +26,8 @@
 #endif
 #define DEMO_BACKGROUND_A UINT32_C(0x00102060)
 #define DEMO_BACKGROUND_B UINT32_C(0x001C140C)
+/* RGB24 only; upper bits passed by callers are ignored by the API. */
+#ifndef DEMO_COLOR_KEY_RGB
+#define DEMO_COLOR_KEY_RGB UINT32_C(0x00FF00FF)
+#endif
 #endif
