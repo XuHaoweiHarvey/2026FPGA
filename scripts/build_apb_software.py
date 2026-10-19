@@ -60,8 +60,8 @@ dump = subprocess.check_output([str(objdump), '-d', '-S', str(elf)], cwd=ROOT, t
 (out / 'apb_reg_test.disasm').write_text(dump, encoding='utf8')
 symbols = subprocess.check_output([str(nm), '-n', '-S', str(elf)], text=True)
 selected = [line for line in symbols.splitlines() if line.split()[-1] in
-            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', '_sp')]
-assert len(selected) == 5
+            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')]
+assert len(selected) == 6
 for line in selected:
     address = int(line.split()[0], 16)
     assert origin <= address <= origin + length - 1024, line

@@ -107,6 +107,16 @@ PC前缀重复、FTDI配置来源和GDB连接后退出的已验证故障见[TROU
 
 两轮有限运行预期26条完成命令、普通BLIT和色键各2条、4次swap；新增`color_key_commands_issued/completed`应一致，`color_key_rgb=0xFF00FF`。这是板级预期，尚未在板卡或本轮CPU指令模型中验收。当前软件已用正式BSP和替代GNU工具链编译通过；共享DDR显示系统的缩小场景RTL检查通过。详细约束与复现见[COLOR_KEY](COLOR_KEY.md)。
 
+### Fixed-workload Benchmark
+
+`DEMO_MODE=4` 在当前v5 bit上运行有限测速，只需Build/下载新ELF。四种尺寸各测FILL/BLIT/色键，默认预热1次、计时8次；准备背景和swap从绘制耗时中分开。命令行：
+
+```powershell
+python scripts/build_apb_software.py --define DEMO_MODE=4 --output output/graphics/benchmark_v5
+```
+
+取消计时过程的断点，在`apb_test_done`停止后展开`g_benchmark_result.cases`。默认预期12组完成、96条被计时命令、总计252条完成命令和24次swap，pass=1、error_code=0、underflow/missed增量0。模式4不使用g_hold_frames/g_frame_limit或模式2/3专用计数。结果是轮询API的端到端时间，板级数据待采集；完整操作、字段与软件检查见[BENCHMARK](BENCHMARK.md)。
+
 ### Five-parameter Test
 
 只修改`software/apb_reg_test/demo_config.h`的TEST_RECT_X/Y/W/H/COLOR，Build新ELF并Debug；`g_demo_mode=1`时两场景都变为黑底单参数矩形。比如321/123/137/89/00123456应对应移动/缩放/颜色变化，无需重编FPGA。

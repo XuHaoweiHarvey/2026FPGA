@@ -1,12 +1,14 @@
 /* Checkpoint E: CPU submits commands only; FPGA performs every pixel write. */
 #include "accel_api.h"
 #include "demo_config.h"
+#include "benchmark_clock.h"
+#include "accel_benchmark.h"
 
 typedef struct { uint32_t x,y,width,height,color; } rectangle_t;
 volatile rectangle_t g_test_rectangle={TEST_RECT_X,TEST_RECT_Y,TEST_RECT_W,TEST_RECT_H,TEST_RECT_COLOR};
 volatile uint32_t g_hold_frames=60;
 volatile uint32_t g_frame_limit=0; /* 0 = indefinite; otherwise number of presented scenes. */
-volatile uint32_t g_demo_mode=DEMO_MODE; /* 0 = rectangles; 1 = parameter rectangle; 2 = BLIT; 3 = color key. */
+volatile uint32_t g_demo_mode=DEMO_MODE; /* 0 = rectangles; 1 = parameter; 2 = BLIT; 3 = key; 4 = benchmark. */
 volatile uint32_t g_validation_target=1000; /* Records a milestone; never stops the loop. */
 
 enum { PHASE_INIT=1,PHASE_BUILD=2,PHASE_RECT=3,PHASE_BACK_READY=4,
@@ -31,6 +33,20 @@ typedef struct {
 /* Keep the successful IDE project/result symbol. diagnostics contains raw CSR
  * values; failure_code records software errors separately from ERROR_CODE. */
 volatile demo_result_t g_apb_test_result;
+volatile benchmark_result_t g_benchmark_result;
+
+static uint32_t benchmark_read32(uintptr_t address) {
+    return *(volatile uint32_t *)address;
+}
+static uint64_t benchmark_ticks(void) {
+    uint64_t value;
+    __asm__ volatile ("fence iorw,iorw" ::: "memory");
+    value=benchmark_clock_read(benchmark_read32);
+    __asm__ volatile ("fence iorw,iorw" ::: "memory");
+    return value;
+}
+static const benchmark_io_t benchmark_io={accel_read,benchmark_ticks,accel_submit,
+                                         accel_wait_done,display_swap_request,display_wait_swap_done};
 
 __attribute__((noinline,noreturn)) void apb_test_done(void) {
     for(;;) __asm__ volatile ("nop" ::: "memory");
@@ -151,6 +167,21 @@ int main(void) {
     g_apb_test_result.missed_baseline=g_apb_test_result.diagnostics.missed_boundaries;
     g_apb_test_result.baseline_valid=1;
     check_health();
+    if(g_demo_mode==4) {
+        uint32_t error;
+        g_apb_test_result.mode=4;g_apb_test_result.phase=PHASE_RECT;
+        error=benchmark_run(&benchmark_io,&g_benchmark_result,BENCHMARK_SAMPLES,
+                            BENCHMARK_WARMUPS,SYSTEM_CLINT_HZ);
+        g_apb_test_result.commands_issued=g_benchmark_result.commands_issued;
+        g_apb_test_result.commands_completed=g_benchmark_result.commands_completed;
+        g_apb_test_result.swaps_requested=g_benchmark_result.swaps_requested;
+        g_apb_test_result.swaps_completed=g_benchmark_result.swaps_completed;
+        if(error && g_benchmark_result.failure_phase==BENCH_SWAP)
+            g_apb_test_result.phase=PHASE_SWAP;
+        require(error);check_health();
+        g_apb_test_result.pass=1;g_apb_test_result.running=0;
+        g_apb_test_result.phase=PHASE_STOPPED;apb_test_done();
+    }
     for(;;) {
         g_apb_test_result.phase=PHASE_BUILD;g_apb_test_result.scene=scene;
         mode=g_demo_mode;g_apb_test_result.mode=mode;

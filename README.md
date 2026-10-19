@@ -18,6 +18,8 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 
 [显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已加入正式framebuffer及工程清单，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。当前v5寄存器为VERSION=0x00050000、CAPABILITIES=0xFB；硬件与软件需配套重新构建，旧v3/v4 ELF与当前软件的精确版本检查不兼容。
 
+新增软件 `DEMO_MODE=4` 固定工作量测速：四种尺寸×FILL/BLIT/色键共12组，默认每组预热1次、计时8次，分别记录API绘制耗时和swap耗时。本机软件行为检查及BSP构建通过，板级性能数值待测；使用当前v5 bit即可，操作和结果说明见 [BENCHMARK](docs/BENCHMARK.md)。
+
 ## 框架
 
 ```mermaid
@@ -157,6 +159,7 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [INTERFACES](docs/INTERFACES.md) | A↔B、B↔C、A↔C 的冻结接口合同 |
 | [REGISTER_MAP](docs/REGISTER_MAP.md) | 按当前 RTL 核对的寄存器、reset、位域、错误与 clear |
 | [BUILD](docs/BUILD.md) | Compile、下载、Build、Debug 与 Demo 操作 |
+| [BENCHMARK](docs/BENCHMARK.md) | 模式4固定工作量测速、计时范围、调试器结果及板级采集步骤 |
 | [VALIDATION](docs/VALIDATION.md) | A～E 仿真/实板证据、吞吐边界与复验方法 |
 | [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) | 已遇到故障、根因、修复和验证 |
 | [TEAM_SPLIT](docs/TEAM_SPLIT.md) | 三人责任、目录归属及共享接口变更规则 |
@@ -175,7 +178,7 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 ## 路线图
 
 - **优先**：核对v5接口/工具告警，完成BLIT/Color Keying实板验收；当前约束下综合/时序已通过。
-- 建立板级性能测量及赛题要求的纯软件/硬件渲染对比方案。
+- 用软件模式4采集板级硬件性能；后续补齐赛题要求的CPU软件渲染对照。
 - Alpha Blend 与后续高负载互动 Demo。
 - Line、进一步命令扩展，以及依据测量决定的 FIFO / line buffer / cache 优化。
 

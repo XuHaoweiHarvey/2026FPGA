@@ -15,7 +15,7 @@ B 的 [FILL/BLIT 统一入口](GRAPHICS_ENGINE.md)、[C侧源窗口检查器](BL
 | 基线 | Solid Fill / FILL_RECT、DDR显示、RISC-V/APB、Front/Back、safe swap、连续性保护 | **Done，A～E实板通过** |
 | Phase 3首要 | Block Copy / BitBlt / BLIT | 已保留在当前v5工程/API/演示；v4模块/共享DDR及CPU行为检查通过，当前软件构建和Efinity静态时序通过，接口告警与实板待验收 |
 | Phase 3前置 | Accelerator DDR read与Display Reader仲裁 | 已接入正式Framebuffer；共享显示并发与故障保护仿真通过；需A/C在正式工具链与板卡验证 |
-| Phase 3演示/测量 | 资源图像加载、纯软件/硬件渲染对照与板级性能统计 | Not implemented；测量条件/耗时/像素工作量可复现，不把仿真速度当实测 |
+| Phase 3演示/测量 | 资源图像加载、纯软件/硬件渲染对照与板级性能统计 | 模式4硬件API计时程序已实现，软件行为检查/构建通过，板级数据待测；资源加载与CPU软件对照仍未实现，见[BENCHMARK](BENCHMARK.md) |
 | 高阶系统实现 | Color Keying | v5已接APB/显示/API/模式3，系统RTL、软件构建和静态时序通过；CPU指令检查、接口告警和实板待验收，见[COLOR_KEY](COLOR_KEY.md) |
 | 后续高阶 | Alpha Blend | Not implemented；透明/不透明端点、舍入/饱和与Back ownership均验证 |
 | 后续可选 | Line与进一步命令扩展 | Not implemented；独立确定几何/边界、接口与测试 |
@@ -41,6 +41,8 @@ A整理新命令API/驱动/资源与对照Demo；B实现复制执行和读写流
 ## Software Comparison and Hardware Performance
 
 赛题要求软/硬渲染FPS对比，当前基础Demo尚无该对照。**TODO / Needs confirmation：CPU对照的内存访问路径和公平测量方案。** 当前Sapphire是控制专用OCRAM配置，不能未经设计就宣称可直接CPU写DDR；未来基准测试与正常“CPU只提交命令”的渲染模式需明确边界和所有权。
+
+软件`DEMO_MODE=4`已实现固定工作量的硬件端入口：四种尺寸、三种操作，CLINT 64位计时，分离准备/预热、绘制和swap；保持原DDR显示保护并检查错误/计数。本机原生C行为检查和BSP构建通过，真实数据待采集。它提供轮询API耗时与矩形像素吞吐，不代表屏幕FPS、CPU占用率或完整软硬件对照，见[BENCHMARK](BENCHMARK.md)。
 
 先定义可复现的计时点、字节/像素工作量、场景、CPU工作量、是否包含swap/hold、测量窗口与重复次数，再报告板级结果。显示最低平均读payload497.664MB/s，必须同时关注实时延迟、FIFO和missed，而不是只报Writer峰值。
 
