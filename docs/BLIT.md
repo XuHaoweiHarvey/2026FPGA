@@ -2,6 +2,8 @@
 
 ## 当前状态
 
+2026-10-19更新：本模块已由统一入口接入正式v5系统；将源结束地址检查分拍后通过100MHz静态时序，BLIT单元49场景及负对照通过。下面关于“独立原型/未集成”的描述保留首版开发背景；当前状态及保留告警见[V5_TIMING_FIX](V5_TIMING_FIX.md)。
+
 `blit_engine.v` 是 Person B 的第一版图像块复制执行单元。它已经通过 Icarus Verilog 单元仿真，覆盖 32×32 棋盘复制、不同源 stride、长行分段、源/目标 4 KiB 边界、VALID/READY 停顿、响应错误、超时排空和参数快照。
 
 这次提交是独立 RTL 原型。它还没有接入 APB 命令、正式 DDR 读服务、显示仲裁、换帧或 HDMI，因此不能把本次仿真结果当作实板 BLIT 已完成。
@@ -35,7 +37,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_blit_check
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_blit_checks.ps1 -NoWave
 ```
 
-成功时会看到三组 `PASS BLIT`、负向记分板检查通过以及 `PASS all BLIT unit simulations`。启用 Python 转换时，基础棋盘预览在 `output/blit/basic/checker_target_6x.png`。
+成功时会看到四组 `PASS BLIT`、负向记分板检查通过以及 `PASS all BLIT unit simulations`。第四组为32位源地址空间顶部检查（7场景）。启用 Python 转换时，基础棋盘预览在 `output/blit/basic/checker_target_6x.png`。
 
 输出由脚本重新生成：`output/blit/blit.log` 是完整运行日志，`output/blit/basic/blit.vcd` 是默认波形，`scoreboard_expected_failure.log` 保存负对照的预期错误。装有 GTKWave 时，可在仓库根目录用 `gtkwave .\output\blit\basic\blit.vcd` 查看波形。
 

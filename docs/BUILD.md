@@ -1,6 +1,6 @@
 # Build and Debug
 
-原FILL基线已由负责人完成A～E实板验收；当前v5 BLIT/色键仍待Efinity综合、时序和实板验收。本指南供团队从仓库复现：Efinity Compile → Programmer → RISC-V IDE Build → Hard JTAG Debug → HDMI Demo。正常流程无需重新Generate IP，也不依赖UART。
+原FILL基线已由负责人完成A～E实板验收；当前v5 BLIT/色键在2026-10-19修复长路径后已通过Efinity完整编译及当前约束下静态时序，接口告警和实板仍待验收，见[V5_TIMING_FIX](V5_TIMING_FIX.md)。本指南供团队从仓库复现：Efinity Compile → Programmer → RISC-V IDE Build → Hard JTAG Debug → HDMI Demo。正常流程无需重新Generate IP，也不依赖UART。
 
 ## Environment and Inputs
 
@@ -97,7 +97,7 @@ PC前缀重复、FTDI配置来源和GDB连接后退出的已验证故障见[TROU
 
 将`software/apb_reg_test/demo_config.h`中的`DEMO_MODE`设为`2`后Build，并下载匹配的当前v5 FPGA配置和新ELF。也可以从仓库根目录用`python scripts/build_apb_software.py --define DEMO_MODE=2 --output output/graphics/blit-demo`生成独立ELF，再让IDE使用该ELF。旧v4行为检查保留在[SYSTEM_BLIT](SYSTEM_BLIT.md)，本轮v5的CPU指令检查受依赖权限限制未执行。
 
-模式2每轮先清Back并在左上角画红、绿、蓝、黄四个16×16色块，换帧显示源图；再清新的Back，用`src=当前Front`、stride=7680执行32×32 BLIT到`(64,64)`，最后换帧显示复制结果。无限运行时会在源图/复制图之间交替。保留`g_demo_mode=2`，可查看`blit_commands_issued/completed`、`source_swaps_completed`、`blit_source_base`及`blit_target_*`；成功时BLIT计数持续一致增长，error/underflow/missed增量应为0。此前v4软件行为检查通过；本轮v5未执行CPU指令，也未验收Efinity时序或实板。
+模式2每轮先清Back并在左上角画红、绿、蓝、黄四个16×16色块，换帧显示源图；再清新的Back，用`src=当前Front`、stride=7680执行32×32 BLIT到`(64,64)`，最后换帧显示复制结果。无限运行时会在源图/复制图之间交替。保留`g_demo_mode=2`，可查看`blit_commands_issued/completed`、`source_swaps_completed`、`blit_source_base`及`blit_target_*`；成功时BLIT计数持续一致增长，error/underflow/missed增量应为0。此前v4软件行为检查通过；当前v5静态时序通过，CPU指令和实板仍未验收。
 
 首次联调可在main断点设置`g_frame_limit=2`，两轮后在`apb_test_done`停止：`iterations=2`、`commands_issued=commands_completed=14`、`blit_commands_issued=blit_commands_completed=2`、`swaps_requested=swaps_completed=4`、`source_swaps_completed=2`、`pass=1`、`errors=0`。模式2的iteration/frame_limit统计一次完整复制流程，包含源图和复制图两次换帧；`g_hold_frames`保持最终复制画面。
 

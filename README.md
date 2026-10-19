@@ -14,7 +14,7 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 | D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
 | E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
 
-正式源码现已接入 **FILL_RECT + Front→Back BLIT + Color Keying**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。当前v5新增色键软件API和左右对比演示，已通过共享DDR系统仿真及软件构建，CPU指令仿真本轮受依赖权限限制未执行；Efinity综合/时序和实板验收待完成。上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，接线和边界见 [COLOR_KEY](docs/COLOR_KEY.md)。
+正式源码现已接入 **FILL_RECT + Front→Back BLIT + Color Keying**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。当前v5新增色键软件API和左右对比演示，已通过共享DDR系统仿真及软件构建，CPU指令仿真受依赖权限限制未执行。2026-10-19修复BLIT参数检查长路径后，Efinity2026.1.132完整编译及当前约束下静态时序通过，core_clk裕量+1.449ns；接口/工具告警和实板验收仍待核对，见 [V5_TIMING_FIX](docs/V5_TIMING_FIX.md)。上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，接线和边界见 [COLOR_KEY](docs/COLOR_KEY.md)。
 
 [显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已加入正式framebuffer及工程清单，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。当前v5寄存器为VERSION=0x00050000、CAPABILITIES=0xFB；硬件与软件需配套重新构建，旧v3/v4 ELF与当前软件的精确版本检查不兼容。
 
@@ -92,8 +92,8 @@ Bayer 适合摄像头原始采样，2D 图元需要明确的 R/G/B 颜色。Pack
 | 命令 | 参数 | 状态 / 语义 |
 |---|---|---|
 | **FILL_RECT：已实现、已上板** | `x, y, width, height, color` | START 接收时快照参数；BUSY 执行；成功 DONE 以最后 B 完成为准 |
-| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统；v4 CPU行为检查通过，当前v5共享RTL/软件构建通过；DEMO_MODE=2，综合/时序及实板待验收，见[SYSTEM_BLIT](docs/SYSTEM_BLIT.md) |
-| Color Keying | BLIT参数加`key_rgb`，复用RECT_COLOR低24位 | v5已接APB/Framebuffer/API，`DEMO_MODE=3`左右对比；系统RTL通过、软件构建通过，CPU指令检查及综合/实板待验收，见[COLOR_KEY](docs/COLOR_KEY.md) |
+| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统；v4 CPU行为检查通过，当前v5共享RTL/软件构建及静态时序通过；DEMO_MODE=2，接口告警与实板待验收，见[V5_TIMING_FIX](docs/V5_TIMING_FIX.md) |
+| Color Keying | BLIT参数加`key_rgb`，复用RECT_COLOR低24位 | v5已接APB/Framebuffer/API，`DEMO_MODE=3`左右对比；系统RTL/软件构建及静态时序通过，CPU指令检查及实板待验收，见[COLOR_KEY](docs/COLOR_KEY.md) |
 | Line | Planned / Not implemented | 可选图元扩展 |
 | Alpha Blend | Planned / Not implemented | 后续混合管线 |
 
@@ -164,6 +164,8 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 | [BLIT](docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
 | [GRAPHICS_ENGINE](docs/GRAPHICS_ENGINE.md) | FILL/BLIT统一入口、混合场景仿真与三步结果图 |
 | [COLOR_KEY](docs/COLOR_KEY.md) | v5色键命令/API、软件演示、共享显示仿真、结果图与板级待办 |
+| [V5_INTEGRATION_ACCEPTANCE](docs/V5_INTEGRATION_ACCEPTANCE.md) | v5集成验收清单、A/C分工和可直接发送的对接说明 |
+| [V5_TIMING_FIX](docs/V5_TIMING_FIX.md) | BLIT长路径修复、Efinity资源/时序对照、功能回归和保留告警 |
 | [BLIT_INTEGRATION](docs/BLIT_INTEGRATION.md) | 按A/C反馈确定的首轮接口、实施状态与验收步骤 |
 | [BLIT_SOURCE_GUARD](docs/BLIT_SOURCE_GUARD.md) | C侧源窗口检查、accept时序、边界用例及对接限制 |
 | [DDR_READ_ARBITER](docs/DDR_READ_ARBITER.md) | 显示/BLIT读仲裁、响应归属、故障保留及独立测试 |
@@ -172,9 +174,9 @@ Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
 
 ## 路线图
 
-- **优先**：完成v5综合/时序和BLIT/Color Keying实板验收。
+- **优先**：核对v5接口/工具告警，完成BLIT/Color Keying实板验收；当前约束下综合/时序已通过。
 - 建立板级性能测量及赛题要求的纯软件/硬件渲染对比方案。
 - Alpha Blend 与后续高负载互动 Demo。
 - Line、进一步命令扩展，以及依据测量决定的 FIFO / line buffer / cache 优化。
 
-BLIT和Color Keying已接入当前v5系统；色键系统RTL仿真和软件构建通过，本轮CPU指令仿真未执行，v4软件行为结果保留为历史记录。Efinity资源/时序、实板验收、性能对照、图片资源加载、Alpha和互动Demo见 [ROADMAP](docs/ROADMAP.md)。
+BLIT和Color Keying已接入当前v5系统；色键系统RTL仿真、软件构建和Efinity静态时序通过，本轮CPU指令仿真未执行，v4软件行为结果保留为历史记录。接口告警、实板验收、性能对照、图片资源加载、Alpha和互动Demo见 [ROADMAP](docs/ROADMAP.md)。

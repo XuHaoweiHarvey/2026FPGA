@@ -44,7 +44,8 @@ localparam [31:0] ERR_PARAM = 32'h21, ERR_READ = 32'h22,
     ERR_WRITE = 32'h23, ERR_TIMEOUT = 32'h24, ERR_PROTOCOL = 32'h25;
 localparam [3:0] IDLE = 0, CHECK = 1, PREP = 2, RD_ADDR = 3,
     RD_DATA = 4, WR_ADDR = 5, WR_LOAD = 6, WR_DATA = 7,
-    WR_RESP = 8, ADVANCE = 9, FAULT = 10;
+    WR_RESP = 8, ADVANCE = 9, FAULT = 10,
+    CHECK_SPAN = 11, CHECK_END = 12, CHECK_RANGE = 13;
 localparam [63:0] FRAME_BYTES = 64'd1 * FRAME_STRIDE * FRAME_HEIGHT;
 
 reg [3:0] state;
@@ -55,19 +56,22 @@ reg [8:0] burst_beats, beat_index;
 reg [WATCHDOG_BITS-1:0] watchdog;
 reg [127:0] beat_mem [0:MAX_BURST_BEATS-1];
 reg segment_read_error;
+reg invalid_geometry_latched;
+reg [31:0] rows_before_last, destination_start_latched;
+reg [63:0] source_span, source_end;
 
-// Extend BEFORE multiplying/shifting so invalid inputs cannot wrap to valid.
+// Keep full precision for rejection of invalid, overflowing addresses. Register
+// subtraction, multiplication, addition and range checking on separate cycles:
+// the original combined expression reached 51 logic levels at 100 MHz.
 wire [63:0] row_bytes = {32'b0, copy_width} << 2;
-wire [63:0] source_end = {32'b0, source} +
-    ({32'b0, copy_height} - 64'd1) * {32'b0, source_stride} + row_bytes;
 wire [63:0] destination_start = {32'b0, y} * FRAME_STRIDE +
     ({32'b0, x} << 2);
-wire invalid_command = copy_width == 0 || copy_height == 0 ||
+wire invalid_geometry = copy_width == 0 || copy_height == 0 ||
     {32'b0, x} + {32'b0, copy_width} > FRAME_WIDTH ||
     {32'b0, y} + {32'b0, copy_height} > FRAME_HEIGHT ||
     source[3:0] != 0 || source_stride[3:0] != 0 ||
     x[1:0] != 0 || copy_width[1:0] != 0 ||
-    {32'b0, source_stride} < row_bytes || source_end > 64'h100000000;
+    {32'b0, source_stride} < row_bytes;
 
 wire [31:0] src_page_beats = (32'd4096 - {20'b0, src_cursor[11:0]}) >> 4;
 wire [31:0] dst_page_beats = (32'd4096 - {20'b0, dst_cursor[11:0]}) >> 4;
@@ -112,6 +116,8 @@ always @(posedge clk or negedge rst_n) begin
         rows_left <= 0; beats_left <= 0;
         burst_beats <= 0; beat_index <= 0; watchdog <= 0; wdata <= 0;
         segment_read_error <= 0;
+        invalid_geometry_latched <= 0; rows_before_last <= 0;
+        destination_start_latched <= 0; source_span <= 0; source_end <= 0;
     end else begin
         if (state == IDLE || activity)
             watchdog <= 0;
@@ -133,11 +139,28 @@ always @(posedge clk or negedge rst_n) begin
             state <= CHECK;
         end
         CHECK: begin
-            if (invalid_command) begin
+            invalid_geometry_latched <= invalid_geometry;
+            // Zero height is rejected independently, so this 32-bit decrement
+            // is exact for every legal command without a 64-bit subtractor.
+            rows_before_last <= copy_height - 32'd1;
+            destination_start_latched <= destination_start[31:0];
+            state <= CHECK_SPAN;
+        end
+        CHECK_SPAN: begin
+            source_span <= {32'b0, rows_before_last} * {32'b0, source_stride};
+            state <= CHECK_END;
+        end
+        CHECK_END: begin
+            source_end <= source_span + {32'b0, source} + row_bytes;
+            state <= CHECK_RANGE;
+        end
+        CHECK_RANGE: begin
+            // No AXI VALID is exposed until all registered checks succeed.
+            if (invalid_geometry_latched || source_end > 64'h100000000) begin
                 error_code <= ERR_PARAM; done <= 1; state <= IDLE;
             end else begin
                 src_row <= source; src_cursor <= source;
-                dst_row <= destination_start[31:0]; dst_cursor <= destination_start[31:0];
+                dst_row <= destination_start_latched; dst_cursor <= destination_start_latched;
                 rows_left <= copy_height; beats_left <= copy_width >> 2;
                 state <= PREP;
             end

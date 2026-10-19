@@ -1,6 +1,6 @@
 # Interfaces — 冻结接口合同
 
-Phase 2旧FILL/v3已实板验收通过。当前源码在BLIT合同上扩展为v5色键复制，需重新综合和上板。此文是Person A/B/C协作合同；寄存器唯一详细定义见[REGISTER_MAP](REGISTER_MAP.md)，色键接线见[COLOR_KEY](COLOR_KEY.md)。
+Phase 2旧FILL/v3已实板验收通过。当前源码在BLIT合同上扩展为v5色键复制；2026-10-19已修复BLIT检查长路径并通过当前约束下Efinity静态时序，接口告警与实板仍待核对，见[V5_TIMING_FIX](V5_TIMING_FIX.md)。此文是Person A/B/C协作合同；寄存器唯一详细定义见[REGISTER_MAP](REGISTER_MAP.md)，色键接线见[COLOR_KEY](COLOR_KEY.md)。
 
 ## Frozen Contract
 

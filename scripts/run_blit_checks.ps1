@@ -57,6 +57,9 @@ try {
         '-Ptb_blit_engine.FRAME_WIDTH=1088', '-Ptb_blit_engine.EDGE_ONLY=1',
         '-Ptb_blit_engine.MAX_BURST_BEATS=1'
     )
+    Invoke-BlitSimulation -Name 'address_space_end' -Overrides @(
+        '-Ptb_blit_engine.ADDRESS_EDGE_ONLY=1', '-Ptb_blit_engine.SOURCE_BASE=4294901760'
+    )
 
     Write-Host 'Check scoreboard: deliberately corrupt a pixel and require rejection'
     $guardBinary = Join-Path $outputPath 'basic/blit.vvp'

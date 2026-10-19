@@ -20,6 +20,12 @@
 
 ## Simulation Results
 
+### v5 BLIT 长路径修复与 Efinity 复验（2026-10-19）
+
+本机安装 Efinity/Elitestek Edition 2026.1.132 后，首次完整编译定位到 `blit_engine` 的源结束地址检查路径：51 级逻辑、core_clk 建立裕量 -0.331 ns。将减法、乘法、加法和最终检查分拍保存后，完整综合/Interface/布局布线/Bitstream 流程通过；约束和硬件接口未变。最终 core_clk 裕量 +1.449 ns、估算最高频率 116.945 MHz，全部已分析关系最差建立裕量 +0.417 ns、最差保持裕量 +0.026 ns。资源 XLR 28001/60800、Memory 141/256、DSP 12/160。
+
+BLIT 单元 49 场景及像素负对照、统一图形入口/色键/源检查/读仲裁/双缓冲和 APB WAIT0/1/3 回归通过；增加 7 个 32 位地址空间顶部场景，检查边界精度与错误拒绝。共享显示系统 WAIT0/1/3 全部通过，每组6次swap、42个完整帧/1,407,777次显示像素比较，全零/部分strobe覆盖160/20拍，正常绘制underflow/missed增量0。本轮未执行 CPU 指令仿真或实板验证；仍有继承接口未匹配、LVDS 距离与组合环切断告警待核对。报告时间、路径、资源对照和复验方法见 [V5_TIMING_FIX](V5_TIMING_FIX.md)。以下 2026-10-18 的未综合记录为当时状态。
+
 ### v5色键正式系统/API/演示（2026-10-18）
 
 顶层同一`COLOR_KEY_ENABLE=1`传到sapphire_control/accel_regs和rgb_framebuffer/graphics_engine，发布VERSION=0x00050000、CAPABILITIES=0xFB（新增bit7）。op2复用RECT_COLOR低24位作RGB key，使用原Front检查、同一BLIT DMA、Back锁存、读仲裁和写准入；部分/全零WSTRB保留目标，仍完整完成W/B。参数默认关闭时保留旧v4。

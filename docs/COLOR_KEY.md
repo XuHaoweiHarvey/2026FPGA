@@ -1,6 +1,6 @@
 # Color Keying：v5系统、软件与独立模块
 
-2026-10-18：赛题二高阶 Color Keying 已从独立复制/统一入口接入正式v5 APB、Framebuffer、顶层与软件API。顶层同一`COLOR_KEY_ENABLE=1`同时开启控制和执行路径，VERSION=0x00050000、CAPABILITIES=0xFB；独立模块参数默认0，保留旧v4配置。共享显示系统RTL检查和当前软件构建通过；本轮CPU指令行为检查因已有Unicorn依赖目录受权限限制未执行，不以旧v4结果代替。综合时序和实板验收待完成。
+2026-10-18：赛题二高阶 Color Keying 已从独立复制/统一入口接入正式v5 APB、Framebuffer、顶层与软件API。顶层同一`COLOR_KEY_ENABLE=1`同时开启控制和执行路径，VERSION=0x00050000、CAPABILITIES=0xFB；独立模块参数默认0，保留旧v4配置。共享显示系统RTL检查和当前软件构建通过；CPU指令行为检查因已有Unicorn依赖目录受权限限制未执行，不以旧v4结果代替。2026-10-19修复共用BLIT参数检查长路径后，Efinity完整编译及当前约束下静态时序通过，接口告警与实板仍待核对，见[V5_TIMING_FIX](V5_TIMING_FIX.md)。
 
 ## v5正式命令与软件接口
 
@@ -174,7 +174,7 @@ python scripts/render_blit_preview.py output/graphics/color_key/basic --names sp
 ## 剩余验收
 
 1. 在依赖可读的环境执行当前v5 ELF的CPU/MMIO行为检查；本轮受权限限制跳过。
-2. A使用正式Efinity工具链重新综合布局布线，核对比较/掩码、源窗口及仲裁路径的100MHz时序和资源，再构建匹配软件。
+2. 当前源码已完成Efinity2026.1.132综合布局布线和当前约束下静态时序；A核对保留的接口/工具告警，并在下载前确认本次bit与软件版本配套。若重新构建，需再次核对资源和时序。
 3. A/C在真实DDR验收部分/全零WSTRB与B响应、1080p显示并发、模式3左右对比、underflow/missed与诊断；保留旧FILL回归。
 
 源码已完成系统接线/API/演示，图像和并发检查属于RTL仿真，尚无v5 HDMI实测或板级性能数据。

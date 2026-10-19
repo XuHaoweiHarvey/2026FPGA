@@ -135,9 +135,10 @@ endmodule
 
 module tb_blit_engine;
 parameter FRAME_WIDTH = 64, FRAME_HEIGHT = 48, EDGE_ONLY = 0;
-parameter MAX_BURST_BEATS = 32;
+parameter MAX_BURST_BEATS = 32, ADDRESS_EDGE_ONLY = 0;
+parameter [31:0] SOURCE_BASE = 32'h01000000;
 localparam SOURCE_WORDS = 32768, TARGET_WORDS = FRAME_WIDTH*FRAME_HEIGHT;
-localparam [31:0] SOURCE_BASE = 32'h01000000, BACK_BASE = 32'h00800000;
+localparam [31:0] BACK_BASE = 32'h00800000;
 localparam [31:0] ERR_PARAM=32'h21, ERR_READ=32'h22, ERR_WRITE=32'h23,
     ERR_TIMEOUT=32'h24, ERR_PROTOCOL=32'h25;
 reg clk=0, rst_n=0, enabled=0, start=0;
@@ -421,7 +422,16 @@ initial begin
     initialize_memory(0);
     if(busy || done || command_count!=0 || error_code!=0)$fatal(1,"Bad idle reset");
 
-    if(EDGE_ONLY) begin
+    if(ADDRESS_EDGE_ONLY) begin
+        enabled=1;
+        copy_case("last source beat ends exactly at 4GiB",32'hfffffff0,16,0,0,4,1);
+        copy_case("two source rows end exactly at 4GiB",32'hfffff000,32'hff0,4,2,4,2);
+        copy_case("two final source beats preserve all 32 address bits",32'hffffffe0,32,8,4,8,1);
+        invalid_case("one beat past address space",32'hfffffff0,32,0,0,8,1);
+        invalid_case("full precision stride product exceeds address space",SOURCE_BASE,32'hfffffff0,0,0,4,2);
+        invalid_case("zero height with maximum aligned stride",SOURCE_BASE,32'hfffffff0,0,0,4,0);
+        invalid_case("huge height cannot wrap into a valid geometry",SOURCE_BASE,16,0,0,4,32'hffffffff);
+    end else if(EDGE_ONLY) begin
         enabled=1;
         copy_case("wide row exceeds burst buffer",SOURCE_BASE,1024,0,0,256,2);
         copy_case("source 4KiB split",SOURCE_BASE+32'hff0,256,0,2,64,2);
