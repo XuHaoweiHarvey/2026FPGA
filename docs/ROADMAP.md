@@ -1,5 +1,7 @@
 # Roadmap
 
+Phase 3 进度：M0 基线已独立归档；M1a CPU→DDR 桥、会话锁和 OCRAM 烟测已实现，RTL/软件检查及 Efinity 完整编译通过，项目负责人于 2026-10-21 确认实板验收通过。M1a 尚未提交为 Git commit，合并后目标目录的重建复验仍待完成。M1b 的公平 CPU/FPGA 渲染对比尚未开始；独立 Sprite atlas、Alpha 和游戏均未实施。具体证据与限制见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。
+
 ## Starting Point
 
 Phase 2基础框架已完成并由负责人实际验收A～E。**FILL_RECT、双缓冲、safe swap和显示保护已实现，不是TODO。** BLIT及Color Keying已接入当前v5正式工程、软件API和演示流程。色键共享DDR系统RTL和软件构建通过，CPU指令仿真受权限限制未执行；2026-10-19修复BLIT长路径后已通过当前约束下Efinity综合/静态时序，见[V5_TIMING_FIX](V5_TIMING_FIX.md)。已归档三轮全屏实测和最终色键画面，范围与剩余验收见[V5_BOARD_BENCHMARK](V5_BOARD_BENCHMARK.md)。v4历史软件行为检查见[SYSTEM_BLIT](SYSTEM_BLIT.md)。

@@ -13,7 +13,7 @@ module rgb_framebuffer #(
     parameter WRITE_SERVICE_ENABLE=1, WRITE_READ_QUOTA=128,
     parameter WRITE_FIFO_LOW=RD_FIFO_DEPTH*3/8, WRITE_FIFO_HIGH=RD_FIFO_DEPTH/2,
     parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000,
-    parameter COLOR_KEY_ENABLE=0
+    parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0
 )(
     input wire axi_clk, input wire rst_n,
     input wire i_clk, input wire i_frame_start, input wire i_de,
@@ -57,7 +57,18 @@ module rgb_framebuffer #(
     output wire [31:0] service_status,writer_throttle_cycles,writer_bursts,
     output wire [31:0] reader_ar_stall_cycles,reader_ar_max_stall,reader_r_stall_cycles,reader_r_max_stall,
     output wire [31:0] display_underflow_count,reader_frame_completions,reader_fifo_level,writer_max_cycles,
-    output wire [31:0] service_read_quota,service_watermarks
+    output wire [31:0] service_read_quota,service_watermarks,
+    input wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_busy,cpu_ddr_clear_error,
+    input wire [31:0] cpu_ddr_error,
+    output wire cpu_ddr_session_active,output wire [31:0] cpu_ddr_session_status,
+    input wire [31:0] cpu_awaddr,input wire cpu_awvalid,output wire cpu_awready,
+    input wire [127:0] cpu_wdata,input wire [15:0] cpu_wstrb,
+    input wire cpu_wlast,cpu_wvalid,output wire cpu_wready,
+    output wire [3:0] cpu_bid,output wire [1:0] cpu_bresp,
+    output wire cpu_bvalid,input wire cpu_bready,
+    input wire [31:0] cpu_araddr,input wire cpu_arvalid,output wire cpu_arready,
+    output wire [127:0] cpu_rdata,output wire [3:0] cpu_rid,output wire [1:0] cpu_rresp,
+    output wire cpu_rlast,output wire cpu_rvalid,input wire cpu_rready
 );
 localparam [24:0] FRAME_BEATS = FRAME_WIDTH * FRAME_HEIGHT / 4;
 wire wr_rst_n, axi_rst_n, rd_rst_n;
@@ -77,6 +88,29 @@ wire [31:0] d_front_base,d_back_base,d_command_base;
 wire manager_draw_ready;
 wire [31:0] display_error;
 wire read_fault;
+reg cpu_session=0,cpu_session_fault=0;
+wire cpu_owner=CPU_DDR_ENABLE && D_MODE && cpu_session;
+assign cpu_ddr_session_active=cpu_owner;
+assign cpu_ddr_session_status={27'b0,(CPU_DDR_ENABLE!=0),1'b0,cpu_session_fault,
+                               cpu_ddr_busy,cpu_owner};
+always @(posedge axi_clk or negedge axi_rst_n) begin
+    if(!axi_rst_n) begin cpu_session<=0;cpu_session_fault<=0;end
+    else if(CPU_DDR_ENABLE && D_MODE) begin
+        if(cpu_ddr_clear_error) cpu_session_fault<=0;
+        if(cpu_ddr_acquire) begin
+            if(!cpu_session && manager_draw_ready && read_healthy &&
+               !cpu_ddr_busy && !engine_busy && !d_owned && !d_pending &&
+               !swap_request && !cmd_start && !a_awvalid && !b_arvalid)
+                cpu_session<=1;
+            else cpu_session_fault<=1;
+        end
+        if(cpu_ddr_release) begin
+            if(cpu_session && !cpu_ddr_busy && !cpu_awvalid && !cpu_wvalid && !cpu_arvalid)
+                cpu_session<=0;
+            else cpu_session_fault<=1;
+        end
+    end
+end
 // Block new commands and publication on a read fault; never cancel DMA.
 wire read_healthy = !BLIT_ENABLE || reader_error==0;
 wire rd_fifo_reset = !axi_rst_n || (D_MODE ? d_flush : rd_period_sync[2:1] == 2'b01);
@@ -115,28 +149,67 @@ wire [3:0] b_rid;
 wire [1:0] display_rresp,b_rresp;
 wire display_rlast,display_rvalid,display_rready;
 wire b_arvalid,b_arready,b_rlast,b_rvalid,b_rready;
+wire [31:0] nondisplay_araddr;
+wire [7:0] nondisplay_arlen;
+wire nondisplay_arvalid,nondisplay_arready,nondisplay_rvalid,nondisplay_rlast,nondisplay_rready;
+wire [127:0] nondisplay_rdata;
+wire [3:0] nondisplay_rid;
+wire [1:0] nondisplay_rresp;
+assign nondisplay_araddr=cpu_owner ? cpu_araddr : b_araddr;
+assign nondisplay_arlen=cpu_owner ? 8'b0 : b_arlen;
+assign nondisplay_arvalid=cpu_owner ? cpu_arvalid : b_arvalid;
+assign nondisplay_rready=cpu_owner ? cpu_rready : b_rready;
+assign cpu_arready=cpu_owner && nondisplay_arready;
+assign cpu_rdata=cpu_owner ? nondisplay_rdata : 128'b0;
+assign cpu_rid=cpu_owner ? nondisplay_rid : 4'b0;
+assign cpu_rresp=cpu_owner ? nondisplay_rresp : 2'b0;
+assign cpu_rlast=cpu_owner && nondisplay_rlast;
+assign cpu_rvalid=cpu_owner && nondisplay_rvalid;
+assign b_arready=!cpu_owner && nondisplay_arready;
+assign b_rdata=cpu_owner ? 128'b0 : nondisplay_rdata;
+assign b_rid=cpu_owner ? 4'b0 : nondisplay_rid;
+assign b_rresp=cpu_owner ? 2'b0 : nondisplay_rresp;
+assign b_rlast=!cpu_owner && nondisplay_rlast;
+assign b_rvalid=!cpu_owner && nondisplay_rvalid;
 wire [31:0] t_awaddr,a_awaddr;
 wire [7:0] t_awlen,a_awlen;
 wire [127:0] t_wdata,a_wdata;
 wire [15:0] t_wstrb,a_wstrb;
 wire t_awvalid,t_awready,t_wvalid,t_wready,t_wlast,t_bvalid,t_bready,t_fifo_empty,t_idle;
 wire a_awvalid,a_awready,a_wvalid,a_wready,a_wlast,a_bvalid,a_bready;
+wire [31:0] active_awaddr;
+wire [127:0] active_wdata;
+wire [15:0] active_wstrb;
+wire active_awvalid,active_wvalid,active_wlast,active_bready,active_bvalid;
+assign active_awaddr=cpu_owner ? cpu_awaddr : a_awaddr+(D_MODE ? d_command_base : 32'b0);
+assign active_wdata=cpu_owner ? cpu_wdata : a_wdata;
+assign active_wstrb=cpu_owner ? cpu_wstrb : a_wstrb;
+assign active_awvalid=cpu_owner ? cpu_awvalid : a_awvalid;
+assign active_wvalid=cpu_owner ? cpu_wvalid : a_wvalid;
+assign active_wlast=cpu_owner ? cpu_wlast : a_wlast;
+assign active_bready=cpu_owner ? cpu_bready : a_bready;
+assign active_bvalid=owner_accel && bvalid;
+assign cpu_awready=cpu_owner && owner_accel && writer_admit && awready;
+assign cpu_wready=cpu_owner && owner_accel && wready;
+assign cpu_bid=bid;
+assign cpu_bresp=bresp;
+assign cpu_bvalid=cpu_owner && active_bvalid;
 wire owner_accel=C_MODE && init_done;
 wire writer_admit;
-assign awaddr=owner_accel?(a_awaddr+(D_MODE ? d_command_base : 32'b0)):t_awaddr;
-assign awlen=owner_accel?a_awlen:t_awlen;
-assign awvalid=owner_accel?(a_awvalid && writer_admit):t_awvalid;
-assign wdata=owner_accel?a_wdata:t_wdata;
-assign wstrb=owner_accel?a_wstrb:t_wstrb;
-assign wlast=owner_accel?a_wlast:t_wlast;
-assign wvalid=owner_accel?a_wvalid:t_wvalid;
-assign bready=owner_accel?a_bready:t_bready;
+assign awaddr=owner_accel?active_awaddr:t_awaddr;
+assign awlen=owner_accel?(cpu_owner ? 8'b0 : a_awlen):t_awlen;
+assign awvalid=owner_accel?(active_awvalid && writer_admit):t_awvalid;
+assign wdata=owner_accel?active_wdata:t_wdata;
+assign wstrb=owner_accel?active_wstrb:t_wstrb;
+assign wlast=owner_accel?active_wlast:t_wlast;
+assign wvalid=owner_accel?active_wvalid:t_wvalid;
+assign bready=owner_accel?active_bready:t_bready;
 assign t_awready=!owner_accel && awready;
 assign t_wready=!owner_accel && wready;
 assign t_bvalid=!owner_accel && bvalid;
-assign a_awready=owner_accel && writer_admit && awready;
-assign a_wready=owner_accel && wready;
-assign a_bvalid=owner_accel && bvalid;
+assign a_awready=owner_accel && !cpu_owner && writer_admit && awready;
+assign a_wready=owner_accel && !cpu_owner && wready;
+assign a_bvalid=owner_accel && !cpu_owner && bvalid;
 // Both writers use ID0, size4, INCR, cache3/prot2/lock0: retain the
 // original constant sideband outputs. Payload/VALID/READY/B are owner muxed.
 ddr_wr_buffer1 #(.AXI_DATA_WIDTH(128), .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
@@ -242,8 +315,10 @@ generate if(BLIT_ENABLE) begin: shared_read
         .display_araddr(display_araddr),.display_arlen(display_arlen),.display_arvalid(display_arvalid),.display_arready(display_arready),
         .display_rdata(display_rdata),.display_rid(display_rid),.display_rresp(display_rresp),
         .display_rlast(display_rlast),.display_rvalid(display_rvalid),.display_rready(display_rready),
-        .blit_araddr(b_araddr),.blit_arlen(b_arlen),.blit_arvalid(b_arvalid),.blit_arready(b_arready),
-        .blit_rdata(b_rdata),.blit_rid(b_rid),.blit_rresp(b_rresp),.blit_rlast(b_rlast),.blit_rvalid(b_rvalid),.blit_rready(b_rready),
+        .blit_araddr(nondisplay_araddr),.blit_arlen(nondisplay_arlen),
+        .blit_arvalid(nondisplay_arvalid),.blit_arready(nondisplay_arready),
+        .blit_rdata(nondisplay_rdata),.blit_rid(nondisplay_rid),.blit_rresp(nondisplay_rresp),
+        .blit_rlast(nondisplay_rlast),.blit_rvalid(nondisplay_rvalid),.blit_rready(nondisplay_rready),
         .araddr(araddr),.arlen(arlen),.arid(arid),.arsize(arsize),.arburst(arburst),
         .arcache(arcache),.arprot(arprot),.arlock(arlock),.arqos(),.arvalid(arvalid),.arready(arready),
         .rdata(rdata),.rid(rid),.rresp(rresp),.rlast(rlast),.rvalid(rvalid),.rready(rready),
@@ -255,16 +330,20 @@ end else begin: display_only
     assign arprot=display_arprot;assign arlock=display_arlock;assign arvalid=display_arvalid;assign display_arready=arready;
     assign display_rdata=rdata;assign display_rid=rid;assign display_rresp=rresp;
     assign display_rlast=rlast;assign display_rvalid=rvalid;assign rready=display_rready;
-    assign b_arready=0;assign b_rdata=0;assign b_rid=0;assign b_rresp=0;assign b_rlast=0;assign b_rvalid=0;
+    assign nondisplay_arready=0;assign nondisplay_rdata=0;assign nondisplay_rid=0;
+    assign nondisplay_rresp=0;assign nondisplay_rlast=0;assign nondisplay_rvalid=0;
     assign read_fault=0;
 end endgenerate
 generate if(D_MODE) begin: d_buffers
     assign reader_error=read_fault ? 32'h2004 : display_error;
-    assign draw_ready=manager_draw_ready && read_healthy;
+    assign draw_ready=manager_draw_ready && read_healthy && !cpu_owner &&
+                      !(CPU_DDR_ENABLE && (cpu_ddr_error!=0 || cpu_session_fault)) &&
+                      !(CPU_DDR_ENABLE && cpu_ddr_acquire);
     ddr_write_admission #(.ENABLE(WRITE_SERVICE_ENABLE),.READ_QUOTA(WRITE_READ_QUOTA),
         .FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH)) write_service (
         .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),
-        .raw_awvalid(a_awvalid),.ddr_awready(awready),.bvalid(a_bvalid),.bready(a_bready),
+        .raw_awvalid(active_awvalid),.ddr_awready(awready),
+        .bvalid(active_bvalid),.bready(active_bready),
         .reader_active(d_active),.reader_safe(d_safe),.reader_launch(d_launch),.fifo_flush(d_flush),
         .fifo_level(reader_fifo_level),.reader_error(reader_error),
         .arvalid(display_arvalid),.arready(display_arready),.rvalid(display_rvalid),.rready(display_rready),.reader_outstanding(reader_outstanding),
@@ -289,9 +368,13 @@ generate if(D_MODE) begin: d_buffers
         .safe(d_safe),.active(d_active),.outstanding(reader_outstanding),.data_beats(reader_data_beats),
         .reserved_beats(reader_reserved_beats),.error_code(display_error));
     buffer_manager #(.BUFFER0_BASE(BUFFER0_BASE),.BUFFER1_BASE(BUFFER1_BASE)) manager (
-        .clk(axi_clk),.rst_n(axi_rst_n),.init_done(init_done),.cmd_request(cmd_start && read_healthy),
+        .clk(axi_clk),.rst_n(axi_rst_n),.init_done(init_done),
+        .cmd_request(cmd_start && read_healthy && !cpu_owner &&
+                     !(CPU_DDR_ENABLE && cpu_ddr_acquire)),
         .writer_busy(engine_busy),.writer_done(engine_done),.writer_error(engine_error),
-        .swap_request(swap_request),.clear_done(clear_swap_done),
+        .swap_request(swap_request && !cpu_owner &&
+                      !(CPU_DDR_ENABLE && (cpu_ddr_error!=0 || cpu_session_fault)) &&
+                      !(CPU_DDR_ENABLE && cpu_ddr_acquire)),.clear_done(clear_swap_done),
         .boundary_tick(d_boundary),.blank_active(d_blank),.reader_safe(d_safe && read_healthy),.reader_fifo_empty(d_fifo_empty),
         .command_accept(d_command_accept),.draw_ready(manager_draw_ready),.writer_owned(d_owned),
         .front_index(d_front_index),.back_index(d_back_index),.front_valid(d_front_valid),

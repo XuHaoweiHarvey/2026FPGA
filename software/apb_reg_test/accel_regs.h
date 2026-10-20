@@ -81,6 +81,9 @@
 #define ACCEL_COMMAND_OP      0xBCu
 #define ACCEL_SRC_ADDR        0xC0u
 #define ACCEL_SRC_STRIDE      0xC4u
+#define ACCEL_CPU_DDR_CONTROL 0xCCu
+#define ACCEL_CPU_DDR_STATUS  0xD0u
+#define ACCEL_CPU_DDR_ERROR   0xD4u
 #define ACCEL_OP_FILL         UINT32_C(0)
 #define ACCEL_OP_BLIT         UINT32_C(1)
 #define ACCEL_OP_COLOR_KEY    UINT32_C(2)

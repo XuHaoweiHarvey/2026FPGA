@@ -6,12 +6,17 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--apb-waits',type=int,nargs='+',default=[0,1,3])
 parser.add_argument('--graphics',action='store_true',help='Enable formal APB/shared-read BLIT integration scenarios')
 parser.add_argument('--color-key',action='store_true',help='Enable v5 color-key scenes (implies --graphics)')
+parser.add_argument('--cpu-ddr',action='store_true',help='Run M1a CPU session integration (implies --graphics)')
 parser.add_argument('--output',type=Path,help='Artifact directory; default is a new temporary directory')
 parser.add_argument('--negative-control',choices=['display-data','display-quota','color-key-mask'],
                     help='With --graphics, intentionally miswire a temporary copy and require the matching checker to fail')
 args=parser.parse_args()
 if args.color_key:
  args.graphics=True
+if args.cpu_ddr:
+ args.graphics=True
+if args.cpu_ddr and (args.color_key or args.negative_control):
+ parser.error('--cpu-ddr is a standalone M1a integration run')
 if args.negative_control and not args.graphics:
  parser.error('--negative-control requires --graphics')
 if args.negative_control=='color-key-mask' and not args.color_key:
@@ -57,7 +62,7 @@ if args.negative_control:
  sources[sources.index(target)]=broken
 for waits in args.apb_waits:
  overrides=[f'-Ptb_checkpoint_d.APB_WAITS={waits}',f'-Ptb_checkpoint_d.GRAPHICS={int(args.graphics)}',
-            f'-Ptb_checkpoint_d.COLOR_KEY={int(args.color_key)}']
+            f'-Ptb_checkpoint_d.COLOR_KEY={int(args.color_key)}',f'-Ptb_checkpoint_d.CPU_DDR={int(args.cpu_ddr)}']
  if args.negative_control:
   binary=out/f'negative-{waits}.vvp'
   run(['iverilog','-g2005-sv','-s','tb_checkpoint_d',*overrides,'-o',binary,*sources])
@@ -71,4 +76,4 @@ for waits in args.apb_waits:
   sim('tb_checkpoint_d',sources,overrides,[f'+PREVIEW_DIR={preview_dir}'] if args.color_key else [])
   if args.color_key:
    run([sys.executable,'scripts/render_blit_preview.py',preview_dir,'--names','color_key_source','color_key_scene'])
-print('PASS D simulations; hardware verification pending.',flush=True)
+print('PASS D simulations; board evidence is recorded separately.',flush=True)

@@ -1,5 +1,9 @@
 # Validation
 
+## Phase 3 M1a（负责人确认实板通过；待 Git 复现）
+
+独立 `2026FPGA-P3` 工作树的生成 Sapphire BMB upsizer 四 lane 仿真、CPU DDR 桥协议仿真、共享 DDR/显示/Swap 集成仿真、v5 FILL/BLIT/Color Key WAIT1 回归、旧 APB WAIT0/1/3、RGB 顶层展开及 OCRAM 软件 Build 已通过。P3 的 Efinity 2026.1.132 日志记录了完整编译、bit 生成及 100 MHz core_clk 时序分析；项目负责人于 2026-10-21 确认 M1a 实板验收通过，范围包含 CPU DDR 读写、Front/Back 会话与事务排空、旧图形功能回归和 DDR/HDMI 显示稳定性。完整命令、现存 bit/ELF 哈希及证据限制见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。尚无与 Git commit 对应的干净检出构建，也未归档所有板级原始寄存器读数。
+
 ## Status and Evidence Rules
 
 **Phase 2基础框架已完成，Checkpoint A～E均由项目负责人完成实际FPGA验收并明确确认通过。** D包含连续显示修复后的重新Compile/Programmer/HDMI验证，E包含最终Demo验收。

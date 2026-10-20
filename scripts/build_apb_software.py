@@ -11,6 +11,8 @@ parser.add_argument('--ide-root', type=Path, default=Path('D:/Efinity/efinity-ri
 parser.add_argument('--toolchain-prefix',type=Path,
                     help='Optional complete GNU cross-tool prefix, ending in a hyphen; default uses the formal IDE')
 parser.add_argument('--output', type=Path, default=ROOT / 'software/apb_reg_test/build')
+parser.add_argument('--program', choices=('apb','m1a'), default='apb')
+parser.add_argument('--opt', choices=('Og','O2'), default='Og')
 parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
                     help='Optional C macro override, e.g. TEST_RECT_X=320; tests use a temporary output')
 args = parser.parse_args()
@@ -21,12 +23,13 @@ macros = dict(re.findall(r'^#define\s+(\w+)\s+(0x[0-9a-fA-F]+|\d+)\s*$', soc_h, 
 def value(name):
     return int(macros[name], 0)
 conf = json.loads((ROOT / 'ip/soc_control/settings.json').read_text(encoding='utf8'))['conf']
-assert conf['DDR'] == "1'b0" and conf['Cache'] == "1'b0"
+assert conf['DDR'] == "1'b1" and conf['DDR_AXI4'] == "1'b1" and conf['Cache'] == "1'b0"
 assert conf['CpuCount'] == '1' and conf['OCRSize'] == '65536'
 assert value('SYSTEM_RISCV_ISA_RV32I') == 1 and value('SYSTEM_RISCV_ISA_EXT_M') == 1
 for extension in ('A', 'C', 'F', 'D'):
     assert value('SYSTEM_RISCV_ISA_EXT_' + extension) == 0, 'Recheck generated ISA before rebuilding'
 assert value('IO_APB_SLAVE_0_INPUT_SIZE') >= 0xC8
+assert value('SYSTEM_DDR_BMB') == 0x1000 and value('SYSTEM_DDR_BMB_SIZE') == 0xe0000000
 assert value('SYSTEM_RAM_A_SIZE') == value('SYSTEM_RAM_A_CTRL_SIZE') == 65536
 linker = bsp / 'linker/default.ld'
 text = linker.read_text(encoding='utf8')
@@ -41,7 +44,7 @@ gcc = Path(tool_prefix+'gcc.exe')
 objcopy = Path(tool_prefix+'objcopy.exe')
 objdump = Path(tool_prefix+'objdump.exe')
 nm = Path(tool_prefix+'nm.exe')
-flags = ['-march=rv32im_zicsr_zifencei', '-mabi=ilp32', '-Og', '-g3', '-ffreestanding',
+flags = ['-march=rv32im_zicsr_zifencei', '-mabi=ilp32', '-'+args.opt, '-g3', '-ffreestanding',
          '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror',
          '-DUSE_GP', '-DNO_LIBC_INIT_ARRAY', '-I' + str(bsp / 'include')]
 for define in args.define:
@@ -49,19 +52,23 @@ for define in args.define:
     flags.append('-D'+define)
 def run(command):
     subprocess.run([str(x) for x in command], cwd=ROOT, check=True)
-run([gcc, *flags, '-c', ROOT / 'software/apb_reg_test/main.c', '-o', out / 'main.o'])
+source = ROOT / ('software/m1a_ddr_smoke/main.c' if args.program=='m1a' else 'software/apb_reg_test/main.c')
+basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'apb_reg_test'
+run([gcc, *flags, '-c', source, '-o', out / 'main.o'])
 run([gcc, *flags, '-c', startup, '-o', out / 'start.o'])
-elf = out / 'apb_reg_test.elf'
+elf = out / (basename+'.elf')
 run([gcc, *flags, '-nostdlib', '-nostartfiles', '-Wl,--gc-sections', '-T', linker,
-     '-Wl,-Map,' + str(out / 'apb_reg_test.map'), out / 'start.o', out / 'main.o', '-lgcc', '-o', elf])
-run([objcopy, '-O', 'binary', elf, out / 'apb_reg_test.bin'])
-run([objcopy, '-O', 'ihex', elf, out / 'apb_reg_test.hex'])
+     '-Wl,-Map,' + str(out / (basename+'.map')), out / 'start.o', out / 'main.o', '-lgcc', '-o', elf])
+run([objcopy, '-O', 'binary', elf, out / (basename+'.bin')])
+run([objcopy, '-O', 'ihex', elf, out / (basename+'.hex')])
 dump = subprocess.check_output([str(objdump), '-d', '-S', str(elf)], cwd=ROOT, text=True)
-(out / 'apb_reg_test.disasm').write_text(dump, encoding='utf8')
+(out / (basename+'.disasm')).write_text(dump, encoding='utf8')
 symbols = subprocess.check_output([str(nm), '-n', '-S', str(elf)], text=True)
+required = ('_start','main','m1a_test_done','g_m1a_result','_sp') if args.program=='m1a' else \
+           ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')
 selected = [line for line in symbols.splitlines() if line.split()[-1] in
-            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')]
-assert len(selected) == 6
+            required]
+assert len(selected) == len(required)
 for line in selected:
     address = int(line.split()[0], 16)
     assert origin <= address <= origin + length - 1024, line

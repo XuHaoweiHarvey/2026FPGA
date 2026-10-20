@@ -459,11 +459,19 @@ wire [31:0] reader_ar_stall_cycles,reader_ar_max_stall,reader_r_stall_cycles;
 wire [31:0] reader_r_max_stall,display_underflow_count,reader_frame_completions;
 wire [31:0] reader_fifo_level,writer_max_cycles,service_read_quota;
 wire [31:0] service_watermarks;
+wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error,cpu_ddr_busy,cpu_ddr_session_active;
+wire [31:0] cpu_ddr_session_status,cpu_ddr_error,cpu_awaddr,cpu_araddr;
+wire cpu_awvalid,cpu_awready,cpu_wlast,cpu_wvalid,cpu_wready;
+wire [127:0] cpu_wdata,cpu_rdata;
+wire [15:0] cpu_wstrb;
+wire [3:0] cpu_bid,cpu_rid;
+wire [1:0] cpu_bresp,cpu_rresp;
+wire cpu_bvalid,cpu_bready,cpu_arvalid,cpu_arready,cpu_rlast,cpu_rvalid,cpu_rready;
 rgb_framebuffer #(
     .FRAME_WIDTH(HACT), .FRAME_HEIGHT(VACT),
     .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH), .AXI_ID_WIDTH(AXI_ID_WIDTH),
     .WR_FIFO_DEPTH(1024), .RD_FIFO_DEPTH(1024), .BURST_LEN(127), .C_MODE(1), .D_MODE(1), .BLIT_ENABLE(1),
-    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)
+    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1)
 ) checker0(
     .diag_wr_fifo_full(wr_fifo_full),
     .diag_wr_bank(wr_buffer_index), .diag_rd_bank(rd_buffer_index),
@@ -473,6 +481,17 @@ rgb_framebuffer #(
     .reader_data_beats(reader_data_beats),.reader_reserved_beats(reader_reserved_beats),.reader_error(reader_error),
     .boundary_count(boundary_count),.swap_count(swap_count),.missed_boundary_count(missed_boundary_count),
     .service_status(service_status),.writer_throttle_cycles(writer_throttle_cycles),.writer_bursts(writer_bursts),
+    .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
+    .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),
+    .cpu_ddr_error(cpu_ddr_error),
+    .cpu_ddr_session_active(cpu_ddr_session_active),.cpu_ddr_session_status(cpu_ddr_session_status),
+    .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
+    .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(cpu_wlast),
+    .cpu_wvalid(cpu_wvalid),.cpu_wready(cpu_wready),
+    .cpu_bid(cpu_bid),.cpu_bresp(cpu_bresp),.cpu_bvalid(cpu_bvalid),.cpu_bready(cpu_bready),
+    .cpu_araddr(cpu_araddr),.cpu_arvalid(cpu_arvalid),.cpu_arready(cpu_arready),
+    .cpu_rdata(cpu_rdata),.cpu_rid(cpu_rid),.cpu_rresp(cpu_rresp),
+    .cpu_rlast(cpu_rlast),.cpu_rvalid(cpu_rvalid),.cpu_rready(cpu_rready),
     .reader_ar_stall_cycles(reader_ar_stall_cycles),.reader_ar_max_stall(reader_ar_max_stall),.reader_r_stall_cycles(reader_r_stall_cycles),
     .reader_r_max_stall(reader_r_max_stall),.display_underflow_count(display_underflow_count),.reader_frame_completions(reader_frame_completions),
     .reader_fifo_level(reader_fifo_level),.writer_max_cycles(writer_max_cycles),.service_read_quota(service_read_quota),
@@ -916,8 +935,9 @@ assign tmds_tx_data2_TX_DATA = ~tmds_data2;
 // Control-island reset never resets the platform-owned writer or video path.
 // Sapphire is the only TDO driver. EDB and the former TDI/TDO placeholder are absent.
 (* syn_keep = 1 *) wire accel_start_test_pulse;
-sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)) u_control (
+sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1)) u_control (
     .core_clk(core_clk), .platform_rst_n(i_arstn && w_arstn),
+    .platform_ddr_rst_n(vid_rst_n),
     .jtag_tck(jtag_inst1_TCK), .jtag_tdi(jtag_inst1_TDI), .jtag_tdo(jtag_inst1_TDO),
     .jtag_sel(jtag_inst1_SEL), .jtag_capture(jtag_inst1_CAPTURE),
     .jtag_shift(jtag_inst1_SHIFT), .jtag_update(jtag_inst1_UPDATE),
@@ -940,7 +960,17 @@ sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)) u_control (
     .reader_fifo_level(reader_fifo_level),.writer_max_cycles(writer_max_cycles),.service_read_quota(service_read_quota),
     .service_watermarks(service_watermarks),
     .swap_request(swap_request),.clear_swap_done(clear_swap_done),
-    .start_test_pulse(accel_start_test_pulse)
+    .start_test_pulse(accel_start_test_pulse),
+    .cpu_ddr_session_active(cpu_ddr_session_active),.cpu_ddr_session_status(cpu_ddr_session_status),
+    .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
+    .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),.cpu_ddr_error(cpu_ddr_error),
+    .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
+    .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(cpu_wlast),
+    .cpu_wvalid(cpu_wvalid),.cpu_wready(cpu_wready),
+    .cpu_bid(cpu_bid),.cpu_bresp(cpu_bresp),.cpu_bvalid(cpu_bvalid),.cpu_bready(cpu_bready),
+    .cpu_araddr(cpu_araddr),.cpu_arvalid(cpu_arvalid),.cpu_arready(cpu_arready),
+    .cpu_rdata(cpu_rdata),.cpu_rid(cpu_rid),.cpu_rresp(cpu_rresp),
+    .cpu_rlast(cpu_rlast),.cpu_rvalid(cpu_rvalid),.cpu_rready(cpu_rready)
 );
 
 // Nonfunctional diagnostics. Counters are local to the signal clock domains.

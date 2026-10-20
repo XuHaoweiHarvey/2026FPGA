@@ -20,7 +20,9 @@
 module tb_soc ();
 
 localparam  MHZ=100000000;
+localparam  MEMDEPTH=$clog2(469762048/128);
 localparam PMHZ=50000000;
+localparam  MEMWIDTH=128;
 
 /////////////////////////////////////////////////////////////////////////////
 wire		io_systemClk; 
@@ -54,6 +56,32 @@ reg		    system_uart_0_io_rxd	= 1'b1;
 wire        memoryCheckerPass;
 wire		baudClk=io_systemClk;
 reg  [10:0] BAUDRATE=(MHZ/115200);
+wire ext_mem_ctrl_clk;
+wire ext_mem_ctrl_resetn;
+wire			io_ddrA_arw_valid;
+wire			io_ddrA_arw_ready;
+wire  [31:0]	io_ddrA_arw_payload_addr;
+wire  [7:0]		io_ddrA_arw_payload_id;
+wire  [7:0]		io_ddrA_arw_payload_len;
+wire  [2:0]		io_ddrA_arw_payload_size;
+wire  [1:0]		io_ddrA_arw_payload_burst;
+wire  [1:0]		io_ddrA_arw_payload_lock;
+wire			io_ddrA_arw_payload_write;
+wire  [7:0]		io_ddrA_w_payload_id;
+wire			io_ddrA_w_valid;
+wire			io_ddrA_w_ready;
+wire  [127:0]	io_ddrA_w_payload_data;
+wire  [15:0]	io_ddrA_w_payload_strb;
+wire			io_ddrA_w_payload_last;
+wire			io_ddrA_b_valid;
+wire			io_ddrA_b_ready;
+wire  [7:0]		io_ddrA_b_payload_id;
+wire			io_ddrA_r_valid;
+wire			io_ddrA_r_ready;
+wire  [127:0]	io_ddrA_r_payload_data;
+wire  [7:0]		io_ddrA_r_payload_id;
+wire  [1:0]		io_ddrA_r_payload_resp;
+wire			io_ddrA_r_payload_last;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -233,6 +261,33 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
 top_soc_wrapper dut_wrapper(
+.io_memoryClk(io_memoryClk),
+.memoryClk_rstn(memoryClk_rstn),
+.memoryClk_locked(memoryClk_locked),
+.io_ddrA_arw_valid(io_ddrA_arw_valid),
+.io_ddrA_arw_ready(io_ddrA_arw_ready),
+.io_ddrA_arw_payload_addr(io_ddrA_arw_payload_addr),
+.io_ddrA_arw_payload_id(io_ddrA_arw_payload_id),
+.io_ddrA_arw_payload_len(io_ddrA_arw_payload_len),
+.io_ddrA_arw_payload_size(io_ddrA_arw_payload_size),
+.io_ddrA_arw_payload_burst(io_ddrA_arw_payload_burst),
+.io_ddrA_arw_payload_lock(io_ddrA_arw_payload_lock),
+.io_ddrA_arw_payload_write(io_ddrA_arw_payload_write),
+.io_ddrA_w_payload_id(io_ddrA_w_payload_id),
+.io_ddrA_w_valid(io_ddrA_w_valid),
+.io_ddrA_w_ready(io_ddrA_w_ready),
+.io_ddrA_w_payload_data(io_ddrA_w_payload_data),
+.io_ddrA_w_payload_strb(io_ddrA_w_payload_strb),
+.io_ddrA_w_payload_last(io_ddrA_w_payload_last),
+.io_ddrA_b_valid(io_ddrA_b_valid),
+.io_ddrA_b_ready(io_ddrA_b_ready),
+.io_ddrA_b_payload_id(io_ddrA_b_payload_id),
+.io_ddrA_r_valid(io_ddrA_r_valid),
+.io_ddrA_r_ready(io_ddrA_r_ready),
+.io_ddrA_r_payload_data(io_ddrA_r_payload_data),
+.io_ddrA_r_payload_id(io_ddrA_r_payload_id),
+.io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
+.io_ddrA_r_payload_last(io_ddrA_r_payload_last),
 
 //clock and reset
 .io_asyncResetn(~rst),
@@ -242,6 +297,38 @@ top_soc_wrapper dut_wrapper(
 .memoryCheckerPass(memoryCheckerPass)
 );
 
+assign ext_mem_ctrl_clk = io_memoryClk;
+assign ext_mem_ctrl_resetn = memoryClk_locked;
+ext_mem_controller #(
+.WIDTH(MEMWIDTH),
+.DEPTH(MEMDEPTH)
+) ext_mem_ctrl_inst (
+.io_memoryClk(ext_mem_ctrl_clk),
+.resetn(ext_mem_ctrl_resetn),
+.aid_0(io_ddrA_arw_payload_id),
+.aaddr_0(io_ddrA_arw_payload_addr),
+.alen_0(io_ddrA_arw_payload_len),
+.asize_0(io_ddrA_arw_payload_size),
+.aburst_0(io_ddrA_arw_payload_burst),
+.alock_0(io_ddrA_arw_payload_lock),
+.avalid_0(io_ddrA_arw_valid),
+.aready_0(io_ddrA_arw_ready),
+.atype_0(io_ddrA_arw_payload_write),
+.wid_0(io_ddrA_w_payload_id),
+.wdata_0(io_ddrA_w_payload_data),
+.wstrb_0(io_ddrA_w_payload_strb),
+.wlast_0(io_ddrA_w_payload_last),
+.wvalid_0(io_ddrA_w_valid),
+.wready_0(io_ddrA_w_ready),
+.rid_0(io_ddrA_r_payload_id),
+.rdata_0(io_ddrA_r_payload_data),
+.rlast_0(io_ddrA_r_payload_last),
+.rvalid_0(io_ddrA_r_valid),
+.rready_0(io_ddrA_r_ready),
+.rresp_0(io_ddrA_r_payload_resp),
+.bid_0(io_ddrA_b_payload_id),
+.bvalid_0(io_ddrA_b_valid),
+.bready_0(io_ddrA_b_ready));
 
 
 W25Q32JVxxIM spi_flash(
@@ -259,6 +346,33 @@ endmodule
 //////////////////////////////////////////////////////////////////////////////
 
 module top_soc_wrapper(
+output		memoryClk_rstn,
+input		memoryClk_locked,
+input		io_memoryClk,
+output		io_ddrA_arw_valid,
+input		io_ddrA_arw_ready,
+output [31:0] io_ddrA_arw_payload_addr,
+output [7:0] io_ddrA_arw_payload_id,
+output [7:0] io_ddrA_arw_payload_len,
+output [2:0] io_ddrA_arw_payload_size,
+output [1:0] io_ddrA_arw_payload_burst,
+output [1:0] io_ddrA_arw_payload_lock,
+output		io_ddrA_arw_payload_write,
+output [7:0] io_ddrA_w_payload_id,
+output		io_ddrA_w_valid,
+input		io_ddrA_w_ready,
+output [127:0] io_ddrA_w_payload_data,
+output [15:0] io_ddrA_w_payload_strb,
+output		io_ddrA_w_payload_last,
+input		io_ddrA_b_valid,
+output		io_ddrA_b_ready,
+input [7:0] io_ddrA_b_payload_id,
+input		io_ddrA_r_valid,
+output		io_ddrA_r_ready,
+input [127:0] io_ddrA_r_payload_data,
+input [7:0] io_ddrA_r_payload_id,
+input [1:0] io_ddrA_r_payload_resp,
+input		io_ddrA_r_payload_last,
 
 output      systemClk_rstn,
 input       systemClk_locked,
@@ -272,6 +386,33 @@ output      memoryCheckerPass
 
 //////////////////////////////////////////////////////////////////////////////
 top_soc dut (
+.io_ddrA_arw_valid(io_ddrA_arw_valid),
+.io_ddrA_arw_ready(io_ddrA_arw_ready),
+.io_ddrA_arw_payload_addr(io_ddrA_arw_payload_addr),
+.io_ddrA_arw_payload_id(io_ddrA_arw_payload_id),
+.io_ddrA_arw_payload_len(io_ddrA_arw_payload_len),
+.io_ddrA_arw_payload_size(io_ddrA_arw_payload_size),
+.io_ddrA_arw_payload_burst(io_ddrA_arw_payload_burst),
+.io_ddrA_arw_payload_lock(io_ddrA_arw_payload_lock),
+.io_ddrA_arw_payload_write(io_ddrA_arw_payload_write),
+.io_ddrA_w_payload_id(io_ddrA_w_payload_id),
+.io_ddrA_w_valid(io_ddrA_w_valid),
+.io_ddrA_w_ready(io_ddrA_w_ready),
+.io_ddrA_w_payload_data(io_ddrA_w_payload_data),
+.io_ddrA_w_payload_strb(io_ddrA_w_payload_strb),
+.io_ddrA_w_payload_last(io_ddrA_w_payload_last),
+.io_ddrA_b_valid(io_ddrA_b_valid),
+.io_ddrA_b_ready(io_ddrA_b_ready),
+.io_ddrA_b_payload_id(io_ddrA_b_payload_id),
+.io_ddrA_r_valid(io_ddrA_r_valid),
+.io_ddrA_r_ready(io_ddrA_r_ready),
+.io_ddrA_r_payload_data(io_ddrA_r_payload_data),
+.io_ddrA_r_payload_id(io_ddrA_r_payload_id),
+.io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
+.io_ddrA_r_payload_last(io_ddrA_r_payload_last),
+.io_memoryClk(io_memoryClk),
+.memoryClk_rstn(memoryClk_rstn),
+.memoryClk_locked(memoryClk_locked),
 
 //clock and reset
 .io_asyncResetn(io_asyncResetn),

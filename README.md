@@ -1,5 +1,7 @@
 # Ti60F225 RISC-V + FPGA 2D Accelerator
 
+**Phase 3 M1a 状态：** 已接入 Sapphire External Memory AXI、CPU DDR 安全桥、Front/Back 会话锁及 OCRAM 烟测。桥协议和共享显示仿真、旧 FILL/BLIT/Color Key 回归、软件构建及 Efinity 2026.1.132 完整编译均已通过；项目负责人于 2026-10-21 确认 M1a 实板验收通过。当前 bit/ELF 哈希及其与未提交源码的溯源限制见 [M1a CPU DDR](docs/M1A_CPU_DDR.md)。合并后仍须在目标目录重新构建并复验。
+
 基于 Efinix Ti60F225、Sapphire RISC-V 和 FPGA 2D Accelerator 的 DDR Framebuffer 图形渲染平台。
 
 RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安全换帧持续输出 HDMI。
