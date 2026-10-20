@@ -6,6 +6,7 @@
 /scripts/__pycache__/
 *.vvp
 /software/apb_reg_test/build/
+/software/m1a_ddr_smoke/build/
 /software/workspace_b/
 /output/blit/
 /output/graphics/

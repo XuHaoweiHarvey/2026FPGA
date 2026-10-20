@@ -1,5 +1,7 @@
 # Build and Debug
 
+Phase 3 M1a 已在独立工作树完成 Sapphire External Memory AXI Generate、RTL/软件检查和 Efinity 2026.1.132 完整编译；项目负责人于 2026-10-21 确认实板验收通过。当前 bit/ELF 哈希、验收边界及复验步骤见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。下文保留的 55 个 design entries 和 v5 bit/ELF 操作属于历史基线；M1a 正式工程应为 56 项，不得混用产物。
+
 原FILL基线已由负责人完成A～E实板验收；当前v5 BLIT/色键在2026-10-19修复长路径后已通过Efinity完整编译及当前约束下静态时序，接口告警和实板仍待验收，见[V5_TIMING_FIX](V5_TIMING_FIX.md)。本指南供团队从仓库复现：Efinity Compile → Programmer → RISC-V IDE Build → Hard JTAG Debug → HDMI Demo。正常流程无需重新Generate IP，也不依赖UART。
 
 ## Environment and Inputs
@@ -16,6 +18,16 @@
 | RAM应用 | build/apb_reg_test.elf；OCRAM F9000000/64KiB，末1KiB留给OpenOCD |
 
 以下用已验证工作目录`D:/Github_repositories/2026FPGA`举例。若克隆到不同路径，在IDE中核对launch的绝对bsp_loc、两个-f、target register/SVD路径；不能假定旧绝对路径会自动重定位。普通软件参数变化只需Build/Debug；改变硬件RTL后才需重新Compile/下载。
+
+## M1a 从 Git 检出复现与本地 IDE 路径
+
+M1a 的根项目 `ti60f225_oob.xml` 使用相对设计文件路径，包含 `rtl/framebuffer/cpu_ddr_bridge.v`，总计 56 个 design entries，并以相对路径注册 `ip/soc_control/settings.json`。Sapphire 配置、生成 RTL/netlist、ROM 初始化文件、IP 元数据、正式 BSP `soc.h` 和 OCRAM linker 均随 Git 源码检出；正常打开工程不需要重新 Generate Sapphire。若工具要求重新生成，先在独立验证目录比较生成结果，不覆盖已验收的 P3 文件。
+
+在目标检出目录的根目录运行 `python scripts/check_project.py`、`python scripts/run_m1a_checks.py`、`python scripts/run_d_checks.py --apb-waits 1 --cpu-ddr` 和 `python scripts/run_d_checks.py --apb-waits 1 --graphics --color-key`。软件用 `python scripts/build_apb_software.py --program m1a --opt O2 --output software/m1a_ddr_smoke/build` 重新生成；脚本从自身位置解析仓库根目录，可通过 `--ide-root` 或 `--toolchain-prefix` 指向本机工具链，检查程序的 LOAD 段仍在 `0xF9000000` 的 64 KB OCRAM。`outflow/`、`work_pnr/`、`work_syn/` 和软件 `build/` 均为本地输出，不从 P3 拷贝旧 bit/ELF 当作目标检出的验证结果。
+
+`software/apb_reg_test/.project`、`.cproject`、`apb_reg_test_ti.launch` 和 `openocd/sapphire.cfg` 含本机绝对路径。P3 工作树中的这些修改服务于当前已验证的 IDE 会话，**不纳入 M1a 通用提交，也不要直接复制到另一检出目录**。在 RISC-V IDE 中从 `<目标检出目录>/software/apb_reg_test` 导入项目，不勾选 Copy projects into workspace；将 linked `common`、`bsp`、C/C++ include 路径、`bsp_loc`、两个 OpenOCD `-f`、寄存器描述和 SVD 全部重新指向目标检出目录。复制 Titanium Hard JTAG launch 为本机 M1a 配置，将 image、symbols 和 Main/Application 设为新生成的 `software/m1a_ddr_smoke/build/m1a_ddr_smoke.elf`，Startup PC 设为 `f9000000`，禁用自动重建旧 `apb_reg_test`。IDE 本地配置应保留在本机，提交前检查其中没有 P3 专属路径。原目录另有一个未跟踪的 M1a launch，它当前也指向 P3，不能直接用于原目录复验。
+
+完成目标目录 Efinity Compile 后，只下载该目录新生成的 `outflow/ti60f225_oob.bit`，记录时间与 SHA256；再加载同次构建的 ELF，按 [M1a 板级复验步骤](M1A_CPU_DDR.md#已由负责人确认通过的板级验收与复验步骤)检查结果。当前 P3 验收不能替代合并后或干净检出的重建复验。
 
 ## 1. Efinity Compile
 

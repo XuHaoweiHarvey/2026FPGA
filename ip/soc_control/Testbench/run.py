@@ -13,7 +13,7 @@ from pathlib import Path
 from shutil import which
 
 ## Define your aldec simulator's install path, example: '/somewhere/aldec/Riviera-PRO/2023.10.106'
-#ALDEC_PATH=Path('PUT', 'YOUR', 'OWN', 'ALDEC', 'PATH') 
+#ALDEC_PATH=Path('PUT', 'YOUR', 'OWN', 'ALDEC', 'PATH')
 
 spi0_en='0'
 uart0_en='0'
@@ -25,6 +25,56 @@ def is_tool(name):
     """Check whether `name` is on PATH and marked as executable."""
 
     return which(name) is not None
+
+def genMEM(args,cp,dp):
+
+    if(args.bin[0] == '/' or args.bin[1] == ':'):
+        fb=Path(args.bin)
+    else:
+        fb=Path(cp,args.bin)
+    #read from application bin
+    try:
+        with open(fb, "rb") as f:
+            while True:
+                binD = f.read(1)
+                if not binD:
+                    break
+                binDl.append(binD)
+    except IOError:
+        print('[EFX_ERR]: Application binary file '+str(fb)+' was not found!')
+        print('[EFX_ERR]: Aborting simulation...')
+        quit()
+
+    for i in binDl:
+        binDv = ord(i)
+        binDb = '{0:02x}'.format(binDv)
+        binDbl.append(binDb)
+
+    ft=len(binDbl) % 16
+    if(ft != 0):
+        for x in range(16-ft):
+            binDbl.append('00')
+
+    words=''
+    wordsl=[]
+    r=0
+    while (r < len(binDbl)):
+        for n in range(r, r+16):
+            words = binDbl[n]+words
+        wordsl.append(words)
+        words=''
+        r=r+16
+
+    #calculate address
+    adr=int(4096/16)
+    adrx=hex(adr).split('x')[-1]
+    wordsl.insert(0,'@'+str(adrx))
+
+    dt=Path(dp,'MEM.TXT')
+    fm=open(dt,'w')
+    for l in range(0,len(wordsl)):
+        fm.write(wordsl[l]+'\n')
+    fm.close()
 
 def binSplit (start, romHex, ramsize):
     rom_l = []
@@ -42,10 +92,10 @@ def binSplit (start, romHex, ramsize):
     f.close
 
 def genBin(args,cp,dp):
-    if(args.bin[0] == '/' or args.bin[1] == ':'):
-        fb=Path(args.bin)
+    if(args.imem[0] == '/' or args.imem[1] == ':'):
+        fb=Path(args.imem)
     else:
-        fb=Path(cp,args.bin)
+        fb=Path(cp,args.imem)
     #read from application bin
     try:
         with open(fb, "rb") as f:
@@ -75,7 +125,7 @@ def genBin(args,cp,dp):
     binSplit(1, bp1, ramSize)
     binSplit(2, bp2, ramSize)
     binSplit(3, bp3, ramSize)
-    
+
 def genMEM_IM(args,cp,dp):
 
     fb=Path(cp,args.bin)
@@ -114,7 +164,11 @@ def main():
     parser.add_argument('-b',
                         '--bin',
                         default=None,
-                        help='Application bin to convert')
+                        help='(Target Ext Mem)Location to Application bin(Relative Path)')
+    parser.add_argument('-i',
+                        '--imem',
+                        default=None,
+                        help='(Target Int Mem)Location to Application bin(Relative Path)')
     parser.add_argument('-f',
                         '--fullflow',
                         action='store_true',
@@ -161,6 +215,11 @@ def main():
         print('[EFX_ERR]: Eg. apb3Demo.bin')
         quit()
 
+    if(args.imem != None and args.imem[-4:] != ".bin"):
+        print('[EFX_ERR]: Application file must be in .bin format')
+        print('[EFX_ERR]: Eg. apb3Demo.bin')
+        quit()
+
     if(args.fullflow == True):
         print('[EFX_INFO]: This simulation run with SPI flash bootloader sequence')
         if(spi0_en == '0'):
@@ -174,8 +233,10 @@ def main():
         if(uart0_en == '0'):
             print('[EFX_ERR]: EfxSapphireSoc UART_0 is not enabled, the default \"hello world\" application requires UART_0')
             quit()
+    elif(args.imem):
+        print('[EFX_INFO]: This simulation run with custom application (target internal memory) provided by user')
     else:
-        print('[EFX_INFO]: This simulation run with custom application provided by user')
+        print('[EFX_INFO]: This simulation run with custom application (target external memory) provided by user')
 
     chosen_simtool=args.tool
     #check directory
@@ -210,21 +271,24 @@ def main():
     for d in glob.glob(r'*.do'):
         shutil.copy(d, dest_sim)
     
-    # Copy modelsim encrypted RTL
+    # Copy modelsim/aldec encrypted RTL
     shutil.copytree(chosen_simtool, Path(dest_sim, chosen_simtool))
 
     #check if any bin file parse in
-    if(args.bin == None):
+    if(args.bin == None and args.imem == None):
         pass
     else:
         print('[EFX_INFO]: Generating new memory initialization file(s) for custom application')
         if(args.fullflow == False):
-            genBin(args,cp,dest_sim)
+            if(args.bin != None):
+                genMEM(args,cp,dest_sim)
+            else:
+                genBin(args,cp,dest_sim)
         else:   
             genMEM_IM(args,cp,dest_sim)
 
     #skip original sequences if custom bin found
-    if(args.bin == None):
+    if(args.bin == None and args.imem == None):
         pass
     else:
         print('[EFX_INFO]: Modifying testbench to skip default driver and monitor sequence for \"hello world\" application')
@@ -239,10 +303,10 @@ def main():
 
         os.remove(tb_sim) # remove original
         os.rename(tmpf, tb_sim) # rename temp to original name
-        
+
     print('[EFX_INFO]: Starting simulator')
     #run simulation
-    os.chdir(dest_sim)    
+    os.chdir(dest_sim)
     if(chosen_simtool == 'aldec'):
         if(os.name == 'nt'):
             aldec_vsim=Path(ALDEC_PATH, 'bin', 'vsim.exe')
@@ -255,6 +319,7 @@ def main():
             os.system('vsim.exe -do tb_soc.do')
         else:
             os.system('vsim -do tb_soc.do')
+
 
 if __name__ == '__main__':
     main()

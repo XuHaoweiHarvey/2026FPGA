@@ -1,10 +1,12 @@
 # Architecture
 
+Phase 3 M1a 已加入 CPU→DDR 单笔桥和平台会话锁，项目负责人确认实板验收通过；旧 v5 基线与 M1a 的 bit/ELF 及构建证据必须区分，见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。
+
 本文描述当前源码架构。Phase 2旧FILL/v3已上板通过；当前v5的BLIT/色键系统仿真、软件构建和静态时序通过，已收到三轮全屏板级测速及色键画面，范围和待补项见 [V5_BOARD_BENCHMARK](V5_BOARD_BENCHMARK.md)。历史系统验证见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。开发故障见 [TROUBLESHOOTING](TROUBLESHOOTING.md)，阶段证据见 [VALIDATION](VALIDATION.md)，共享契约见 [INTERFACES](INTERFACES.md)。CPU软件对照仍在方案阶段，见 [CPU_RENDER_PLAN](CPU_RENDER_PLAN.md)。
 
 ## Overall Architecture
 
-根项目 [ti60f225_oob.xml](../ti60f225_oob.xml)，顶层 [ti60f225_oob_top.v](../rtl/ti60f225_oob_top.v)。当前为55个 design entries 和单独注册的 `soc_control` IP；不要重复加入生成 RTL。
+根项目 [ti60f225_oob.xml](../ti60f225_oob.xml)，顶层 [ti60f225_oob_top.v](../rtl/ti60f225_oob_top.v)。Phase 3 当前为56个 design entries 和单独注册的 `soc_control` IP；不要重复加入生成 RTL。v5 基线为55项。
 
 ```text
 u_control: sapphire_control
@@ -27,7 +29,7 @@ cvo_axi_inst.fifo_rd_period → d_buffers.frame_cdc: video_frame_cdc
   shared_read.arbiter: ddr_read_arbiter ← 显示/BLIT的AR/R → DDR Front
 ```
 
-graphics_engine选择FILL或BLIT，统一AW/W/B和执行状态；BLIT另有源读AR/R。读仲裁全局一笔outstanding，按burst固定owner并单独路由R。当前无通用命令队列，CPU无DDR端口，不逐像素写framebuffer。
+graphics_engine选择FILL或BLIT，统一AW/W/B和执行状态；BLIT另有源读AR/R。M1a 生成的 Sapphire 外部 AXI 经 `cpu_ddr_bridge` 在会话锁期间接入既有 DDR 写准入和显示优先读仲裁；CPU 只可写当前 Back 的有效像素区，释放会话前必须排空事务。当前无通用命令队列；M1a 烟测通过 CPU 逐像素写入小块区域，不代表 FPS 对比功能。
 
 Camera/CSI/Sensor 配置 RTL 不在活动2D链路，Bayer/Debayer不参与当前像素处理。Interface Designer 保留原 Camera D-PHY、DSI、相关 PLL、端口和 pin assignment；不能根据模块名称删除仍供 core/video 使用的时钟。
 

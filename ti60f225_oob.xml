@@ -47,6 +47,7 @@
         <efx:design_file name="rtl/user_cvo_axi_v2/cvo_axi_v2.v" version="default" library="default"/>
         <efx:design_file name="rtl/test_pattern/rgb_tpg.v" version="default" library="default"/>
         <efx:design_file name="rtl/framebuffer/rgb_framebuffer.v" version="default" library="default"/>
+        <efx:design_file name="rtl/framebuffer/cpu_ddr_bridge.v" version="default" library="default"/>
         <efx:design_file name="rtl/framebuffer/rgb_unpack128_to64.v" version="default" library="default"/>
         <efx:design_file name="rtl/display/rgb_to_hdmi.v" version="default" library="default"/>
         <efx:design_file name="rtl/control/accel_regs.v" version="default" library="default"/>

@@ -13,7 +13,8 @@ for name in files:
     assert not name.startswith(("demo/", "rtl/cam_i2c_ctrl/", "rtl/mipi_config/"))
     assert name not in {"debug_top.v", "rtl/csi_rx_controller.sv"}
 for name in ["rtl/test_pattern/rgb_tpg.v", "rtl/framebuffer/rgb_framebuffer.v",
-             "rtl/framebuffer/rgb_unpack128_to64.v", "rtl/display/rgb_to_hdmi.v"]:
+             "rtl/framebuffer/cpu_ddr_bridge.v", "rtl/framebuffer/rgb_unpack128_to64.v",
+             "rtl/display/rgb_to_hdmi.v"]:
     assert name in files, f"Missing RGB source: {name}"
 assert not any(name.startswith("rtl/debayer/") for name in files)
 assert "rtl/test_pattern/bayer_tpg.v" not in files
@@ -56,6 +57,16 @@ for name in ('rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v'
 assert '.BLIT_ENABLE(1)' in formal and 'ddr_read_arbiter #' in rgb_fb
 control = (ROOT / 'rtl/control/sapphire_control.v').read_text(encoding='utf8')
 assert '.BLIT_ENABLE(1)' in control
+generated_soc = (ROOT / 'ip/soc_control/soc_control.v').read_text(encoding='utf8')
+soc_start = generated_soc.index('module soc_control')
+soc_header = generated_soc[soc_start:generated_soc.index(');',soc_start)]
+soc_inputs = set(re.findall(r'\binput\s+(?:\[[^]]+\]\s+)?(\w+)',soc_header))
+connection_start = control.index('soc_control u_soc_control')
+soc_connections = set(re.findall(r'\.(\w+)\s*\(',
+    control[connection_start:control.index(');',connection_start)]))
+assert not (soc_inputs-soc_connections), f'Unconnected generated SoC inputs: {sorted(soc_inputs-soc_connections)}'
+assert 'io_memoryClk' in soc_inputs and 'io_ddrA_r_payload_data' in soc_inputs
+assert 'io_ddrMasters_0_clk' in soc_inputs
 assert 'localparam COLOR_KEY_ENABLE = 1;' in formal
 assert formal.count('.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)') == 2
 assert '.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)' in control and '.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)' in rgb_fb

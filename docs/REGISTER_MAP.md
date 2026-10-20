@@ -70,6 +70,11 @@
 | BC | COMMAND_OP | RW | 0 / C | 0 FILL，1 BLIT，2色键复制；其他值接受计数后报0x26；关闭色键的v4配置也拒绝2；START时快照 |
 | C0 | SRC_ADDR | RW | 0 / C | BLIT源绝对字节地址，16byte对齐，整个矩形位于当前Front有效图像 |
 | C4 | SRC_STRIDE | RW | 0 / C | BLIT源行距bytes，首轮固定7680；START时快照 |
+| CC | CPU_DDR_CONTROL | WO | 0 / C | Phase 3：bit0请求CPU会话，bit1请求释放，bit2清CPU DDR错误；会话与现有图形命令互斥 |
+| D0 | CPU_DDR_STATUS | RO | 0x10 / P | Phase 3：bit0会话有效，bit1桥非空，bit2会话错误，bit4支持CPU DDR；释放前须等待bit1=0 |
+| D4 | CPU_DDR_ERROR | RO | 0 / P | Phase 3桥首个错误码：1权限/协议，3 DDR响应ID，4 DDR响应错误，5 RLAST，6 CPU复位中止 |
+
+Phase 3 CPU 外部DDR窗口从 `0x00001000` 起。桥将地址减 `0x1000` 并对齐到128-bit字；仅锁定的Back有效像素区可写，Front/Back有效像素区可读。M1a 程序与栈仍在64 KB OCRAM。CPU会话期间禁止图形命令和Swap；Display Reader持续工作，写准入节流仍生效。项目负责人已确认 M1a 实板验收通过；当前产物哈希、证据限制和目标检出复验步骤见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。
 
 BUFFER_STATUS复位时Front0、Back1、active/owned/valid/pending/done=0；bit7按`!active && reader_idle && !ARVALID && !RVALID && outstanding==0 && reader_error==0`实时组合。Reader/DDR空闲且复位已稳定时可读0x82，不能把bit7当manager存储复位常量。
 

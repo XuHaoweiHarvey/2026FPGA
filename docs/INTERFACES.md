@@ -1,5 +1,7 @@
 # Interfaces — 冻结接口合同
 
+Phase 3 M1a 新增 Sapphire 外部 AXI 8-bit ID、CPU DDR 桥和 `0xCC/0xD0/0xD4` 会话寄存器；下游 DDR 仍是原 128-bit/ID4/ID0 总线。Front 写保护、地址偏移、复位排空及状态定义见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。原表记录的 v5 契约继续适用于既有 FILL/BLIT/显示路径；项目负责人已确认 M1a 实板验收通过，合并后目标目录仍须重建复验。
+
 Phase 2旧FILL/v3已实板验收通过。当前源码在BLIT合同上扩展为v5色键复制；2026-10-19已修复BLIT检查长路径并通过当前约束下Efinity静态时序，接口告警与实板仍待核对，见[V5_TIMING_FIX](V5_TIMING_FIX.md)。此文是Person A/B/C协作合同；寄存器唯一详细定义见[REGISTER_MAP](REGISTER_MAP.md)，色键接线见[COLOR_KEY](COLOR_KEY.md)。
 
 ## Frozen Contract

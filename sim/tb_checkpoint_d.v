@@ -2,7 +2,7 @@
 // One-shot TPG, real legacy engines and shared mock DDR, APB registers,
 // accelerator, CVO and serializer. No CPU or encrypted-controller simulation.
 module tb_checkpoint_d;
-parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0, COLOR_KEY=0;
+parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0, COLOR_KEY=0, CPU_DDR=0;
 localparam INIT_ONLY=0;
 localparam BEATS=WIDTH*HEIGHT/4;
 reg axi_clk=0, i_clk=0, o_clk=0, rst_n=0;
@@ -25,7 +25,20 @@ integer image_tag[0:1];
 wire [31:0] init_error,engine_error,commands,beats,aws,lasts,bs,reserved;
 wire [31:0] cx,cy,cw,ch,cc;
 wire [31:0] cop,csrc,cstride;
-accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.COLOR_KEY_ENABLE(COLOR_KEY),.WAIT_CYCLES(APB_WAITS),
+wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error,cpu_session_active;
+wire [31:0] cpu_session_status;
+reg cpu_ddr_busy=0;
+reg [31:0] cpu_fault=0;
+reg [31:0] cpu_awaddr=0,cpu_araddr=0;
+reg cpu_awvalid=0,cpu_wvalid=0,cpu_bready=0,cpu_arvalid=0,cpu_rready=0;
+wire cpu_awready,cpu_wready,cpu_bvalid,cpu_arready,cpu_rvalid,cpu_rlast;
+wire [3:0] cpu_bid,cpu_rid;
+wire [1:0] cpu_bresp,cpu_rresp;
+wire [127:0] cpu_rdata;
+reg [127:0] cpu_wdata=0;
+reg [15:0] cpu_wstrb=0;
+accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.COLOR_KEY_ENABLE(COLOR_KEY),
+ .CPU_DDR_ENABLE(CPU_DDR),.WAIT_CYCLES(APB_WAITS),
  .FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.FRAME_STRIDE(WIDTH*4)) regs (
  .PCLK(axi_clk),.PRESETn(apb_reset),.PADDR(paddr),.PWDATA(pwdata),.PSEL(psel),.PENABLE(penable),.PWRITE(pwrite),
  .PRDATA(prdata),.PREADY(pready),.PSLVERROR(pslverror),.display_buffer_base(front_base),.tpg_write_buffer_base(back_base),
@@ -49,7 +62,9 @@ accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.COLOR_K
  .swap_count(swap_count),.missed_boundary_count(missed_boundary_count),
  .command_count(commands),.init_data_beats(beats),.init_aw_bursts(aws),.init_wlast_bursts(lasts),.init_b_responses(bs),
  .init_aw_beats(reserved),.cmd_x(cx),.cmd_y(cy),.cmd_width(cw),.cmd_height(ch),.cmd_color(cc),
- .cmd_op(cop),.cmd_src_addr(csrc),.cmd_src_stride(cstride),.start_pulse(start));
+ .cmd_op(cop),.cmd_src_addr(csrc),.cmd_src_stride(cstride),.start_pulse(start),
+ .cpu_ddr_status(cpu_session_status),.cpu_ddr_busy(cpu_ddr_busy),.cpu_ddr_error(cpu_fault),
+ .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),.cpu_ddr_clear_error(cpu_ddr_clear_error));
 wire [127:0] vin;
 wire [31:0] tpg_frames;
 rgb_tpg #(.H_ACTIVE(WIDTH),.V_ACTIVE(HEIGHT),.H_BLANK_CYCLES(INIT_ONLY?320:95),.V_BLANK_LINES(INIT_ONLY?170:10),.ONE_FRAME(1)) tpg (
@@ -78,7 +93,9 @@ wire [63:0] axis_data;
 wire axis_valid,axis_last,axis_user,full;
 wire axis_ready;
 wire [1:0] wr_bank,rd_bank;
-rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),.RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS),.COLOR_KEY_ENABLE(COLOR_KEY)) dut (
+rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),
+ .RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS),
+ .COLOR_KEY_ENABLE(COLOR_KEY),.CPU_DDR_ENABLE(CPU_DDR)) dut (
     .axi_clk(axi_clk),.rst_n(rst_n),.i_clk(i_clk),.i_frame_start(frame_start),
     .i_de(source_de),.vin(vin),.o_clk(o_clk),.fifo_rd_period(period),
     .display_underflow(underflow),
@@ -113,7 +130,18 @@ rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_
  .reader_reserved_beats(reader_reserved_beats),.reader_error(reader_error),.boundary_count(boundary_count),
  .swap_count(swap_count),.missed_boundary_count(missed_boundary_count),
     .diag_wr_base(back_base),.diag_rd_base(front_base),
-    .diag_wr_fifo_full(full),.diag_wr_bank(wr_bank),.diag_rd_bank(rd_bank));
+    .diag_wr_fifo_full(full),.diag_wr_bank(wr_bank),.diag_rd_bank(rd_bank),
+    .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
+    .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),
+    .cpu_ddr_error(cpu_fault),
+    .cpu_ddr_session_active(cpu_session_active),.cpu_ddr_session_status(cpu_session_status),
+    .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
+    .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(1'b1),
+    .cpu_wvalid(cpu_wvalid),.cpu_wready(cpu_wready),
+    .cpu_bid(cpu_bid),.cpu_bresp(cpu_bresp),.cpu_bvalid(cpu_bvalid),.cpu_bready(cpu_bready),
+    .cpu_araddr(cpu_araddr),.cpu_arvalid(cpu_arvalid),.cpu_arready(cpu_arready),
+    .cpu_rdata(cpu_rdata),.cpu_rid(cpu_rid),.cpu_rresp(cpu_rresp),
+    .cpu_rlast(cpu_rlast),.cpu_rvalid(cpu_rvalid),.cpu_rready(cpu_rready));
 reg [127:0] memory [0:2*BEATS-1];
 // Independent coordinate references. They do not inspect DMA state or masks.
 function [31:0] robot_pixel;
@@ -197,7 +225,9 @@ always @(posedge axi_clk) begin
             if(arsize!=4 || arburst!=1 || araddr[3:0]!=0 ||
                 araddr[11:0]+(arlen+1)*16>4096 || !in_frame(araddr,arlen))
                 $fatal(1,"Bad AR burst");
-            if((araddr>=32'h00800000)!=buffer_status[0] || reader_frame_base!=front_base)
+            if(cpu_session_active && cpu_arvalid && cpu_arready) begin
+                if(araddr!==cpu_araddr) $fatal(1,"CPU read routed to wrong address");
+            end else if((araddr>=32'h00800000)!=buffer_status[0] || reader_frame_base!=front_base)
                 $fatal(1,"Reader accessed Back");
             read_active<=1; r_index<=mem_index(araddr); r_left<=arlen+1;
             ar_count<=ar_count+1;
@@ -261,6 +291,7 @@ always @(posedge pixel_clk) begin
             color=y<32 ? (x<80?24'hff0000:24'h00ff00) : (x<80?24'h0000ff:24'hffffff);
        end
     5,6: color=key_scene_pixel(frame_tag,x,y);
+    8: begin color=0;if(y==8 && x>=256 && x<260) color=24'h00e060;end
     default: $fatal(1,"Displayed unbuilt Back");
    endcase
    if(checking && (frame_index!=buffer_status[0] || {red,green,blue}!==color))
@@ -361,6 +392,11 @@ initial begin
   if(!buffer_status[3]) $fatal(1,"SWAP_DONE not sticky");
   access('h60,1,2,0);repeat(3) @(negedge axi_clk);if(buffer_status[3])$fatal(1,"CLEAR_DONE failed");
  end
+ if(CPU_DDR) begin
+  cpu_ddr_round;
+  $display("PASS CPU DDR session integration: command/swap exclusion, shared write admission, read arbiter, B/R drain, pixel scanout");
+  $finish;
+ end
  if(GRAPHICS) graphics_round;
  if(COLOR_KEY) color_key_round;
  // Hold the last R of a frame across two boundaries. Last AR is NOT completion.
@@ -382,6 +418,45 @@ initial begin
  $display("PASS D pipeline: %0d swaps, %0d full frames/%0d pixels; Back-only AW, Front-only AR, busy/pending, APB reset, delayed last R recovery",swap_count,frames,checked_pixels);
  $finish;
 end
+task cpu_ddr_round;
+integer saved_swap,saved_underflow,saved_missed,saved_frames;
+reg [31:0] target;
+begin
+ back_slot=buffer_status[1];saved_swap=swap_count;
+ start_rect(0,0,WIDTH,HEIGHT,0);wait_fill;
+ target=back_base+(8*WIDTH+256)*4;
+ saved_underflow=display_underflow_count;saved_missed=missed_boundary_count;
+ access('hCC,1,1,0);wait(cpu_session_active);@(negedge axi_clk);
+ if(draw_ready || !cpu_session_status[0]) $fatal(1,"CPU session not exclusive");
+ access('h60,1,1,1);access(8,1,1,1); // No swap or accelerator START while owned.
+ access(8,1,2,0); // Clear only the expected APB error.
+ @(negedge axi_clk);apb_reset=0;repeat(10)@(negedge axi_clk);apb_reset=1;
+ if(!cpu_session_active || swap_count!=saved_swap) $fatal(1,"CPU reset released platform DDR owner");
+ cpu_ddr_busy=1;
+ @(negedge axi_clk);cpu_awaddr=target;cpu_awvalid=1;
+ wait(cpu_awready);@(posedge axi_clk);@(negedge axi_clk);cpu_awvalid=0;
+ cpu_wdata={4{32'h0000e060}};cpu_wstrb=16'hffff;cpu_wvalid=1;
+ wait(cpu_wready);@(posedge axi_clk);@(negedge axi_clk);cpu_wvalid=0;
+ wait(cpu_bvalid);if(cpu_bresp!=0 || cpu_bid!=0) $fatal(1,"CPU B response");
+ cpu_bready=1;@(posedge axi_clk);@(negedge axi_clk);cpu_bready=0;
+ cpu_araddr=target;cpu_arvalid=1;
+ wait(cpu_arready);@(posedge axi_clk);@(negedge axi_clk);cpu_arvalid=0;
+ wait(cpu_rvalid);if(cpu_rresp!=0 || cpu_rid!=0 || !cpu_rlast ||
+                      cpu_rdata!={4{32'h0000e060}}) $fatal(1,"CPU R response");
+ cpu_rready=1;@(posedge axi_clk);@(negedge axi_clk);cpu_rready=0;
+ cpu_ddr_busy=0;
+ if(memory[mem_index(target)]!=={4{32'h0000e060}}) $fatal(1,"CPU data not in Back");
+ if(swap_count!=saved_swap || buffer_status[2]) $fatal(1,"Swap occurred during CPU session");
+ access('hCC,1,2,0);wait(!cpu_session_active);@(negedge axi_clk);
+ cpu_fault=3;
+ access('h60,1,1,1); // A failed CPU DDR transaction may not publish Back.
+ access(8,1,2,0);cpu_fault=0;
+ access('hCC,1,4,0);
+ image_tag[back_slot]=8;request_swap;wait_swap(saved_swap);
+ saved_frames=frames;wait(frames>=saved_frames+2);
+ if(display_underflow_count!=saved_underflow || missed_boundary_count!=saved_missed)
+  $fatal(1,"Display disturbed by CPU DDR access");
+end endtask
 integer display_during_blit=0,blit_during_display=0,contention=0;
 integer key_zero_beats=0,key_partial_beats=0;
 reg copy_in_progress=0;

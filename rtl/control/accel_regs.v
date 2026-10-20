@@ -10,7 +10,8 @@ module accel_regs #(
     parameter [31:0] FRAME_WIDTH = 1920,
     parameter [31:0] FRAME_HEIGHT = 1080,
     parameter [31:0] FRAME_STRIDE = 7680,
-    parameter COLOR_KEY_ENABLE = 0
+    parameter COLOR_KEY_ENABLE = 0,
+    parameter CPU_DDR_ENABLE = 0
 )(
     input wire PCLK,
     input wire PRESETn,
@@ -38,7 +39,11 @@ module accel_regs #(
     input wire [31:0] reader_fifo_level,writer_max_cycles,service_read_quota,
     input wire [31:0] service_watermarks,
     output reg swap_request,clear_swap_done,
-    output reg start_pulse
+    output reg start_pulse,
+    input wire [31:0] cpu_ddr_status,
+    input wire cpu_ddr_busy,
+    input wire [31:0] cpu_ddr_error,
+    output reg cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error
 );
 localparam [31:0] ID = 32'h4143434C; // "ACCL"
 localparam [31:0] VERSION = 32'h00010000;
@@ -111,6 +116,9 @@ always @(*) begin
         32'hBC: begin PRDATA=command_op;writable=1;if(!BLIT_ENABLE) mapped=0;end
         32'hC0: begin PRDATA=source_addr;writable=1;if(!BLIT_ENABLE) mapped=0;end
         32'hC4: begin PRDATA=source_stride;writable=1;if(!BLIT_ENABLE) mapped=0;end
+        32'hCC: begin PRDATA=0;writable=1;if(!CPU_DDR_ENABLE) mapped=0;end
+        32'hD0: begin PRDATA=cpu_ddr_status | {30'b0,cpu_ddr_busy,1'b0};if(!CPU_DDR_ENABLE) mapped=0;end
+        32'hD4: begin PRDATA=cpu_ddr_error;if(!CPU_DDR_ENABLE) mapped=0;end
         default: mapped = 0;
     endcase
     if (|PADDR[1:0]) transaction_error = 1;
@@ -122,6 +130,15 @@ always @(*) begin
     else if(DOUBLE_BUFFER && PWRITE && PADDR=='h60 && PWDATA[0] && !buffer_status[4]) transaction_error=4;
     else if(DOUBLE_BUFFER && PWRITE && PADDR=='h60 && PWDATA[0] && (buffer_status[2] || swap_request)) transaction_error=6;
     else if(BLIT_ENABLE && PWRITE && PADDR=='h60 && PWDATA[0] && reader_error!=0) transaction_error=6;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR==8 && PWDATA[0] &&
+            (cpu_ddr_status[0] || cpu_ddr_acquire)) transaction_error=6;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR=='h60 && PWDATA[0] &&
+            (cpu_ddr_status[0] || cpu_ddr_acquire)) transaction_error=6;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR=='h60 && PWDATA[0] &&
+            (cpu_ddr_error!=0 || cpu_ddr_status[2])) transaction_error=6;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR=='hCC && PWDATA[0] &&
+            (!draw_ready || cpu_ddr_status[0] || cpu_ddr_acquire)) transaction_error=6;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR=='hCC && PWDATA[1:0]==2'b11) transaction_error=3;
     else transaction_error = 0;
     if (transaction_error != 0) PRDATA = 0;
 end
@@ -140,12 +157,14 @@ always @(posedge PCLK or negedge PRESETn) begin
         scratch <= 0;
         start_seen <= 0;
         start_pulse <= 0;swap_request<=0;clear_swap_done<=0;
+        cpu_ddr_acquire<=0;cpu_ddr_release<=0;cpu_ddr_clear_error<=0;
         error_code <= 0;
         cmd_x<=0;cmd_y<=0;cmd_width<=0;cmd_height<=0;cmd_color<=0;
         command_op<=0;source_addr<=0;source_stride<=0;
         cmd_op<=0;cmd_src_addr<=0;cmd_src_stride<=0;
     end else begin
         start_pulse <= 0;swap_request<=0;clear_swap_done<=0;
+        cpu_ddr_acquire<=0;cpu_ddr_release<=0;cpu_ddr_clear_error<=0;
         // Setup loads the wait count; each access wait consumes one cycle.
         // Side effects occur only on the final access edge, never in setup.
         if (PSEL && !PENABLE) wait_remaining <= WAIT_CYCLES;
@@ -176,6 +195,11 @@ always @(posedge PCLK or negedge PRESETn) begin
                     32'hBC: command_op <= PWDATA;
                     32'hC0: source_addr <= PWDATA;
                     32'hC4: source_stride <= PWDATA;
+                    32'hCC: begin
+                        cpu_ddr_acquire<=PWDATA[0];
+                        cpu_ddr_release<=PWDATA[1];
+                        cpu_ddr_clear_error<=PWDATA[2];
+                    end
                     default: begin end
                 endcase
             end
