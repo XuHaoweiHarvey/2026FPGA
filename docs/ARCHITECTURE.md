@@ -1,6 +1,6 @@
 # Architecture
 
-本文描述当前源码架构。Phase 2旧FILL/v3已上板通过；新增v4 BLIT尚待综合时序及实板验收，当前系统验证见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。开发故障见 [TROUBLESHOOTING](TROUBLESHOOTING.md)，阶段证据见 [VALIDATION](VALIDATION.md)，共享契约见 [INTERFACES](INTERFACES.md)。
+本文描述当前源码架构。Phase 2旧FILL/v3已上板通过；当前v5的BLIT/色键系统仿真、软件构建和静态时序通过，已收到三轮全屏板级测速及色键画面，范围和待补项见 [V5_BOARD_BENCHMARK](V5_BOARD_BENCHMARK.md)。历史系统验证见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。开发故障见 [TROUBLESHOOTING](TROUBLESHOOTING.md)，阶段证据见 [VALIDATION](VALIDATION.md)，共享契约见 [INTERFACES](INTERFACES.md)。CPU软件对照仍在方案阶段，见 [CPU_RENDER_PLAN](CPU_RENDER_PLAN.md)。
 
 ## Overall Architecture
 

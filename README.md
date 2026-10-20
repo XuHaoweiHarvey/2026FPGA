@@ -14,11 +14,11 @@ RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安�
 | D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
 | E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
 
-正式源码现已接入 **FILL_RECT + Front→Back BLIT + Color Keying**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。当前v5新增色键软件API和左右对比演示，已通过共享DDR系统仿真及软件构建，CPU指令仿真受依赖权限限制未执行。2026-10-19修复BLIT参数检查长路径后，Efinity2026.1.132完整编译及当前约束下静态时序通过，core_clk裕量+1.449ns；接口/工具告警和实板验收仍待核对，见 [V5_TIMING_FIX](docs/V5_TIMING_FIX.md)。上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，接线和边界见 [COLOR_KEY](docs/COLOR_KEY.md)。
+正式源码现已接入 **FILL_RECT + Front→Back BLIT + Color Keying**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。当前v5新增色键软件API和左右对比演示，已通过共享DDR系统仿真及软件构建，CPU指令仿真受依赖权限限制未执行。2026-10-19修复BLIT参数检查长路径后，Efinity2026.1.132完整编译及当前约束下静态时序通过，core_clk裕量+1.449ns，见 [V5_TIMING_FIX](docs/V5_TIMING_FIX.md)。已收到模式3画面及模式4实板结果，证据和未覆盖范围见 [V5_BOARD_BENCHMARK](docs/V5_BOARD_BENCHMARK.md)；接口/工具告警核对及长期验收仍待完成。上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，接线和边界见 [COLOR_KEY](docs/COLOR_KEY.md)。
 
 [显示/BLIT DDR读仲裁器](docs/DDR_READ_ARBITER.md) 已加入正式framebuffer及工程清单，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。当前v5寄存器为VERSION=0x00050000、CAPABILITIES=0xFB；硬件与软件需配套重新构建，旧v3/v4 ELF与当前软件的精确版本检查不兼容。
 
-新增软件 `DEMO_MODE=4` 固定工作量测速：四种尺寸×FILL/BLIT/色键共12组，默认每组预热1次、计时8次，分别记录API绘制耗时和swap耗时。本机软件行为检查及BSP构建通过，板级性能数值待测；使用当前v5 bit即可，操作和结果说明见 [BENCHMARK](docs/BENCHMARK.md)。
+软件 `DEMO_MODE=4` 固定工作量测速：四种尺寸×FILL/BLIT/色键共12组，默认每组预热1次、计时8次，分别记录API绘制耗时和swap耗时。本机软件行为检查及BSP构建通过。已归档三轮全屏实测：FILL平均约62.64ms，普通/色键BLIT约65.65ms，九个全屏case显示错误增量均为0；第一轮总流程pass=1。bit/ELF来源、后两轮总结果及其他尺寸性能值待补，见 [实板记录](docs/V5_BOARD_BENCHMARK.md)。操作见 [BENCHMARK](docs/BENCHMARK.md)，CPU软件对照接入方案见 [CPU_RENDER_PLAN](docs/CPU_RENDER_PLAN.md)。
 
 ## 框架
 
@@ -64,7 +64,7 @@ CPU 不逐像素绘图，也没有直接连接 DDR framebuffer 的外部 AXI 端
 | Ownership | Display Reader 只读 Front；Accelerator 每命令锁存 Back 地址 |
 | Swap | 软件显式请求，安全 VS/frame boundary、旧 R 完成与 FIFO 清空确认后交换 |
 | DONE | 最后一个成功 AXI B response 后完成；软件还检查 BUSY=0、writer ownership 释放 |
-| 当前源码命令 / 通知 | FILL_RECT、BLIT、Color Keying；polling，无 Accelerator interrupt；复制功能待板级验证 |
+| 当前源码命令 / 通知 | FILL_RECT、BLIT、Color Keying；polling，无 Accelerator interrupt；已有全屏实板结果，其他边界与长期验收见实板记录 |
 | 连续性保护 | 真实 R handshake quota + Display FIFO 低/高水位控制新写 burst 准入 |
 | Camera / Bayer / Debayer | 不在正式 2D 数据路径；部分旧文件和 physical blocks 保留作参考/兼容 |
 
@@ -94,8 +94,8 @@ Bayer 适合摄像头原始采样，2D 图元需要明确的 R/G/B 颜色。Pack
 | 命令 | 参数 | 状态 / 语义 |
 |---|---|---|
 | **FILL_RECT：已实现、已上板** | `x, y, width, height, color` | START 接收时快照参数；BUSY 执行；成功 DONE 以最后 B 完成为准 |
-| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统；v4 CPU行为检查通过，当前v5共享RTL/软件构建及静态时序通过；DEMO_MODE=2，接口告警与实板待验收，见[V5_TIMING_FIX](docs/V5_TIMING_FIX.md) |
-| Color Keying | BLIT参数加`key_rgb`，复用RECT_COLOR低24位 | v5已接APB/Framebuffer/API，`DEMO_MODE=3`左右对比；系统RTL/软件构建及静态时序通过，CPU指令检查及实板待验收，见[COLOR_KEY](docs/COLOR_KEY.md) |
+| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统；v4 CPU行为检查及当前v5共享RTL/软件构建/静态时序通过；已有模式4全屏实测，接口告警与长期验收待完成，见[实板记录](docs/V5_BOARD_BENCHMARK.md) |
+| Color Keying | BLIT参数加`key_rgb`，复用RECT_COLOR低24位 | v5已接APB/Framebuffer/API；模式3对比照片、模式4最终画面和全屏实测符合预期；其他边界验收及CPU指令检查待完成，见[COLOR_KEY](docs/COLOR_KEY.md)和[实板记录](docs/V5_BOARD_BENCHMARK.md) |
 | Line | Planned / Not implemented | 可选图元扩展 |
 | Alpha Blend | Planned / Not implemented | 后续混合管线 |
 
@@ -120,6 +120,8 @@ docs_reference/  开发板资料和赛题指南，只读
 正式 Efinity 工程位于根目录 `ti60f225_oob.xml`，顶层 `ti60f225_oob_top`。
 
 ## 分工
+
+团队现按完整任务推进，任何成员都可跨目录完成一个功能。下面保留原A/B/C划分用于理解模块边界；开工时同步任务与涉及文件，避免同时修改同一模块。共享接口仍需配套更新与验证。
 
 ### Person A — RISC-V / Control / Software
 
