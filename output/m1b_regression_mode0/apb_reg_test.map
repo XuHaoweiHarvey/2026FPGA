@@ -1,0 +1,384 @@
+Archive member included to satisfy reference by file (symbol)
+
+D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                              D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o (__udivdi3)
+D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+                              D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o (__umoddi3)
+D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+                              D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o) (__clz_tab)
+
+Discarded input sections
+
+ .text          0x00000000        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .data          0x00000000        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .bss           0x00000000        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .group         0x00000000        0xc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .group         0x00000000        0xc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .group         0x00000000        0xc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .group         0x00000000        0xc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .group         0x00000000        0xc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .group         0x00000000        0xc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .group         0x00000000        0xc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text          0x00000000        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .data          0x00000000        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .bss           0x00000000        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .data          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .bss           0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .eh_frame      0x00000000       0x28 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .text          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .data          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .bss           0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .eh_frame      0x00000000       0x28 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .text          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+ .data          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+ .bss           0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+ram              0xf9000000         0x00010000         axwl!r
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+LOAD D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+LOAD D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a
+                0x00002000                        __stack_size = DEFINED (__stack_size)?__stack_size:0x2000
+
+.init           0xf9000000       0x6c
+ *(SORT_NONE(.init))
+ .init          0xf9000000       0x6c D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+                0xf9000000                _start
+                0xf9000068                _init
+
+.text           0xf900006c     0x300c
+ *(.text.Proc_1)
+ *(.text.Proc_2)
+ *(.text.Proc_3)
+ *(.text.Proc_4)
+ *(.text.Proc_5)
+ *(.text.Proc_6)
+ *(.text.Proc_7)
+ *(.text.Proc_8)
+ *(.text.Func_1)
+ *(.text.Func_2)
+ *(.text.Func_3)
+ *(.text.strcpy)
+ *libc.a:*(.text .text.*)
+ *(.text.main)
+ .text.main     0xf900006c      0x9e4 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf900006c                main
+ *(.text.unlikely .text.unlikely.*)
+ *(.text.startup .text.startup.*)
+ *(.text .text.*)
+ .text.accel_read
+                0xf9000a50       0x18 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.diagnostics_read
+                0xf9000a68      0x28c D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.accel_init
+                0xf9000cf4      0x188 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.accel_wait_done
+                0xf9000e7c       0x88 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.accel_submit
+                0xf9000f04      0x15c D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.frame_swap_request
+                0xf9001060       0x88 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.frame_wait_swap_done
+                0xf90010e8       0x78 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.display_swap_request
+                0xf9001160       0x18 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.display_wait_swap_done
+                0xf9001178       0x18 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.display_wait_frames
+                0xf9001190       0x68 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_clock_read
+                0xf90011f8       0x68 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_health
+                0xf9001260      0x110 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_issue
+                0xf9001370       0x80 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_swap
+                0xf90013f0       0x64 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_case_run
+                0xf9001454      0x8f4 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_run
+                0xf9001d48      0x454 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_read32
+                0xf900219c        0x8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.benchmark_ticks
+                0xf90021a4       0x28 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.snapshot
+                0xf90021cc       0x6c D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.apb_test_done
+                0xf9002238        0x8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf9002238                apb_test_done
+ .text.require  0xf9002240      0x1b0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.equal    0xf90023f0       0x28 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.check_health
+                0xf9002418       0x88 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.keyed_blit_from_front
+                0xf90024a0       0xb8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.blit_from_front
+                0xf9002558       0xa8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.fill     0xf9002600       0x6c D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.request_swap
+                0xf900266c       0x8c D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.hold_scene
+                0xf90026f8       0x48 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .text.scene_begin
+                0xf9002740        0x8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf9002740                scene_begin
+ .text.back_ready
+                0xf9002748        0x8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf9002748                back_ready
+ .text.frame_presented
+                0xf9002750        0x8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf9002750                frame_presented
+ .text.__udivdi3
+                0xf9002758      0x4b0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                0xf9002758                __udivdi3
+ .text.__umoddi3
+                0xf9002c08      0x470 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+                0xf9002c08                __umoddi3
+ *(.gnu.linkonce.t.*)
+ *(.note.gnu.build-id)
+
+.rela.dyn       0xf9003078        0x0
+ .rela.init     0xf9003078        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+
+.fini
+ *(SORT_NONE(.fini))
+                [!provide]                        PROVIDE (__etext = .)
+                [!provide]                        PROVIDE (_etext = .)
+                [!provide]                        PROVIDE (etext = .)
+                0xf9003078                        . = ALIGN (0x4)
+
+.preinit_array  0xf9003078        0x0
+                [!provide]                        PROVIDE (__preinit_array_start = .)
+ *(.preinit_array)
+                [!provide]                        PROVIDE (__preinit_array_end = .)
+
+.init_array     0xf9003078        0x0
+                [!provide]                        PROVIDE (__init_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*))
+ *(.init_array EXCLUDE_FILE(*crtend?.o *crtend.o *crtbegin?.o *crtbegin.o) .ctors)
+                [!provide]                        PROVIDE (__init_array_end = .)
+
+.fini_array     0xf9003078        0x0
+                [!provide]                        PROVIDE (__fini_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*))
+ *(.fini_array EXCLUDE_FILE(*crtend?.o *crtend.o *crtbegin?.o *crtbegin.o) .dtors)
+                [!provide]                        PROVIDE (__fini_array_end = .)
+
+.ctors
+ *crtbegin.o(.ctors)
+ *crtbegin?.o(.ctors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
+ *(SORT_BY_NAME(.ctors.*))
+ *(.ctors)
+
+.dtors
+ *crtbegin.o(.dtors)
+ *crtbegin?.o(.dtors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
+ *(SORT_BY_NAME(.dtors.*))
+ *(.dtors)
+
+.lalign         0xf9003078        0x0
+                0xf9003078                        PROVIDE (_data_lma = .)
+
+.dalign         0xf9003078        0x0
+                0xf9003078                        PROVIDE (_data = .)
+
+.data           0xf9003078      0x162
+ *(.rdata)
+ *(.rodata .rodata.*)
+ .rodata.heights.0
+                0xf9003078       0x10 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .rodata.widths.1
+                0xf9003088       0x10 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .rodata.benchmark_io
+                0xf9003098       0x18 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .rodata.__clz_tab
+                0xf90030b0      0x100 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+                0xf90030b0                __clz_tab
+ *(.gnu.linkonce.r.*)
+ *(.data .data.*)
+ .data.g_test_rectangle
+                0xf90031b0       0x14 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf90031b0                g_test_rectangle
+ *(.gnu.linkonce.d.*)
+                0xf90031c8                        . = ALIGN (0x8)
+ *fill*         0xf90031c4        0x4 
+                0xf90039b8                        PROVIDE (__global_pointer$ = (. + 0x7f0))
+ *(.sdata .sdata.*)
+ .sdata.g_validation_target
+                0xf90031c8        0x4 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf90031c8                g_validation_target
+ .sdata.g_hold_frames
+                0xf90031cc        0x4 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf90031cc                g_hold_frames
+ *(.gnu.linkonce.s.*)
+                0xf90031d0                        . = ALIGN (0x8)
+ *(.srodata.cst16)
+ *(.srodata.cst8)
+ *(.srodata.cst4)
+ *(.srodata.cst2)
+ *(.srodata .srodata.*)
+                0xf90031da                        . = (. + 0xa)
+ *fill*         0xf90031d0        0xa 
+                0xf90031dc                        . = ALIGN (0x4)
+                0xf90031dc                        PROVIDE (_edata = .)
+                [!provide]                        PROVIDE (edata = .)
+                [!provide]                        PROVIDE (_fbss = .)
+                0xf90031dc                        PROVIDE (__bss_start = .)
+
+.bss            0xf90031e0      0x934
+ *(.sbss*)
+ .sbss.g_demo_mode
+                0xf90031e0        0x4 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf90031e0                g_demo_mode
+ .sbss.g_frame_limit
+                0xf90031e4        0x4 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf90031e4                g_frame_limit
+ *(.gnu.linkonce.sb.*)
+ *(.bss .bss.*)
+ .bss.g_benchmark_result
+                0xf90031e8      0x7f8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf90031e8                g_benchmark_result
+ .bss.g_apb_test_result
+                0xf90039e0      0x134 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                0xf90039e0                g_apb_test_result
+ *(.gnu.linkonce.b.*)
+ *(COMMON)
+                0xf9003b14                        . = ALIGN (0x4)
+                0xf9003b18                        . = ALIGN (0x8)
+                0xf9003b18                        PROVIDE (_end = .)
+                [!provide]                        PROVIDE (end = .)
+
+.stack          0xf9003b20     0x2000
+                [!provide]                        PROVIDE (_heap_end = .)
+                0x00002000                        . = __stack_size
+ *fill*         0xf9003b20     0x2000 
+                0xf9005b20                        PROVIDE (_sp = .)
+                0xf9005b20                        __freertos_irq_stack_top = .
+OUTPUT(D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\apb_reg_test.elf elf32-littleriscv)
+
+.riscv.attributes
+                0x00000000       0x43
+ .riscv.attributes
+                0x00000000       0x3d D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .riscv.attributes
+                0x0000003d       0x43 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .riscv.attributes
+                0x00000080       0x2a D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .riscv.attributes
+                0x000000aa       0x2a D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .riscv.attributes
+                0x000000d4       0x2a D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+
+.comment        0x00000000       0x33
+ .comment       0x00000000       0x33 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                                 0x34 (size before relaxing)
+ .comment       0x00000033        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                                 0x34 (size before relaxing)
+ .comment       0x00000033        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+                                 0x34 (size before relaxing)
+ .comment       0x00000033        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+                                 0x34 (size before relaxing)
+
+.debug_line     0x00000000     0x5f84
+ .debug_line    0x00000000       0xbc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .debug_line    0x000000bc     0x4a2d D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_line    0x00004ae9      0x9df D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_line    0x000054c8      0xa7d D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .debug_line    0x00005f45       0x3f D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+
+.debug_line_str
+                0x00000000      0x42b
+ .debug_line_str
+                0x00000000      0x42b D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+                                 0x7b (size before relaxing)
+ .debug_line_str
+                0x0000042b        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                                0x1d6 (size before relaxing)
+ .debug_line_str
+                0x0000042b        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                                0x31a (size before relaxing)
+ .debug_line_str
+                0x0000042b        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+                                0x31a (size before relaxing)
+ .debug_line_str
+                0x0000042b        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+                                0x31a (size before relaxing)
+
+.debug_info     0x00000000     0x4b80
+ .debug_info    0x00000000       0x24 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .debug_info    0x00000024     0x3b4e D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_info    0x00003b72      0x767 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_info    0x000042d9      0x7c1 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .debug_info    0x00004a9a       0xe6 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+
+.debug_abbrev   0x00000000      0x757
+ .debug_abbrev  0x00000000       0x14 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .debug_abbrev  0x00000014      0x36f D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_abbrev  0x00000383      0x199 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_abbrev  0x0000051c      0x1cb D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .debug_abbrev  0x000006e7       0x70 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+
+.debug_aranges  0x00000000      0x190
+ .debug_aranges
+                0x00000000       0x20 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+ .debug_aranges
+                0x00000020      0x118 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_aranges
+                0x00000138       0x20 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_aranges
+                0x00000158       0x20 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+ .debug_aranges
+                0x00000178       0x18 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+
+.debug_str      0x00000000     0x4bd1
+ .debug_str     0x00000000     0x4bd1 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\start.o
+                                 0x87 (size before relaxing)
+ .debug_str     0x00004bd1        0x0 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+                               0x4b38 (size before relaxing)
+ .debug_str     0x00004bd1        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                                0x27d (size before relaxing)
+ .debug_str     0x00004bd1        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+                                0x27d (size before relaxing)
+ .debug_str     0x00004bd1        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+                                0x1ca (size before relaxing)
+
+.debug_loclists
+                0x00000000     0x2b72
+ .debug_loclists
+                0x00000000     0x184b D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_loclists
+                0x0000184b      0xa4d D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_loclists
+                0x00002298      0x8da D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+
+.debug_rnglists
+                0x00000000      0x2db
+ .debug_rnglists
+                0x00000000       0xdd D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_rnglists
+                0x000000dd      0x116 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_rnglists
+                0x000001f3       0xe8 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_umoddi3.o)
+
+.debug_macro    0x00000000      0xe59
+ .debug_macro   0x00000000       0x67 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_macro   0x00000067      0x7b4 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_macro   0x0000081b      0x34e D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_macro   0x00000b69       0xb2 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_macro   0x00000c1b      0x1cc D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_macro   0x00000de7       0x16 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_macro   0x00000dfd       0x4c D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+ .debug_macro   0x00000e49       0x10 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o
+
+.debug_frame    0x00000000      0x3c8
+ .debug_frame   0x00000000      0x3c8 D:\Github_repositories\2026FPGA\output\m1b_regression_mode0\main.o

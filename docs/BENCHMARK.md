@@ -1,5 +1,7 @@
 # v5 固定工作量性能测试（软件模式 4）
 
+M1b 新增独立模式 5，执行真正的 CPU DDR 逐像素绘制与同输入 FPGA 对照，报告 Render FPS、Presented FPS 和读回校验。Mode 4 历史数据及其 `(0,0)` 局部目标坐标保持原样；Mode 5 局部目标位于 `(256,256)`，两模式数值不能直接构成加速比。Mode 5 口径和板级步骤见 [M1B_ACCEPTANCE](M1B_ACCEPTANCE.md)。
+
 该模式测量当前硬件在持续显示、原有 DDR 服务保护开启时，执行 FILL、普通 BLIT 和色键 BLIT 的软件可见耗时。它为赛题的软硬件性能对比提供硬件端测量入口。已收到三轮全屏板级数据，见 [V5_BOARD_BENCHMARK](V5_BOARD_BENCHMARK.md)；CPU 逐像素对照与加速比仍待完成，接入方案见 [CPU_RENDER_PLAN](CPU_RENDER_PLAN.md)。
 
 只新增 OCRAM 软件，不改变 RTL、寄存器或 VERSION/CAPABILITIES。使用包含时序修复的 v5 bit，重新构建并下载 ELF 即可，无需为本功能重新 Compile FPGA。

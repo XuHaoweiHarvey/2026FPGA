@@ -1,5 +1,7 @@
 # Architecture
 
+M1b 仅在 OCRAM 软件中新增 `DEMO_MODE=5`。它经 M1a 的受控 CPU DDR 会话逐像素访问 Back，并复用原加速器、Front→Back BLIT 和安全 Swap；没有修改本页所述 RTL、DDR 仲裁或 ownership。完整测试顺序与计时边界见 [M1B_ACCEPTANCE](M1B_ACCEPTANCE.md)。以下历史段落描述 M1b 之前的架构状态。
+
 Phase 3 M1a 已加入 CPU→DDR 单笔桥和平台会话锁，项目负责人确认实板验收通过；旧 v5 基线与 M1a 的 bit/ELF 及构建证据必须区分，见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。
 
 本文描述当前源码架构。Phase 2旧FILL/v3已上板通过；当前v5的BLIT/色键系统仿真、软件构建和静态时序通过，已收到三轮全屏板级测速及色键画面，范围和待补项见 [V5_BOARD_BENCHMARK](V5_BOARD_BENCHMARK.md)。历史系统验证见 [SYSTEM_BLIT](SYSTEM_BLIT.md)。开发故障见 [TROUBLESHOOTING](TROUBLESHOOTING.md)，阶段证据见 [VALIDATION](VALIDATION.md)，共享契约见 [INTERFACES](INTERFACES.md)。CPU软件对照仍在方案阶段，见 [CPU_RENDER_PLAN](CPU_RENDER_PLAN.md)。
