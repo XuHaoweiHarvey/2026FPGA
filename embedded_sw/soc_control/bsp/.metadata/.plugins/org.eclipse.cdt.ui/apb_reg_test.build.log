@@ -1,14 +1,15 @@
-19:03:30 **** Incremental Build of configuration Default for project apb_reg_test ****
+19:07:55 **** Incremental Build of configuration Default for project apb_reg_test ****
 "D:\\Efinity\\efinity-riscv-ide-2026.1\\build_tools\\bin\\make.exe" all 
 python ../../scripts/build_apb_software.py
 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/../../../../riscv-none-elf/bin/ld.exe: warning: D:\Github_repositories\2026FPGA\software\apb_reg_test\build\apb_reg_test.elf has a LOAD segment with RWX permissions
 PASS formal BSP RAM ELF: APB base=0xf8100000, RAM=0xf9000000/65536 bytes
 f9000000 T _start
-f900006c 000004e8 T main
-f9000ce0 00000008 T apb_test_done
-f900105c 00000104 B g_apb_test_result
-f9003160 B _sp
+f900006c 000009e4 T main
+f9002238 00000008 T apb_test_done
+f90031e8 000007f8 B g_benchmark_result
+f90039e0 00000134 B g_apb_test_result
+f9005b20 B _sp
 ELF: D:\Github_repositories\2026FPGA\software\apb_reg_test\build\apb_reg_test.elf
 
-19:03:31 Build Finished. 0 errors, 1 warnings. (took 896ms)
+19:07:56 Build Finished. 0 errors, 1 warnings. (took 538ms)
 

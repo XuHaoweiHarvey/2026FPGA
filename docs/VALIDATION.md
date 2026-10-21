@@ -1,5 +1,9 @@
 # Validation
 
+## Phase 3 M1b（本机检查通过；等待实板）
+
+`DEMO_MODE=5` 的真实 CPU 绘制、FPGA 成对对照、DDR 读回验证及 HDMI HUD 已加入软件；无 RTL 变更。正式 BSP `-O2` 软件构建、原生 C 算法测试、M1a 桥和会话集成、旧 FILL/BLIT/Color Key、Mode 4 原生行为、APB、RGB/顶层展开回归通过。完整命令、计时口径、未完成 Efinity/实板项目和人工验收条件见 [M1B_ACCEPTANCE](M1B_ACCEPTANCE.md)。本机结果不代表 CPU 指令仿真或 M1b 板级性能。
+
 ## Phase 3 M1a（负责人确认实板通过；待 Git 复现）
 
 独立 `2026FPGA-P3` 工作树的生成 Sapphire BMB upsizer 四 lane 仿真、CPU DDR 桥协议仿真、共享 DDR/显示/Swap 集成仿真、v5 FILL/BLIT/Color Key WAIT1 回归、旧 APB WAIT0/1/3、RGB 顶层展开及 OCRAM 软件 Build 已通过。P3 的 Efinity 2026.1.132 日志记录了完整编译、bit 生成及 100 MHz core_clk 时序分析；项目负责人于 2026-10-21 确认 M1a 实板验收通过，范围包含 CPU DDR 读写、Front/Back 会话与事务排空、旧图形功能回归和 DDR/HDMI 显示稳定性。完整命令、现存 bit/ELF 哈希及证据限制见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。尚无与 Git commit 对应的干净检出构建，也未归档所有板级原始寄存器读数。

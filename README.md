@@ -1,5 +1,7 @@
 # Ti60F225 RISC-V + FPGA 2D Accelerator
 
+**Phase 3 M1b 源码状态：** 已加入独立 `DEMO_MODE=5` 的真实 CPU 逐像素 Fill/BLIT/Color Key 与 FPGA 对照、DDR 读回逐像素检查、CLINT 计时和 HDMI 文字 HUD；本机软件构建、算法测试与旧 RTL 回归已通过。M1b 尚未 Efinity Compile 或实板测试，不能填写真实性能值。操作、口径、风险和人工验收关口见 [M1B_ACCEPTANCE](docs/M1B_ACCEPTANCE.md)。
+
 **Phase 3 M1a 状态：** 已接入 Sapphire External Memory AXI、CPU DDR 安全桥、Front/Back 会话锁及 OCRAM 烟测。桥协议和共享显示仿真、旧 FILL/BLIT/Color Key 回归、软件构建及 Efinity 2026.1.132 完整编译均已通过；项目负责人于 2026-10-21 确认 M1a 实板验收通过。当前 bit/ELF 哈希及其与未提交源码的溯源限制见 [M1a CPU DDR](docs/M1A_CPU_DDR.md)。合并后仍须在目标目录重新构建并复验。
 
 基于 Efinix Ti60F225、Sapphire RISC-V 和 FPGA 2D Accelerator 的 DDR Framebuffer 图形渲染平台。
