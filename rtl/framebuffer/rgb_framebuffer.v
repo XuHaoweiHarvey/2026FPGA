@@ -60,6 +60,8 @@ module rgb_framebuffer #(
     output wire [31:0] service_read_quota,service_watermarks,
     input wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_busy,cpu_ddr_clear_error,
     input wire [31:0] cpu_ddr_error,
+    input wire asset_begin,asset_seal,
+    output wire [31:0] asset_status,
     output wire cpu_ddr_session_active,output wire [31:0] cpu_ddr_session_status,
     input wire [31:0] cpu_awaddr,input wire cpu_awvalid,output wire cpu_awready,
     input wire [127:0] cpu_wdata,input wire [15:0] cpu_wstrb,
@@ -89,7 +91,10 @@ wire manager_draw_ready;
 wire [31:0] display_error;
 wire read_fault;
 reg cpu_session=0,cpu_session_fault=0;
+reg asset_loading=0,asset_ready=0;
 wire cpu_owner=CPU_DDR_ENABLE && D_MODE && cpu_session;
+assign asset_status={1'b1,28'b0,(cpu_session_fault || cpu_ddr_error!=0),
+                     asset_ready,asset_loading};
 assign cpu_ddr_session_active=cpu_owner;
 assign cpu_ddr_session_status={27'b0,(CPU_DDR_ENABLE!=0),1'b0,cpu_session_fault,
                                cpu_ddr_busy,cpu_owner};
@@ -108,6 +113,20 @@ always @(posedge axi_clk or negedge axi_rst_n) begin
             if(cpu_session && !cpu_ddr_busy && !cpu_awvalid && !cpu_wvalid && !cpu_arvalid)
                 cpu_session<=0;
             else cpu_session_fault<=1;
+        end
+    end
+end
+always @(posedge axi_clk or negedge axi_rst_n) begin
+    if(!axi_rst_n) begin asset_loading<=0;asset_ready<=0;end
+    else if(CPU_DDR_ENABLE && D_MODE) begin
+        if(asset_begin && !asset_loading && !asset_ready && !cpu_session &&
+           !cpu_ddr_busy && !engine_busy && !d_pending && init_done &&
+           cpu_ddr_error==0 && !cpu_session_fault && read_healthy)
+            asset_loading<=1;
+        if(asset_seal && asset_loading && !asset_ready && !cpu_session &&
+           !cpu_ddr_busy && !engine_busy && !d_pending &&
+           cpu_ddr_error==0 && !cpu_session_fault && read_healthy) begin
+            asset_loading<=0;asset_ready<=1;
         end
     end
 end
@@ -253,6 +272,7 @@ generate if(C_MODE) begin: c_control
             .clk(axi_clk),.rst_n(axi_rst_n),.command_accept(d_command_accept),
             .front_base(d_front_base),.back_base(d_back_base),
             .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),
+            .op(cmd_op),.asset_ready(asset_ready),
             .width(cmd_width),.height(cmd_height),.src_range_valid(source_valid));
         graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
             .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)) engine (

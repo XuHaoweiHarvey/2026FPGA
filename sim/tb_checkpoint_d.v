@@ -27,6 +27,8 @@ wire [31:0] cx,cy,cw,ch,cc;
 wire [31:0] cop,csrc,cstride;
 wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error,cpu_session_active;
 wire [31:0] cpu_session_status;
+wire asset_begin,asset_seal;
+wire [31:0] asset_status;
 reg cpu_ddr_busy=0;
 reg [31:0] cpu_fault=0;
 reg [31:0] cpu_awaddr=0,cpu_araddr=0;
@@ -64,7 +66,8 @@ accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.COLOR_K
  .init_aw_beats(reserved),.cmd_x(cx),.cmd_y(cy),.cmd_width(cw),.cmd_height(ch),.cmd_color(cc),
  .cmd_op(cop),.cmd_src_addr(csrc),.cmd_src_stride(cstride),.start_pulse(start),
  .cpu_ddr_status(cpu_session_status),.cpu_ddr_busy(cpu_ddr_busy),.cpu_ddr_error(cpu_fault),
- .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),.cpu_ddr_clear_error(cpu_ddr_clear_error));
+ .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),.cpu_ddr_clear_error(cpu_ddr_clear_error),
+ .asset_status(asset_status),.asset_begin(asset_begin),.asset_seal(asset_seal));
 wire [127:0] vin;
 wire [31:0] tpg_frames;
 rgb_tpg #(.H_ACTIVE(WIDTH),.V_ACTIVE(HEIGHT),.H_BLANK_CYCLES(INIT_ONLY?320:95),.V_BLANK_LINES(INIT_ONLY?170:10),.ONE_FRAME(1)) tpg (
@@ -134,6 +137,7 @@ rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_
     .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
     .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),
     .cpu_ddr_error(cpu_fault),
+    .asset_begin(asset_begin),.asset_seal(asset_seal),.asset_status(asset_status),
     .cpu_ddr_session_active(cpu_session_active),.cpu_ddr_session_status(cpu_session_status),
     .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
     .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(1'b1),
@@ -394,6 +398,9 @@ initial begin
  end
  if(CPU_DDR) begin
   cpu_ddr_round;
+  @(negedge axi_clk);rst_n=0;
+  repeat(4) @(negedge axi_clk);
+  if(asset_status[1:0]!=0) $fatal(1,"Platform reset retained M2 asset READY");
   $display("PASS CPU DDR session integration: command/swap exclusion, shared write admission, read arbiter, B/R drain, pixel scanout");
   $finish;
  end
@@ -426,8 +433,10 @@ begin
  start_rect(0,0,WIDTH,HEIGHT,0);wait_fill;
  target=back_base+(8*WIDTH+256)*4;
  saved_underflow=display_underflow_count;saved_missed=missed_boundary_count;
+ access('hD8,1,1,0);wait(asset_status[0]);
  access('hCC,1,1,0);wait(cpu_session_active);@(negedge axi_clk);
  if(draw_ready || !cpu_session_status[0]) $fatal(1,"CPU session not exclusive");
+ access('hD8,1,2,1);access(8,1,2,0); // Cannot seal an active CPU session.
  access('h60,1,1,1);access(8,1,1,1); // No swap or accelerator START while owned.
  access(8,1,2,0); // Clear only the expected APB error.
  @(negedge axi_clk);apb_reset=0;repeat(10)@(negedge axi_clk);apb_reset=1;
@@ -448,6 +457,8 @@ begin
  if(memory[mem_index(target)]!=={4{32'h0000e060}}) $fatal(1,"CPU data not in Back");
  if(swap_count!=saved_swap || buffer_status[2]) $fatal(1,"Swap occurred during CPU session");
  access('hCC,1,2,0);wait(!cpu_session_active);@(negedge axi_clk);
+ access('hD8,1,2,0);wait(asset_status[1]);
+ if(asset_status[0]) $fatal(1,"Sealed asset is still writable");
  cpu_fault=3;
  access('h60,1,1,1); // A failed CPU DDR transaction may not publish Back.
  access(8,1,2,0);cpu_fault=0;

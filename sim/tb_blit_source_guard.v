@@ -9,7 +9,8 @@ localparam [63:0] FRAME_BYTES=64'd1*FRAME_STRIDE*FRAME_HEIGHT;
 reg clk=0, rst_n=0, command_accept=0;
 always #5 clk=~clk;
 reg [31:0] front_base=BASE0, back_base=BASE1;
-reg [31:0] src_addr=0, src_stride=FRAME_STRIDE, width=32, height=32;
+reg [31:0] src_addr=0, src_stride=FRAME_STRIDE, width=32, height=32,op=1;
+reg asset_ready=0;
 wire src_range_valid;
 integer cases=0, random_cases=0, seed=32'h51a7c0de;
 integer i, xx, yy, ww, hh, mode;
@@ -21,6 +22,7 @@ blit_source_guard #(.FRAME_WIDTH(FRAME_WIDTH), .FRAME_HEIGHT(FRAME_HEIGHT),
     .clk(clk), .rst_n(rst_n), .command_accept(command_accept),
     .front_base(front_base), .back_base(back_base), .src_addr(src_addr),
     .src_stride(src_stride), .width(width), .height(height),
+    .op(op),.asset_ready(asset_ready),
     .src_range_valid(src_range_valid)
 );
 
@@ -64,6 +66,20 @@ begin
     if (src_range_valid!==wanted)
         $fatal(1,"Source guard mismatch %0s: front=%h src=%h stride=%0d w=%0d h=%0d got=%b expected=%b",
             name,front,source,stride,w,h,src_range_valid,wanted);
+end
+endtask
+
+task asset_check;
+input [31:0] source,stride,w,h,operation;
+input ready,wanted;
+begin
+    @(negedge clk);
+    front_base=BASE0;back_base=BASE1;src_addr=source;src_stride=stride;
+    width=w;height=h;op=operation;asset_ready=ready;command_accept=1;
+    @(negedge clk);command_accept=0;
+    if(src_range_valid!==wanted)
+        $fatal(1,"Asset guard source=%h op=%h ready=%b got=%b wanted=%b",
+               source,operation,ready,src_range_valid,wanted);
 end
 endtask
 
@@ -119,6 +135,16 @@ initial begin
     check("Front window wraps address space",32'hfffff000,BASE0,32'hfffff000,FRAME_STRIDE,4,1,0);
     check("address cannot wrap below Front",32'hfffff000,BASE0,0,FRAME_STRIDE,4,1,0);
     check("unaligned Front",1,BASE1,4,FRAME_STRIDE,4,1,0);
+    asset_check(32'h01000000,2560,640,480,1,0,0);
+    asset_check(32'h01000000,2560,640,480,1,1,1);
+    asset_check(32'h0112c000,2560,640,480,1,1,1);
+    asset_check(32'h01258000,2560,640,480,1,1,1);
+    asset_check(32'h01384000,2560,640,480,1,1,0);
+    asset_check(32'h01000010,2560,640,480,1,1,0);
+    asset_check(32'h01000000,7680,640,480,1,1,0);
+    asset_check(32'h01000000,2560,636,480,1,1,0);
+    asset_check(32'h01000000,2560,640,480,2,1,0);
+    asset_ready=0;op=1;
 
     // Deterministic random geometries: both roles, interior/edge/outside,
     // rejected stride/alignment and extreme unsigned dimensions.

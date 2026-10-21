@@ -11,7 +11,7 @@ parser.add_argument('--ide-root', type=Path, default=Path('D:/Efinity/efinity-ri
 parser.add_argument('--toolchain-prefix',type=Path,
                     help='Optional complete GNU cross-tool prefix, ending in a hyphen; default uses the formal IDE')
 parser.add_argument('--output', type=Path, default=ROOT / 'software/apb_reg_test/build')
-parser.add_argument('--program', choices=('apb','m1a','m1b'), default='apb')
+parser.add_argument('--program', choices=('apb','m1a','m1b','m2'), default='apb')
 parser.add_argument('--opt', choices=('Og','O2'), default='Og')
 parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
                     help='Optional C macro override, e.g. TEST_RECT_X=320; tests use a temporary output')
@@ -53,10 +53,13 @@ for define in args.define:
 if args.program == 'm1b':
     assert not any(d.startswith('DEMO_MODE=') for d in args.define)
     flags.append('-DDEMO_MODE=5')
+if args.program == 'm2':
+    assert not any(d.startswith('DEMO_MODE=') for d in args.define)
+    flags.append('-DDEMO_MODE=6')
 def run(command):
     subprocess.run([str(x) for x in command], cwd=ROOT, check=True)
 source = ROOT / ('software/m1a_ddr_smoke/main.c' if args.program=='m1a' else 'software/apb_reg_test/main.c')
-basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'm1b_compare' if args.program=='m1b' else 'apb_reg_test'
+basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'm1b_compare' if args.program=='m1b' else 'm2_demo' if args.program=='m2' else 'apb_reg_test'
 run([gcc, *flags, '-c', source, '-o', out / 'main.o'])
 run([gcc, *flags, '-c', startup, '-o', out / 'start.o'])
 elf = out / (basename+'.elf')
@@ -69,6 +72,7 @@ dump = subprocess.check_output([str(objdump), '-d', '-S', str(elf)], cwd=ROOT, t
 symbols = subprocess.check_output([str(nm), '-n', '-S', str(elf)], text=True)
 required = ('_start','main','m1a_test_done','g_m1a_result','_sp') if args.program=='m1a' else \
            ('_start','main','m1b_test_done','g_m1b_result','_sp') if args.program=='m1b' else \
+           ('_start','main','m2_error_stop','m2_cycle_boundary','g_m2_result','_sp') if args.program=='m2' else \
            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')
 selected = [line for line in symbols.splitlines() if line.split()[-1] in
             required]

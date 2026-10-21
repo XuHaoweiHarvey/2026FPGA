@@ -1,6 +1,6 @@
 # Register Map — 当前 accel_regs
 
-本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。正式ENGINE_ENABLE=1、DOUBLE_BUFFER=1、BLIT_ENABLE=1、COLOR_KEY_ENABLE=1。A～E旧v3基线已实板通过；当前v5 BLIT/色键接线需重新综合、构建匹配软件及上板验收。
+本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。正式ENGINE_ENABLE=1、DOUBLE_BUFFER=1、BLIT_ENABLE=1、COLOR_KEY_ENABLE=1。用户已确认 v5、M1a、M1b 实板基线；新增 M2 素材权限和 Mode 6 仍须重新综合并上板验收。
 
 ## Address and Access
 
@@ -8,7 +8,7 @@
 - 同文件 `SYSTEM_RAM_A_CTRL=0xF9000000`、SIZE=`0x10000`；正式linker为64KiB OCRAM、默认8192byte stack，不能用旧Demo地址替代。
 - offset为**本地byte地址**；下表Offset列均为十六进制。32bit整字、4byte对齐、无PSTRB/byte写。
 - 写在PSEL&&PENABLE&&PREADY最终access边沿发生；默认WAIT_CYCLES=1。PSLVERROR仅最终access有效。setup/wait不重复写。
-- `RO`无读清除；写RO报错。C8及之后未映射，错误读返回0。不要让IDE Memory自动扫描整个64KiB窗口。
+- `RO`无读清除；写RO报错。C8仍未映射；D8/DC为M2新增，E0及之后未映射，错误读返回0。不要让IDE Memory自动扫描整个64KiB窗口。
 
 ## Reset Notation
 
@@ -73,8 +73,10 @@
 | CC | CPU_DDR_CONTROL | WO | 0 / C | Phase 3：bit0请求CPU会话，bit1请求释放，bit2清CPU DDR错误；会话与现有图形命令互斥 |
 | D0 | CPU_DDR_STATUS | RO | 0x10 / P | Phase 3：bit0会话有效，bit1桥非空，bit2会话错误，bit4支持CPU DDR；释放前须等待bit1=0 |
 | D4 | CPU_DDR_ERROR | RO | 0 / P | Phase 3桥首个错误码：1权限/协议，3 DDR响应ID，4 DDR响应错误，5 RLAST，6 CPU复位中止 |
+| D8 | ASSET_CONTROL | WO | 0 / C | M2：bit0 BEGIN_LOAD，bit1 SEAL；其余位及两位同时写入非法；仅在无CPU会话、桥/引擎空闲且无关键错误时接受 |
+| DC | ASSET_STATUS | RO | 0x80000000 / P | M2：bit31功能存在，bit0 LOADING，bit1 READY，bit2 CPU会话/桥错误；平台复位清LOADING/READY，CPU Debug Reset不清；READY后素材只读 |
 
-Phase 3 CPU 外部DDR窗口从 `0x00001000` 起。桥将地址减 `0x1000` 并对齐到128-bit字；仅锁定的Back有效像素区可写，Front/Back有效像素区可读。M1a 程序与栈仍在64 KB OCRAM。CPU会话期间禁止图形命令和Swap；Display Reader持续工作，写准入节流仍生效。项目负责人已确认 M1a 实板验收通过；当前产物哈希、证据限制和目标检出复验步骤见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。
+Phase 3 CPU 外部DDR窗口从 `0x00001000` 起。桥将地址减 `0x1000` 并对齐到128-bit字；锁定的Back有效像素区可写，Front/Back有效像素区可读。M2加载期另外仅允许`0x01000000..0x01383FFF`素材读写，封存后仅允许素材读；其他DDR地址仍拒绝。M1a 程序与栈仍在64 KB OCRAM。CPU会话期间禁止图形命令和Swap；Display Reader持续工作，写准入节流仍生效。项目负责人已确认 M1a 实板验收通过；当前产物哈希、证据限制和目标检出复验步骤见 [M1A_CPU_DDR](M1A_CPU_DDR.md)。
 
 BUFFER_STATUS复位时Front0、Back1、active/owned/valid/pending/done=0；bit7按`!active && reader_idle && !ARVALID && !RVALID && outstanding==0 && reader_error==0`实时组合。Reader/DDR空闲且复位已稳定时可读0x82，不能把bit7当manager存储复位常量。
 
@@ -82,7 +84,7 @@ SERVICE_STATUS复位healthy=0、read_credit=0、grant=0、transaction_active=0�
 
 ## START / DONE / Swap Semantics
 
-START有效时，先检查INIT_DONE，再BUSY/已有start_pulse，再draw_ready；成功APB access快照五个矩形字段及op/src_addr/src_stride，下一core拍manager/engine接收并锁存Back；源检查器同拍锁存结果，engine下一拍读取。width/height>0，x<1920、y<1080，33bit相加的x+width/y+height不越界，不裁剪。FILL的x/width无需4对齐；BLIT的x/width必须4像素对齐。BLIT源只能位于当前Front的0x7E9000有效图像内，不能使用8MiB槽尾padding，也不能横跨源行。FILL不使用源字段，API每次显式写op=0。
+START有效时，先检查INIT_DONE，再BUSY/已有start_pulse，再draw_ready；成功APB access快照五个矩形字段及op/src_addr/src_stride，下一core拍manager/engine接收并锁存Back；源检查器同拍锁存结果，engine下一拍读取。width/height>0，x<1920、y<1080，33bit相加的x+width/y+height不越界，不裁剪。FILL的x/width无需4对齐；BLIT的x/width必须4像素对齐。旧Front源规则保留：矩形只能位于当前Front的0x7E9000有效图像内，不能使用8MiB槽尾padding，也不能横跨源行。M2另允许普通BLIT在ASSET_READY后从三个精确素材基址`0x01000000/0x0112C000/0x01258000`读取整张640×480、stride2560图像；READY前无素材AR。色键不使用素材源。FILL不使用源字段，API每次显式写op=0。
 
 色键复制继承全部BLIT几何、源窗口、完成和错误规则，使用同一个DMA。源RGB等于RECT_COLOR低24位时，对应四个byte strobe为0，保留Back完整XRGB；其他源像素完整复制。全透明拍/命令仍完成AW/W/B，不减少beat数。背景须先在Back构建，换帧不会自动复制Front背景；源X不是Alpha。新软件严格要求v5/0xFB，旧v3/v4 ELF需重新Build。
 

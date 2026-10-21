@@ -460,6 +460,8 @@ wire [31:0] reader_r_max_stall,display_underflow_count,reader_frame_completions;
 wire [31:0] reader_fifo_level,writer_max_cycles,service_read_quota;
 wire [31:0] service_watermarks;
 wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error,cpu_ddr_busy,cpu_ddr_session_active;
+wire asset_begin,asset_seal;
+wire [31:0] asset_status;
 wire [31:0] cpu_ddr_session_status,cpu_ddr_error,cpu_awaddr,cpu_araddr;
 wire cpu_awvalid,cpu_awready,cpu_wlast,cpu_wvalid,cpu_wready;
 wire [127:0] cpu_wdata,cpu_rdata;
@@ -484,6 +486,7 @@ rgb_framebuffer #(
     .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
     .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),
     .cpu_ddr_error(cpu_ddr_error),
+    .asset_begin(asset_begin),.asset_seal(asset_seal),.asset_status(asset_status),
     .cpu_ddr_session_active(cpu_ddr_session_active),.cpu_ddr_session_status(cpu_ddr_session_status),
     .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
     .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(cpu_wlast),
@@ -964,6 +967,7 @@ sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1)) u_con
     .cpu_ddr_session_active(cpu_ddr_session_active),.cpu_ddr_session_status(cpu_ddr_session_status),
     .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
     .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),.cpu_ddr_error(cpu_ddr_error),
+    .asset_status(asset_status),.asset_begin(asset_begin),.asset_seal(asset_seal),
     .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
     .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(cpu_wlast),
     .cpu_wvalid(cpu_wvalid),.cpu_wready(cpu_wready),

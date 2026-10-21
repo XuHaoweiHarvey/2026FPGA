@@ -29,6 +29,8 @@ module sapphire_control #(
     input wire cpu_ddr_session_active,
     input wire [31:0] cpu_ddr_session_status,
     output wire cpu_ddr_acquire, cpu_ddr_release, cpu_ddr_clear_error,
+    input wire [31:0] asset_status,
+    output wire asset_begin,asset_seal,
     output wire cpu_ddr_busy, output wire [31:0] cpu_ddr_error,
     output wire [31:0] cpu_awaddr, output wire cpu_awvalid, input wire cpu_awready,
     output wire [127:0] cpu_wdata, output wire [15:0] cpu_wstrb,
@@ -112,6 +114,7 @@ generate if(CPU_DDR_ENABLE) begin: cpu_ddr
     cpu_ddr_bridge bridge (
         .clk(core_clk),.rst_n(cpu_bridge_rst_n),.cpu_reset(system_reset || memory_reset),
         .session_active(cpu_ddr_session_active),
+        .asset_loading(asset_status[0]),.asset_ready(asset_status[1]),
         .front_base(display_buffer_base),.back_base(tpg_write_buffer_base),
         .busy(cpu_ddr_busy),.error_code(cpu_ddr_error),.clear_error(cpu_ddr_clear_error),
         .s_awaddr(s_awaddr),.s_awid(s_awid),.s_awlen(s_awlen),.s_awsize(s_awsize),
@@ -164,6 +167,7 @@ accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1),
     .start_pulse(start_test_pulse),
     .cpu_ddr_status(cpu_ddr_session_status),.cpu_ddr_busy(cpu_ddr_busy),
     .cpu_ddr_error(cpu_ddr_error),.cpu_ddr_acquire(cpu_ddr_acquire),
-    .cpu_ddr_release(cpu_ddr_release),.cpu_ddr_clear_error(cpu_ddr_clear_error)
+    .cpu_ddr_release(cpu_ddr_release),.cpu_ddr_clear_error(cpu_ddr_clear_error),
+    .asset_status(asset_status),.asset_begin(asset_begin),.asset_seal(asset_seal)
 );
 endmodule

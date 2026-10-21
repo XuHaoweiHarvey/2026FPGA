@@ -7,6 +7,7 @@
 *.vvp
 /software/apb_reg_test/build/
 /software/m1a_ddr_smoke/build/
+/software/m2_demo/build/
 /software/workspace_b/
 /output/blit/
 /output/graphics/

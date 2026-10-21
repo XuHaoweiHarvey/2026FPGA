@@ -35,6 +35,7 @@ blit_source_guard #(.FRAME_WIDTH(64), .FRAME_HEIGHT(48), .FRAME_STRIDE(256)) sou
     .clk(clk), .rst_n(rst_n), .command_accept(manager_accept),
     .front_base(front_base), .back_base(back_base), .src_addr(src_addr),
     .src_stride(src_stride), .width(command_width), .height(command_height),
+    .op(op),.asset_ready(1'b0),
     .src_range_valid(registered_range_ok)
 );
 
