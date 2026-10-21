@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?fileVersion 4.0.0?>
+<cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
+    <storageModule moduleId="org.eclipse.cdt.core.settings">
+        <cconfiguration id="0.1686464695">
+            <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="0.1686464695" moduleId="org.eclipse.cdt.core.settings" name="Default">
+                <externalSettings />
+                <extensions>
+                    <extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser" />
+                    <extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser" />
+                    <extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser" />
+                    <extension id="org.eclipse.cdt.core.VCErrorParser" point="org.eclipse.cdt.core.ErrorParser" />
+                    <extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser" />
+                    <extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser" />
+                </extensions>
+            </storageModule>
+            <storageModule moduleId="cdtBuildSystem" version="4.0.0">
+                <configuration buildProperties="" description="" id="0.1686464695" name="Default" parent="org.eclipse.cdt.build.core.prefbase.cfg">
+                    <folderInfo id="0.1686464695." name="/" resourcePath="">
+                        <toolChain id="org.eclipse.cdt.build.core.prefbase.toolchain.1489571673" name="No ToolChain" resourceTypeBasedDiscovery="false" superClass="org.eclipse.cdt.build.core.prefbase.toolchain">
+                            <targetPlatform id="org.eclipse.cdt.build.core.prefbase.toolchain.1489571673.2064052321" name="" />
+                            <builder id="org.eclipse.cdt.build.core.settings.default.builder.798877141" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="org.eclipse.cdt.build.core.settings.default.builder" command="D:/Efinity/efinity-riscv-ide-2026.1/build_tools/bin/make.exe" buildPath="${workspace_loc:/apb_reg_test}" autoBuildTarget="all" incrementalBuildTarget="all" cleanBuildTarget="clean" />
+                            <tool id="org.eclipse.cdt.build.core.settings.holder.libs.1172921824" name="holder for library settings" superClass="org.eclipse.cdt.build.core.settings.holder.libs" />
+                            <tool id="org.eclipse.cdt.build.core.settings.holder.699987460" name="Assembly" superClass="org.eclipse.cdt.build.core.settings.holder">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="org.eclipse.cdt.build.core.settings.holder.incpaths.234971018" superClass="org.eclipse.cdt.build.core.settings.holder.incpaths" valueType="includePath">
+                                    <listOptionValue builtIn="false" value="D:/Github_repositories/2026FPGA/advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include" />
+                                    <listOptionValue builtIn="false" value="D:/Efinity/efinity-riscv-ide-2026.1/toolchain/riscv-none-elf/include" />
+                                    <listOptionValue builtIn="false" value="D:/Github_repositories/2026FPGA/advanced_demo/software/apb_reg_test" />
+                                </option>
+                                <inputType id="org.eclipse.cdt.build.core.settings.holder.inType.1382421602" languageId="org.eclipse.cdt.core.assembly" languageName="Assembly" sourceContentType="org.eclipse.cdt.core.asmSource" superClass="org.eclipse.cdt.build.core.settings.holder.inType" />
+                            </tool>
+                            <tool id="org.eclipse.cdt.build.core.settings.holder.1627605352" name="GNU C++" superClass="org.eclipse.cdt.build.core.settings.holder">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="org.eclipse.cdt.build.core.settings.holder.incpaths.1689603968" superClass="org.eclipse.cdt.build.core.settings.holder.incpaths" valueType="includePath">
+                                    <listOptionValue builtIn="false" value="D:/Github_repositories/2026FPGA/advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include" />
+                                    <listOptionValue builtIn="false" value="D:/Efinity/efinity-riscv-ide-2026.1/toolchain/riscv-none-elf/include" />
+                                    <listOptionValue builtIn="false" value="D:/Github_repositories/2026FPGA/advanced_demo/software/apb_reg_test" />
+                                </option>
+                                <inputType id="org.eclipse.cdt.build.core.settings.holder.inType.777899344" languageId="org.eclipse.cdt.core.g++" languageName="GNU C++" sourceContentType="org.eclipse.cdt.core.cxxSource,org.eclipse.cdt.core.cxxHeader" superClass="org.eclipse.cdt.build.core.settings.holder.inType" />
+                            </tool>
+                            <tool id="org.eclipse.cdt.build.core.settings.holder.1489840010" name="GNU C" superClass="org.eclipse.cdt.build.core.settings.holder">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="org.eclipse.cdt.build.core.settings.holder.incpaths.1390898866" superClass="org.eclipse.cdt.build.core.settings.holder.incpaths" valueType="includePath">
+                                    <listOptionValue builtIn="false" value="D:/Github_repositories/2026FPGA/advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include" />
+                                    <listOptionValue builtIn="false" value="D:/Efinity/efinity-riscv-ide-2026.1/toolchain/riscv-none-elf/include" />
+                                    <listOptionValue builtIn="false" value="D:/Github_repositories/2026FPGA/advanced_demo/software/apb_reg_test" />
+                                </option>
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="org.eclipse.cdt.build.core.settings.holder.symbols.859432158" superClass="org.eclipse.cdt.build.core.settings.holder.symbols" valueType="definedSymbols">
+									</option>
+                                <inputType id="org.eclipse.cdt.build.core.settings.holder.inType.248264015" languageId="org.eclipse.cdt.core.gcc" languageName="GNU C" sourceContentType="org.eclipse.cdt.core.cSource,org.eclipse.cdt.core.cHeader" superClass="org.eclipse.cdt.build.core.settings.holder.inType" />
+                            </tool>
+                        </toolChain>
+                    </folderInfo>
+                </configuration>
+            </storageModule>
+            <storageModule moduleId="org.eclipse.cdt.core.externalSettings" />
+        </cconfiguration>
+    </storageModule>
+    <storageModule moduleId="cdtBuildSystem" version="4.0.0">
+        <project id="apb_reg_test.null.178859626" name="apb_reg_test" />
+    </storageModule>
+    <storageModule moduleId="scannerConfiguration">
+        <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="" />
+        <scannerConfigBuildInfo instanceId="0.1686464695">
+            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="" />
+        </scannerConfigBuildInfo>
+    </storageModule>
+    <storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders" />
+</cproject>

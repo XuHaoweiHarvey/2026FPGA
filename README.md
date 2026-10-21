@@ -1,5 +1,12 @@
 # Ti60F225 RISC-V + FPGA 2D Accelerator
 
+## 工程目录
+
+- [`basic_demo`](basic_demo/ti60f225_oob.xml)：从当前 `main` 移入的工程，包含后续 M1b/M2 软件与现有构建产物。
+- [`advanced_demo`](advanced_demo/ti60f225_oob.xml)：从原 P3 工作树复制的 M1a 工程。其 bit/ELF 与 `basic_demo` 的产物不能混用。
+
+两个目录各自是完整的 Efinity 工程根目录。运行 `scripts/` 中的命令时，先进入所选 demo；在 Efinity 中打开该目录自己的 `ti60f225_oob.xml`。两个 RISC-V IDE 项目都名为 `apb_reg_test`，请使用不同的 IDE workspace，避免 Eclipse 把一个项目的路径或 Launch 复用到另一个工程。
+
 **Phase 3 M1b 源码状态：** 已加入独立 `DEMO_MODE=5` 的真实 CPU 逐像素 Fill/BLIT/Color Key 与 FPGA 对照、DDR 读回逐像素检查、CLINT 计时和 HDMI 文字 HUD；本机软件构建、算法测试与旧 RTL 回归已通过。M1b 尚未 Efinity Compile 或实板测试，不能填写真实性能值。操作、口径、风险和人工验收关口见 [M1B_ACCEPTANCE](docs/M1B_ACCEPTANCE.md)。
 
 **Phase 3 M1a 状态：** 已接入 Sapphire External Memory AXI、CPU DDR 安全桥、Front/Back 会话锁及 OCRAM 烟测。桥协议和共享显示仿真、旧 FILL/BLIT/Color Key 回归、软件构建及 Efinity 2026.1.132 完整编译均已通过；项目负责人于 2026-10-21 确认 M1a 实板验收通过。当前 bit/ELF 哈希及其与未提交源码的溯源限制见 [M1a CPU DDR](docs/M1A_CPU_DDR.md)。合并后仍须在目标目录重新构建并复验。

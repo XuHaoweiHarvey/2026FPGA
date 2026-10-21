@@ -1,5 +1,7 @@
 # M2 独立 DDR 素材与连续动态 Demo：开发记录及实板验收
 
+> 目录整理后，本页所述 M2 工程位于 `basic_demo/`。在该目录运行软件与检查脚本，并在 Efinity 打开 `basic_demo/ti60f225_oob.xml`；不要使用 `advanced_demo/` 的 M1a bit/ELF。本次迁移复验的独立软件构建位于 `basic_demo/output/board_revalidation/m2/m2_demo.elf`，本地 Launch 已指向它，搬来的旧 ELF 保留原样。
+
 状态：**RTL/C 开发与本机检查完成；Efinity 完整 Compile、Programmer 下载和真实 FPGA 验收待负责人执行。** 不把仿真 FPS 当作实板 FPS，也不沿用旧 bit/ELF 证明 M2。
 
 实际修改文件：`.gitignore`；`rtl/control/{accel_regs,sapphire_control}.v`、`rtl/framebuffer/{blit_source_guard,cpu_ddr_bridge,rgb_framebuffer}.v`、`rtl/ti60f225_oob_top.v`；`software/apb_reg_test/{accel_regs.h,main.c}`、新增 `software/m2_demo/{main.c,scene.h,assets.h,metrics.h,render.h}`；`scripts/build_apb_software.py`、新增 `scripts/run_m2_software_checks.py`；`sim/{tb_blit_source_guard,tb_checkpoint_d,tb_cpu_ddr_bridge,tb_graphics_contract,tb_graphics_double_buffer}.v`、新增 `sim/{tb_m2_asset_regs,tb_m2_full_asset_blit,m2_software_checks.c}`；`docs/{BUILD,REGISTER_MAP,M2_ACCEPTANCE}.md`。`software/m2_demo/build/` 是新 ELF 输出，已加入 ignore；历史 bit/ELF 未覆盖。

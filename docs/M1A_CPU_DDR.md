@@ -1,5 +1,7 @@
 # M1a CPU→DDR 接入与验收
 
+> 目录整理后，P3 的 M1a 工程副本位于 `advanced_demo/`。在该目录运行脚本并打开 `advanced_demo/ti60f225_oob.xml`；历史 P3 bit/ELF 是验收证据，迁移后的重新编译与上板结果需另行记录。本次迁移复验的独立软件构建位于 `advanced_demo/output/board_revalidation/m1a/m1a_ddr_smoke.elf`，本地 M1a Launch 已指向它，搬来的旧 ELF 保留原样。
+
 ## 状态与边界
 
 本页描述 M1a 的实现和验收。项目负责人于 2026-10-21 确认 P3 工作树中的 M1a 已通过 FPGA 实板验收。M1a 烟测验证最小 CPU→DDR 读写、Front/Back 会话与事务排空、旧 FILL/BLIT/Color Key 回归及 DDR/HDMI 显示稳定性；它不是 CPU/FPGA FPS 对比。v5 的独立基线归档保存在 `D:/Github_repositories/_phase3_baselines/v5-20261020-200945-bcc39b40/manifest.json`。

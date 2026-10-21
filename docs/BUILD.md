@@ -1,5 +1,7 @@
 # Build and Debug
 
+> 目录整理后，Efinity 工程已分别位于 `basic_demo/` 与 `advanced_demo/`。本页下方的相对命令均以**选定的 demo 目录**为当前工作目录；两者分别打开自己的 `ti60f225_oob.xml`，不要混用 bit、ELF 或 IDE workspace。下文出现的旧仓库根目录路径属于历史记录，实际调试请以对应 demo 的 `.project`、Launch 与 OpenOCD 配置为准。
+
 ## M1b 模式 5 快速入口
 
 M2 比赛动态 Demo 使用 `python scripts/build_apb_software.py --program m2 --opt O2 --output software/m2_demo/build`，得到独立的 `DEMO_MODE=6` ELF；方块数可用 `--define RECT_COUNT=50` 等指定。M2 的综合、下载、IDE 与实板检查见 [M2_ACCEPTANCE](M2_ACCEPTANCE.md)。历史 Mode 5 仍可用 `--program m1b` 构建；旧 Mode 0～4 的默认构建不变。

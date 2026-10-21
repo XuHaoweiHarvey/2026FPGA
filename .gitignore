@@ -5,6 +5,7 @@
 /ooc/
 /scripts/__pycache__/
 *.vvp
+*.obj
 /software/apb_reg_test/build/
 /software/m1a_ddr_smoke/build/
 /software/m2_demo/build/
@@ -12,3 +13,24 @@
 /output/blit/
 /output/graphics/
 /output/read_arbiter/
+
+# Each relocated Efinity project keeps its own local build products.
+/basic_demo/work_syn/
+/basic_demo/work_pnr/
+/basic_demo/work_pt/
+/basic_demo/work_dbg/
+/basic_demo/outflow/
+/basic_demo/ooc/
+/basic_demo/output/
+/basic_demo/software/*/build/
+/basic_demo/scripts/__pycache__/
+/advanced_demo/work_syn/
+/advanced_demo/work_pnr/
+/advanced_demo/work_pt/
+/advanced_demo/work_dbg/
+/advanced_demo/outflow/
+/advanced_demo/ooc/
+/advanced_demo/output/
+/advanced_demo/software/*/build/
+/advanced_demo/scripts/__pycache__/
+**/.metadata/

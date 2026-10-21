@@ -1,0 +1,189 @@
+# Ti60F225 RISC-V + FPGA 2D Accelerator
+
+**Phase 3 M1a 状态：** 已接入 Sapphire External Memory AXI、CPU DDR 安全桥、Front/Back 会话锁及 OCRAM 烟测。桥协议和共享显示仿真、旧 FILL/BLIT/Color Key 回归、软件构建及 Efinity 2026.1.132 完整编译均已通过；项目负责人于 2026-10-21 确认 M1a 实板验收通过。当前 bit/ELF 哈希及其与未提交源码的溯源限制见 [M1a CPU DDR](../docs/M1A_CPU_DDR.md)。合并后仍须在目标目录重新构建并复验。
+
+基于 Efinix Ti60F225、Sapphire RISC-V 和 FPGA 2D Accelerator 的 DDR Framebuffer 图形渲染平台。
+
+RISC-V 负责命令与控制，FPGA 执行像素写入，通过双缓冲和安全换帧持续输出 HDMI。
+
+## 工程状态
+
+| Checkpoint | 已完成能力 | 硬件状态 |
+|---|---|---|
+| A | XRGB8888 TPG → DDR → RGB Display Reader → HDMI | 通过 |
+| B | Sapphire RISC-V、Hard JTAG、APB3 自定义寄存器 | 通过 |
+| C | FILL_RECT Accelerator → DDR → HDMI，五参数可改变矩形 | 通过 |
+| D | Front/Back、VBlank-safe Swap、连续显示保护 | 通过 |
+| E | 多矩形双场景 Demo、持续循环、软件 API 与诊断 | 通过 |
+
+正式源码现已接入 **FILL_RECT + Front→Back BLIT + Color Keying**：APB命令快照、统一执行层、源窗口检查、DDR读仲裁、显示统计及安全换帧。当前v5新增色键软件API和左右对比演示，已通过共享DDR系统仿真及软件构建，CPU指令仿真受依赖权限限制未执行。2026-10-19修复BLIT参数检查长路径后，Efinity2026.1.132完整编译及当前约束下静态时序通过，core_clk裕量+1.449ns，见 [V5_TIMING_FIX](../docs/V5_TIMING_FIX.md)。已收到模式3画面及模式4实板结果，证据和未覆盖范围见 [V5_BOARD_BENCHMARK](../docs/V5_BOARD_BENCHMARK.md)；接口/工具告警核对及长期验收仍待完成。上表通过记录属于旧FILL基线。Line、Alpha Blend尚未实现，接线和边界见 [COLOR_KEY](../docs/COLOR_KEY.md)。
+
+[显示/BLIT DDR读仲裁器](../docs/DDR_READ_ARBITER.md) 已加入正式framebuffer及工程清单，支持低水位显示优先、健康状态轮流服务、固定burst归属及协议故障保留。当前v5寄存器为VERSION=0x00050000、CAPABILITIES=0xFB；硬件与软件需配套重新构建，旧v3/v4 ELF与当前软件的精确版本检查不兼容。
+
+软件 `DEMO_MODE=4` 固定工作量测速：四种尺寸×FILL/BLIT/色键共12组，默认每组预热1次、计时8次，分别记录API绘制耗时和swap耗时。本机软件行为检查及BSP构建通过。已归档三轮全屏实测：FILL平均约62.64ms，普通/色键BLIT约65.65ms，九个全屏case显示错误增量均为0；第一轮总流程pass=1。bit/ELF来源、后两轮总结果及其他尺寸性能值待补，见 [实板记录](../docs/V5_BOARD_BENCHMARK.md)。操作见 [BENCHMARK](../docs/BENCHMARK.md)，CPU软件对照接入方案见 [CPU_RENDER_PLAN](../docs/CPU_RENDER_PLAN.md)。
+
+## 框架
+
+```mermaid
+flowchart TD
+    CPU["Sapphire RISC-V / OCRAM Software"] -->|APB3| REG[accel_regs]
+    REG --> ACC["2D Accelerator / FILL + BLIT + Color Key"]
+    ACC -->|源读| ARB[DDR Read Arbiter]
+    READER --> ARB
+    ARB --> FRONT
+    ACC --> ADMIT["AXI Writer + Display-protection Admission"]
+    ADMIT --> BACK[DDR Back Buffer]
+    BACK --> SWAP["VBlank-safe Swap: exchange roles"]
+    SWAP --> FRONT[DDR Front Buffer]
+    FRONT --> READER[RGB Display Reader]
+    READER --> HDMI["CVO / RGB Adapter / HDMI"]
+```
+
+CPU 不逐像素绘图，也没有直接连接 DDR framebuffer 的外部 AXI 端口。所有大规模像素写入由硬件 Accelerator 完成；交换只改变缓冲角色，不搬运整帧数据。模块和时钟细节见 [ARCHITECTURE](../docs/ARCHITECTURE.md)。
+
+## 关键设计要点
+
+下表按当前顶层、RTL、正式生成的 BSP/配置及活动软件核对。
+
+| 项目 | 当前实现 |
+|---|---|
+| FPGA / 工具 | Efinix Ti60F225；Efinity 2026.1；Efinix RISC-V IDE 2026.1 |
+| CPU | 单核 Sapphire 3.4.0，100 MHz，RV32IM；Hard JTAG |
+| 输出 | 1920 × 1080 @ 60 Hz |
+| Pixel format | XRGB8888；每 pixel 4 bytes，X 被显示链忽略 |
+| Bit layout | `[31:24] X`、`[23:16] R`、`[15:8] G`、`[7:0] B` |
+| DDR byte 顺序 | 低地址到高地址为 B、G、R、X；软件颜色使用 `0x00RRGGBB` |
+| Frame stride / size | 7680 bytes；8,294,400 bytes = `0x7E9000` |
+| DDR AXI | 128-bit data、32-bit byte address；16 bytes/beat = 4 pixels/beat |
+| Beat pixel order | `WDATA={P3,P2,P1,P0}`，P0 位于最低 32 位 |
+| APB | APB3、32-bit 数据、4-byte 对齐整字，无 PSTRB；默认 1 wait cycle |
+| CPU 软件位置 | 64 KiB OCRAM，`0xF9000000`；CPU 不直接访问 framebuffer |
+| Accelerator / DDR AXI / core | 共用 `core_clk = 100 MHz` |
+| Display / CVO | `vid_clk_dvi2 = 74.25 MHz`，每拍两个 pixels |
+| HDMI pixel clock | `hdmi_tx_slow_clk = 148.5 MHz`，每拍一个 pixel |
+| DDR physical | 原控制器/PHY，DDR clock 400 MHz，DQ16；配置容量 256 MiB |
+| Buffers | Buffer0=`0x00000000`，Buffer1=`0x00800000`，每槽预留 8 MiB |
+| Ownership | Display Reader 只读 Front；Accelerator 每命令锁存 Back 地址 |
+| Swap | 软件显式请求，安全 VS/frame boundary、旧 R 完成与 FIFO 清空确认后交换 |
+| DONE | 最后一个成功 AXI B response 后完成；软件还检查 BUSY=0、writer ownership 释放 |
+| 当前源码命令 / 通知 | FILL_RECT、BLIT、Color Keying；polling，无 Accelerator interrupt；已有全屏实板结果，其他边界与长期验收见实板记录 |
+| 连续性保护 | 真实 R handshake quota + Display FIFO 低/高水位控制新写 burst 准入 |
+| Camera / Bayer / Debayer | 不在正式 2D 数据路径；部分旧文件和 physical blocks 保留作参考/兼容 |
+
+APB base 来自正式 BSP 宏，当前为 `0xF8100000`，不是从旧 Demo 猜测。M1a 的 offset、reset 和 clear 语义见 [REGISTER_MAP_M1A](../docs/REGISTER_MAP_M1A.md)；仓库根目录的 `REGISTER_MAP.md` 已包含较新的 M2 寄存器。
+
+## 为什么选择 XRGB8888
+
+Bayer 适合摄像头原始采样，2D 图元需要明确的 R/G/B 颜色。Packed RGB888 的 3-byte pixel 会增加 128-bit beat 的像素跨界处理；XRGB8888 让一个 beat 正好容纳四个完整 pixels，简化地址和 FILL_RECT strobe，也便于后续 BLIT/混合单元处理。当前 X **不是 Alpha**，未来 Alpha 的输入格式与规则需另行定义。
+
+## 缓冲与显示
+
+- **Front**：Display Reader 持续读取，绘制 Back 期间保持旧画面。
+- **Back**：Accelerator 可连续执行多条 FILL_RECT，构建完整场景。
+- 软件最后发出 `SWAP_REQUEST`；系统保持 `SWAP_PENDING`，等待 writer 完成和安全边界。
+- 完成旧帧全部 R 返回、流水线排空及安全 FIFO flush 后，原子交换 Front/Back，置 sticky `SWAP_DONE`。
+
+**Swap 不复制图像。** 旧 Front 成为新 Back，不保证含最新场景；当前软件每轮完整清屏并重建。协议见 [INTERFACES](../docs/INTERFACES.md)。
+
+## 显示连续性保护
+
+开发时实际遇到过：连续写 DDR → Reader 服务不足 → FIFO underflow → CVO 重启 H/V timing → HDMI 黑屏、missed boundary 增长，现已修复并上板通过。
+
+正式保留 **Display-protection write admission**：Reader 活跃时，按真实 R handshake 进展及 FIFO 水位限制下一笔 Accelerator 写 burst；已暴露的 AW 保持到完成，不门控 W/B 或 AR/R。完整故障链和定位办法见 [TROUBLESHOOTING](../docs/TROUBLESHOOTING.md)。
+
+## 当前加速器指令
+
+| 命令 | 参数 | 状态 / 语义 |
+|---|---|---|
+| **FILL_RECT：已实现、已上板** | `x, y, width, height, color` | START 接收时快照参数；BUSY 执行；成功 DONE 以最后 B 完成为准 |
+| Block Copy / BLIT | `src_addr, src_stride, dst_x, dst_y, width, height` | 已接正式系统；v4 CPU行为检查及当前v5共享RTL/软件构建/静态时序通过；已有模式4全屏实测，接口告警与长期验收待完成，见[实板记录](../docs/V5_BOARD_BENCHMARK.md) |
+| Color Keying | BLIT参数加`key_rgb`，复用RECT_COLOR低24位 | v5已接APB/Framebuffer/API；模式3对比照片、模式4最终画面和全屏实测符合预期；其他边界验收及CPU指令检查待完成，见[COLOR_KEY](../docs/COLOR_KEY.md)和[实板记录](../docs/V5_BOARD_BENCHMARK.md) |
+| Line | Planned / Not implemented | 可选图元扩展 |
+| Alpha Blend | Planned / Not implemented | 后续混合管线 |
+
+矩形不做裁剪；要求尺寸非零且完全位于有效画面内，非法几何返回错误。软件 API、错误处理和演示参数见 [BUILD](../docs/BUILD.md)。
+
+## 代码仓库结构
+
+```text
+rtl/             顶层、控制、Accelerator、Framebuffer、Display 与继承硬件模块
+software/        当前 apb_reg_test Demo/API，以及旧阶段软件快照
+sim/             APB、FILL_RECT、buffer manager、显示及并发压力测试
+scripts/         构建、接口/来源校验和仿真入口
+ip/              厂商生成 IP，默认只读
+embedded_sw/     正式 Sapphire 生成 BSP、启动文件及支持文件，默认只读
+constraints/     项目约束相关文件
+README.md        快速介绍与文档导航
+docs/            项目说明、独立模块与集成草案
+demo/            原始参考工程，只读
+docs_reference/  开发板资料和赛题指南，只读
+```
+
+正式 Efinity 工程位于根目录 `ti60f225_oob.xml`，顶层 `ti60f225_oob_top`。
+
+## 分工
+
+团队现按完整任务推进，任何成员都可跨目录完成一个功能。下面保留原A/B/C划分用于理解模块边界；开工时同步任务与涉及文件，避免同时修改同一模块。共享接口仍需配套更新与验证。
+
+### Person A — RISC-V / Control / Software
+
+负责 Sapphire/BSP 集成、APB driver、accel API、command submission、polling、软件 Demo 与软件验证。主要目录：`software/apb_reg_test/`、`rtl/control/`，以及对应构建/软件测试脚本；生成 BSP 不手改。
+
+### Person B — 2D Accelerator
+
+负责命令执行、FILL_RECT、地址生成、AXI writer、Accelerator 仿真，以及后续获准开发的 BLIT/Line/Alpha。主要目录：`rtl/accelerator/`，以及对应 `sim/` 测试。
+
+### Person C — DDR / Framebuffer / Display
+
+负责 DDR 集成、Display Reader、Front/Back、buffer_manager、VBlank Swap、HDMI、连续性保护及 DDR 服务诊断。主要目录：`rtl/framebuffer/`、`rtl/frame_buffer_V4/`、`rtl/display/`、`rtl/user_cvo_axi_v2/`；DDR/PHY/encoder 的生成或继承实现默认只读。
+
+**冻结共享接口**：APB Register Map、Command interface、Pixel format、DDR 地址单位、AXI 数据宽度、Buffer ownership、Swap 和 DONE 语义。任何人修改前必须与另外两人同步。详细边界及联调规则见 [TEAM_SPLIT](../docs/TEAM_SPLIT.md)。
+
+## 开发规范
+
+- `demo/`、`docs_reference/` 保留原始参考内容。
+- 厂商生成 IP/BSP 不手改；DDR Controller 和已验证 HDMI 路径不随意重写。
+- 新功能通过已冻结接口扩展，先明确共享契约的变化。
+- 不移除写准入保护，不以屏蔽 underflow/missed 或强制 swap 掩盖故障。
+- 修改共享接口先同步团队；功能完成后更新验证记录，区分仿真与实板结果。
+
+## Build and Debug
+
+```text
+Efinity → Compile → Programmer → RISC-V IDE → Build → Hard JTAG Debug
+```
+
+当前基线无需重新 Generate IP。活动软件项目为 `software/apb_reg_test`；旧 APB 调试使用 `apb_reg_test_ti.launch`，M1a 烟测使用 `m1a_ddr_smoke_ti.launch`，两者均指向本目录的 BSP/OpenOCD，后者加载本目录的 M1a ELF。完整操作及 PC 设置见 [BUILD](../docs/BUILD.md)。
+
+## 文档
+
+| 文档 | 用途 |
+|---|---|
+| [ARCHITECTURE](../docs/ARCHITECTURE.md) | 当前模块、时钟/复位、DDR、双缓冲与显示保护 |
+| [INTERFACES](../docs/INTERFACES.md) | A↔B、B↔C、A↔C 的冻结接口合同 |
+| [REGISTER_MAP_M1A](../docs/REGISTER_MAP_M1A.md) | 按本工程 M1a RTL 核对的寄存器、reset、位域、错误与 clear |
+| [BUILD](../docs/BUILD.md) | Compile、下载、Build、Debug 与 Demo 操作 |
+| [BENCHMARK](../docs/BENCHMARK.md) | 模式4固定工作量测速、计时范围、调试器结果及板级采集步骤 |
+| [VALIDATION](../docs/VALIDATION.md) | A～E 仿真/实板证据、吞吐边界与复验方法 |
+| [TROUBLESHOOTING](../docs/TROUBLESHOOTING.md) | 已遇到故障、根因、修复和验证 |
+| [TEAM_SPLIT](../docs/TEAM_SPLIT.md) | 三人责任、目录归属及共享接口变更规则 |
+| [ROADMAP](../docs/ROADMAP.md) | 按赛题实际要求安排的后续任务与验收出口 |
+| [BLIT](../docs/BLIT.md) | 独立复制原型、运行方法、接口草案和当前限制 |
+| [GRAPHICS_ENGINE](../docs/GRAPHICS_ENGINE.md) | FILL/BLIT统一入口、混合场景仿真与三步结果图 |
+| [COLOR_KEY](../docs/COLOR_KEY.md) | v5色键命令/API、软件演示、共享显示仿真、结果图与板级待办 |
+| [V5_INTEGRATION_ACCEPTANCE](../docs/V5_INTEGRATION_ACCEPTANCE.md) | v5集成验收清单、A/C分工和可直接发送的对接说明 |
+| [V5_TIMING_FIX](../docs/V5_TIMING_FIX.md) | BLIT长路径修复、Efinity资源/时序对照、功能回归和保留告警 |
+| [BLIT_INTEGRATION](../docs/BLIT_INTEGRATION.md) | 按A/C反馈确定的首轮接口、实施状态与验收步骤 |
+| [BLIT_SOURCE_GUARD](../docs/BLIT_SOURCE_GUARD.md) | C侧源窗口检查、accept时序、边界用例及对接限制 |
+| [DDR_READ_ARBITER](../docs/DDR_READ_ARBITER.md) | 显示/BLIT读仲裁、响应归属、故障保留及独立测试 |
+
+`docs/` 维护上述长期说明及 BLIT 原型交付文档。历史阶段性快照和验证摘要已合并清理；正式 testbench 与回归脚本保留在 sim/、scripts/。
+
+## 路线图
+
+- **优先**：核对v5接口/工具告警，完成BLIT/Color Keying实板验收；当前约束下综合/时序已通过。
+- 用软件模式4采集板级硬件性能；后续补齐赛题要求的CPU软件渲染对照。
+- Alpha Blend 与后续高负载互动 Demo。
+- Line、进一步命令扩展，以及依据测量决定的 FIFO / line buffer / cache 优化。
+
+BLIT和Color Keying已接入当前v5系统；色键系统RTL仿真、软件构建和Efinity静态时序通过，本轮CPU指令仿真未执行，v4软件行为结果保留为历史记录。接口告警、实板验收、性能对照、图片资源加载、Alpha和互动Demo见 [ROADMAP](../docs/ROADMAP.md)。
