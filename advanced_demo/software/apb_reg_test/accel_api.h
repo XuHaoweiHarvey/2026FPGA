@@ -136,6 +136,46 @@ static inline uint32_t accel_color_key_blit(uint32_t src_addr,uint32_t src_strid
                                           uint32_t width,uint32_t height,uint32_t key_rgb) {
     return accel_submit(ACCEL_OP_COLOR_KEY,src_addr,src_stride,x,y,width,height,key_rgb & UINT32_C(0x00FFFFFF));
 }
+/* Alpha source pixels use ARGB8888. global_alpha scales each source alpha;
+ * the destination X byte is retained. Both coordinates and width must be
+ * four-pixel aligned, and the command reads/writes only sealed sprite pixels. */
+static inline uint32_t accel_alpha_blend(uint32_t src_addr,uint32_t src_stride,
+                                         uint32_t x,uint32_t y,uint32_t width,
+                                         uint32_t height,uint32_t global_alpha) {
+    return accel_submit(ACCEL_OP_ALPHA_BLEND,src_addr,src_stride,x,y,width,height,
+                       global_alpha&UINT32_C(0xFF));
+}
+static inline uint32_t accel_sprite_begin(void) {
+    uint32_t i,s;
+    s=accel_read(ACCEL_SPRITE_STATUS);
+    if(!(s&UINT32_C(0x80000000)) || (s&3u)) return UINT32_C(0xE201);
+    accel_write(ACCEL_SPRITE_CONTROL,1u);
+    for(i=0;i<ACCEL_POLL_LIMIT;++i) {
+        s=accel_read(ACCEL_SPRITE_STATUS);
+        if(s&2u) return UINT32_C(0xE202);
+        if(s&1u) return 0;
+    }
+    return UINT32_C(0xE203);
+}
+static inline uint32_t accel_sprite_seal(void) {
+    uint32_t i,s=accel_read(ACCEL_SPRITE_STATUS);
+    if(!(s&1u) || (s&2u)) return UINT32_C(0xE204);
+    accel_write(ACCEL_SPRITE_CONTROL,2u);
+    for(i=0;i<ACCEL_POLL_LIMIT;++i) {
+        s=accel_read(ACCEL_SPRITE_STATUS);
+        if(s&1u) return UINT32_C(0xE205);
+        if(s&2u) return 0;
+    }
+    return UINT32_C(0xE206);
+}
+static inline uint32_t accel_alpha_pixel_reference(uint32_t src,uint32_t dst,
+                                                    uint32_t global_alpha) {
+    uint32_t a=((src>>24)*(global_alpha&255u)+127u)/255u;
+    uint32_t r=((((src>>16)&255u)*a+((dst>>16)&255u)*(255u-a)+127u)/255u);
+    uint32_t g=((((src>>8)&255u)*a+((dst>>8)&255u)*(255u-a)+127u)/255u);
+    uint32_t b=(((src&255u)*a+(dst&255u)*(255u-a)+127u)/255u);
+    return (dst&UINT32_C(0xFF000000))|(r<<16)|(g<<8)|b;
+}
 static inline uint32_t frame_swap_request(uint32_t *ticket) {
     uint32_t e=accel_error(),bs=accel_read(ACCEL_BUFFER_STATUS);
     if(e) return e;

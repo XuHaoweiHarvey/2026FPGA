@@ -11,11 +11,14 @@ module graphics_engine #(
     // Formal v5 enables opcode 2. Default off retains the v4 contract.
     // The key uses the accepted color[23:0]; X is ignored.
     parameter COLOR_KEY_ENABLE = 0,
-    parameter [31:0] OP_COLOR_KEY = 32'd2
+    parameter [31:0] OP_COLOR_KEY = 32'd2,
+    parameter ALPHA_ENABLE = 0,
+    parameter [31:0] OP_ALPHA_BLEND = 32'd3
 )(
     input wire clk, rst_n, enabled, start,
     input wire [31:0] op, x, y, width, height, color,
     input wire [31:0] src_addr, src_stride,
+    input wire [31:0] back_base,
     input wire src_range_valid,
     output wire accept,
     output wire busy,
@@ -48,9 +51,16 @@ module graphics_engine #(
 localparam IDLE = 0, CHECK_SOURCE = 1, LAUNCH = 2, RUN = 3;
 localparam [31:0] ERR_BLIT_PARAM = 32'h21;
 reg [1:0] state;
-reg selected_blit, selected_color_key, source_range_checked;
+reg selected_blit, selected_color_key, selected_alpha, source_range_checked;
 reg [31:0] saved_x, saved_y, saved_width, saved_height, saved_color;
-reg [31:0] source, source_stride;
+reg [31:0] source, source_stride, saved_back_base;
+wire alpha_busy,alpha_done;
+wire [31:0] alpha_error,alpha_araddr,alpha_awaddr;
+wire [7:0] alpha_arlen,alpha_awlen;
+wire alpha_arvalid,alpha_rready,alpha_awvalid,alpha_wvalid,alpha_wlast,alpha_bready;
+wire [127:0] alpha_wdata;
+wire [15:0] alpha_wstrb;
+wire alpha_active=state==RUN && selected_alpha;
 wire fill_busy, fill_done, blit_busy, blit_done;
 wire [31:0] fill_error, blit_error;
 wire [31:0] fill_awaddr, blit_awaddr;
@@ -64,12 +74,13 @@ wire [31:0] blit_araddr;
 wire [7:0] blit_arlen;
 wire blit_arvalid, blit_rready;
 wire fill_active = state == RUN && !selected_blit;
-wire blit_active = state == RUN && selected_blit;
-wire selected_done = selected_blit ? blit_done : fill_done;
-wire selected_busy = selected_blit ? blit_busy : fill_busy;
-wire [31:0] selected_error = selected_blit ? blit_error : fill_error;
+wire blit_active = state == RUN && selected_blit && !selected_alpha;
+wire selected_done = selected_alpha ? alpha_done : selected_blit ? blit_done : fill_done;
+wire selected_busy = selected_alpha ? alpha_busy : selected_blit ? blit_busy : fill_busy;
+wire [31:0] selected_error = selected_alpha ? alpha_error : selected_blit ? blit_error : fill_error;
 wire requested_color_key = COLOR_KEY_ENABLE && op == OP_COLOR_KEY;
-wire requested_copy = op == OP_BLIT || requested_color_key;
+wire requested_alpha = ALPHA_ENABLE && op == OP_ALPHA_BLEND;
+wire requested_copy = op == OP_BLIT || requested_color_key || requested_alpha;
 
 // Ordinary and color-key copies share blit_unit, its burst buffer and all
 // error/drain states. Mask at the common output using ACCEPT-time snapshots.
@@ -89,18 +100,18 @@ assign busy = state != IDLE;
 // No queue and no second trigger: the platform must feed its final grant to
 // START. Invalid opcodes/ranges are still accepted and counted, then rejected.
 assign accept = rst_n && state == IDLE && enabled && start;
-assign araddr = blit_araddr;
-assign arlen = blit_arlen;
-assign arvalid = blit_active && blit_arvalid;
-assign rready = blit_active && blit_rready;
-assign awaddr = selected_blit ? blit_awaddr : fill_awaddr;
-assign awlen = selected_blit ? blit_awlen : fill_awlen;
-assign awvalid = state == RUN && (selected_blit ? blit_awvalid : fill_awvalid);
-assign wdata = selected_blit ? blit_wdata : fill_wdata;
-assign wstrb = selected_blit ? copy_wstrb : fill_wstrb;
-assign wlast = state == RUN && (selected_blit ? blit_wlast : fill_wlast);
-assign wvalid = state == RUN && (selected_blit ? blit_wvalid : fill_wvalid);
-assign bready = state == RUN && (selected_blit ? blit_bready : fill_bready);
+assign araddr = selected_alpha ? alpha_araddr : blit_araddr;
+assign arlen = selected_alpha ? alpha_arlen : blit_arlen;
+assign arvalid = (alpha_active && alpha_arvalid) || (blit_active && blit_arvalid);
+assign rready = (alpha_active && alpha_rready) || (blit_active && blit_rready);
+assign awaddr = selected_alpha ? alpha_awaddr : selected_blit ? blit_awaddr : fill_awaddr;
+assign awlen = selected_alpha ? alpha_awlen : selected_blit ? blit_awlen : fill_awlen;
+assign awvalid = state == RUN && (selected_alpha ? alpha_awvalid : selected_blit ? blit_awvalid : fill_awvalid);
+assign wdata = selected_alpha ? alpha_wdata : selected_blit ? blit_wdata : fill_wdata;
+assign wstrb = selected_alpha ? alpha_wstrb : selected_blit ? copy_wstrb : fill_wstrb;
+assign wlast = state == RUN && (selected_alpha ? alpha_wlast : selected_blit ? blit_wlast : fill_wlast);
+assign wvalid = state == RUN && (selected_alpha ? alpha_wvalid : selected_blit ? blit_wvalid : fill_wvalid);
+assign bready = state == RUN && (selected_alpha ? alpha_bready : selected_blit ? blit_bready : fill_bready);
 
 // SETTLE_FRAMES=0 matches the double-buffered platform: command completion
 // means memory work finished. A later explicit swap controls presentation.
@@ -126,7 +137,7 @@ blit_engine #(
     .WATCHDOG_BITS(WATCHDOG_BITS)
 ) blit_unit (
     .clk(clk), .rst_n(rst_n), .enabled(1'b1),
-    .start(state == LAUNCH && selected_blit && source_range_checked),
+    .start(state == LAUNCH && selected_blit && !selected_alpha && source_range_checked),
     .src_addr(source), .src_stride(source_stride),
     .dst_x(saved_x), .dst_y(saved_y), .width(saved_width), .height(saved_height),
     .busy(blit_busy), .done(blit_done), .error_code(blit_error), .command_count(),
@@ -139,17 +150,42 @@ blit_engine #(
     .bid(bid), .bresp(bresp), .bvalid(blit_active && bvalid), .bready(blit_bready)
 );
 
+generate if(ALPHA_ENABLE) begin: alpha_path
+    alpha_blit_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
+        .FRAME_STRIDE(FRAME_STRIDE),.MAX_BURST_BEATS(MAX_BURST_BEATS),
+        .WATCHDOG_BITS(WATCHDOG_BITS)) alpha_unit (
+        .clk(clk),.rst_n(rst_n),.enabled(1'b1),
+        .start(state==LAUNCH && selected_alpha && source_range_checked),
+        .src_addr(source),.src_stride(source_stride),.back_base(saved_back_base),
+        .global_alpha(saved_color[7:0]),.dst_x(saved_x),.dst_y(saved_y),
+        .width(saved_width),.height(saved_height),.busy(alpha_busy),.done(alpha_done),
+        .error_code(alpha_error),.command_count(),
+        .araddr(alpha_araddr),.arlen(alpha_arlen),.arvalid(alpha_arvalid),
+        .arready(alpha_active && arready),.rdata(rdata),.rid(rid),.rresp(rresp),
+        .rlast(rlast),.rvalid(alpha_active && rvalid),.rready(alpha_rready),
+        .awaddr(alpha_awaddr),.awlen(alpha_awlen),.awvalid(alpha_awvalid),
+        .awready(alpha_active && awready),.wdata(alpha_wdata),.wstrb(alpha_wstrb),
+        .wlast(alpha_wlast),.wvalid(alpha_wvalid),.wready(alpha_active && wready),
+        .bid(bid),.bresp(bresp),.bvalid(alpha_active && bvalid),.bready(alpha_bready));
+end else begin: no_alpha
+    assign alpha_busy=0;assign alpha_done=0;assign alpha_error=0;
+    assign alpha_araddr=0;assign alpha_arlen=0;assign alpha_arvalid=0;assign alpha_rready=0;
+    assign alpha_awaddr=0;assign alpha_awlen=0;assign alpha_awvalid=0;
+    assign alpha_wdata=0;assign alpha_wstrb=0;assign alpha_wlast=0;
+    assign alpha_wvalid=0;assign alpha_bready=0;
+end endgenerate
+
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        state <= IDLE; selected_blit <= 0; selected_color_key <= 0; source_range_checked <= 0;
+        state <= IDLE; selected_blit <= 0; selected_color_key <= 0; selected_alpha<=0; source_range_checked <= 0;
         saved_x <= 0; saved_y <= 0; saved_width <= 0; saved_height <= 0; saved_color <= 0;
-        source <= 0; source_stride <= 0;
+        source <= 0; source_stride <= 0; saved_back_base<=0;
         done <= 0; error_code <= 0; command_count <= 0;
     end else begin
         case (state)
         IDLE: if (accept) begin
             saved_x <= x; saved_y <= y; saved_width <= width; saved_height <= height;
-            saved_color <= color; source <= src_addr; source_stride <= src_stride;
+            saved_color <= color; source <= src_addr; source_stride <= src_stride;saved_back_base<=back_base;
             done <= 0; error_code <= 0; command_count <= command_count + 1'b1;
             if (op != OP_FILL && !requested_copy) begin
                 // Count the accepted request, report an error, never touch AXI.
@@ -157,6 +193,7 @@ always @(posedge clk or negedge rst_n) begin
             end else begin
                 selected_blit <= requested_copy;
                 selected_color_key <= requested_color_key;
+                selected_alpha <= requested_alpha;
                 state <= requested_copy ? CHECK_SOURCE : LAUNCH;
             end
         end
@@ -192,7 +229,9 @@ end
 
 // synthesis translate_off
 initial if (OP_FILL == OP_BLIT || (COLOR_KEY_ENABLE &&
-    (OP_COLOR_KEY == OP_FILL || OP_COLOR_KEY == OP_BLIT)))
+    (OP_COLOR_KEY == OP_FILL || OP_COLOR_KEY == OP_BLIT)) || (ALPHA_ENABLE &&
+    (OP_ALPHA_BLEND==OP_FILL || OP_ALPHA_BLEND==OP_BLIT ||
+     (COLOR_KEY_ENABLE && OP_ALPHA_BLEND==OP_COLOR_KEY))))
     $fatal(1, "Enabled graphics opcodes must differ");
 // synthesis translate_on
 endmodule

@@ -11,7 +11,8 @@ module accel_regs #(
     parameter [31:0] FRAME_HEIGHT = 1080,
     parameter [31:0] FRAME_STRIDE = 7680,
     parameter COLOR_KEY_ENABLE = 0,
-    parameter CPU_DDR_ENABLE = 0
+    parameter CPU_DDR_ENABLE = 0,
+    parameter ALPHA_ENABLE = 0
 )(
     input wire PCLK,
     input wire PRESETn,
@@ -43,7 +44,11 @@ module accel_regs #(
     input wire [31:0] cpu_ddr_status,
     input wire cpu_ddr_busy,
     input wire [31:0] cpu_ddr_error,
-    output reg cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error
+    output reg cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error,
+    input wire [31:0] asset_status,
+    output reg asset_begin,asset_seal,
+    input wire [31:0] sprite_status,
+    output reg sprite_begin,sprite_seal
 );
 localparam [31:0] ID = 32'h4143434C; // "ACCL"
 localparam [31:0] VERSION = 32'h00010000;
@@ -64,7 +69,7 @@ always @(*) begin
     writable = 0;
     case (PADDR)
         32'h00: PRDATA = ID;
-        32'h04: PRDATA = COLOR_KEY_ENABLE ? 32'h00050000 : BLIT_ENABLE ? 32'h00040000 : DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
+        32'h04: PRDATA = ALPHA_ENABLE ? 32'h00060000 : COLOR_KEY_ENABLE ? 32'h00050000 : BLIT_ENABLE ? 32'h00040000 : DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
         32'h08: begin PRDATA = {control,1'b0}; writable = 1; end
         32'h0C: PRDATA = ENGINE_ENABLE ?
             {27'b0,init_done,init_done,(init_error!=0 || engine_error!=0 || error_code!=0 || (DOUBLE_BUFFER && reader_error!=0)),engine_done,engine_busy} :
@@ -82,7 +87,7 @@ always @(*) begin
         32'h34: PRDATA = FRAME_STRIDE;
         32'h38: PRDATA = FRAME_WIDTH;
         32'h3C: PRDATA = FRAME_HEIGHT;
-        32'h40: PRDATA = COLOR_KEY_ENABLE ? 32'h000000FB : BLIT_ENABLE ? 32'h0000007B : DOUBLE_BUFFER ? 32'h0000003B : ENGINE_ENABLE ? 32'h0000001B : 32'h00000007;
+        32'h40: PRDATA = ALPHA_ENABLE ? 32'h000001FB : COLOR_KEY_ENABLE ? 32'h000000FB : BLIT_ENABLE ? 32'h0000007B : DOUBLE_BUFFER ? 32'h0000003B : ENGINE_ENABLE ? 32'h0000001B : 32'h00000007;
         32'h44: begin PRDATA=init_data_beats;if(!ENGINE_ENABLE) mapped=0;end
         32'h48: begin PRDATA=init_aw_bursts;if(!ENGINE_ENABLE) mapped=0;end
         32'h4C: begin PRDATA=init_wlast_bursts;if(!ENGINE_ENABLE) mapped=0;end
@@ -119,6 +124,10 @@ always @(*) begin
         32'hCC: begin PRDATA=0;writable=1;if(!CPU_DDR_ENABLE) mapped=0;end
         32'hD0: begin PRDATA=cpu_ddr_status | {30'b0,cpu_ddr_busy,1'b0};if(!CPU_DDR_ENABLE) mapped=0;end
         32'hD4: begin PRDATA=cpu_ddr_error;if(!CPU_DDR_ENABLE) mapped=0;end
+        32'hD8: begin PRDATA=0;writable=1;if(!CPU_DDR_ENABLE) mapped=0;end
+        32'hDC: begin PRDATA=asset_status;if(!CPU_DDR_ENABLE) mapped=0;end
+        32'hE0: begin PRDATA=0;writable=1;if(!ALPHA_ENABLE) mapped=0;end
+        32'hE4: begin PRDATA=sprite_status;if(!ALPHA_ENABLE) mapped=0;end
         default: mapped = 0;
     endcase
     if (|PADDR[1:0]) transaction_error = 1;
@@ -139,6 +148,27 @@ always @(*) begin
     else if(CPU_DDR_ENABLE && PWRITE && PADDR=='hCC && PWDATA[0] &&
             (!draw_ready || cpu_ddr_status[0] || cpu_ddr_acquire)) transaction_error=6;
     else if(CPU_DDR_ENABLE && PWRITE && PADDR=='hCC && PWDATA[1:0]==2'b11) transaction_error=3;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR=='hD8 &&
+            (PWDATA[31:2]!=0 || PWDATA[1:0]==0 || PWDATA[1:0]==2'b11)) transaction_error=3;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR=='hD8 && PWDATA[0] &&
+            (asset_status[0] || asset_status[1] || cpu_ddr_status[0] || cpu_ddr_busy ||
+             engine_busy || buffer_status[2] || !init_done || cpu_ddr_error!=0 ||
+             cpu_ddr_status[2] || reader_error!=0)) transaction_error=6;
+    else if(CPU_DDR_ENABLE && PWRITE && PADDR=='hD8 && PWDATA[1] &&
+            (!asset_status[0] || asset_status[1] || cpu_ddr_status[0] || cpu_ddr_busy ||
+             engine_busy || buffer_status[2] || cpu_ddr_error!=0 ||
+             cpu_ddr_status[2] || reader_error!=0)) transaction_error=6;
+    else if(ALPHA_ENABLE && PWRITE && PADDR=='hE0 &&
+            (PWDATA[31:2]!=0 || PWDATA[1:0]==0 || PWDATA[1:0]==2'b11)) transaction_error=3;
+    else if(ALPHA_ENABLE && PWRITE && PADDR=='hE0 &&
+            (cpu_ddr_status[0] || cpu_ddr_busy || cpu_ddr_acquire ||
+             engine_busy || buffer_status[2] || !init_done || cpu_ddr_error!=0 ||
+             cpu_ddr_status[2] || reader_error!=0 || asset_status[0] || !asset_status[1])) transaction_error=6;
+    else if(ALPHA_ENABLE && PWRITE && PADDR=='hE0 && PWDATA[0] &&
+            (sprite_status[0] || sprite_status[1])) transaction_error=6;
+    else if(ALPHA_ENABLE && PWRITE && PADDR=='hE0 && PWDATA[1] &&
+            (!sprite_status[0] || sprite_status[1])) transaction_error=6;
+    else if(ALPHA_ENABLE && PWRITE && PADDR=='hD8 && sprite_status[0]) transaction_error=6;
     else transaction_error = 0;
     if (transaction_error != 0) PRDATA = 0;
 end
@@ -158,6 +188,8 @@ always @(posedge PCLK or negedge PRESETn) begin
         start_seen <= 0;
         start_pulse <= 0;swap_request<=0;clear_swap_done<=0;
         cpu_ddr_acquire<=0;cpu_ddr_release<=0;cpu_ddr_clear_error<=0;
+        asset_begin<=0;asset_seal<=0;
+        sprite_begin<=0;sprite_seal<=0;
         error_code <= 0;
         cmd_x<=0;cmd_y<=0;cmd_width<=0;cmd_height<=0;cmd_color<=0;
         command_op<=0;source_addr<=0;source_stride<=0;
@@ -165,6 +197,8 @@ always @(posedge PCLK or negedge PRESETn) begin
     end else begin
         start_pulse <= 0;swap_request<=0;clear_swap_done<=0;
         cpu_ddr_acquire<=0;cpu_ddr_release<=0;cpu_ddr_clear_error<=0;
+        asset_begin<=0;asset_seal<=0;
+        sprite_begin<=0;sprite_seal<=0;
         // Setup loads the wait count; each access wait consumes one cycle.
         // Side effects occur only on the final access edge, never in setup.
         if (PSEL && !PENABLE) wait_remaining <= WAIT_CYCLES;
@@ -200,6 +234,8 @@ always @(posedge PCLK or negedge PRESETn) begin
                         cpu_ddr_release<=PWDATA[1];
                         cpu_ddr_clear_error<=PWDATA[2];
                     end
+                    32'hD8: begin asset_begin<=PWDATA[0];asset_seal<=PWDATA[1];end
+                    32'hE0: begin sprite_begin<=PWDATA[0];sprite_seal<=PWDATA[1];end
                     default: begin end
                 endcase
             end
@@ -212,5 +248,7 @@ initial if (BLIT_ENABLE && (!ENGINE_ENABLE || !DOUBLE_BUFFER))
     $fatal(1,"BLIT registers require the double-buffered graphics engine");
 initial if (COLOR_KEY_ENABLE && !BLIT_ENABLE)
     $fatal(1,"Color-key registers require BLIT support");
+initial if (ALPHA_ENABLE && (!COLOR_KEY_ENABLE || !CPU_DDR_ENABLE))
+    $fatal(1,"Alpha registers require color key and CPU DDR support");
 // synthesis translate_on
 endmodule

@@ -1,16 +1,20 @@
 `timescale 1ns/1ps
-// First-round BLIT source policy: a rectangle inside the current packed Front.
+// Front remains the legacy source. M2 also permits three sealed full images
+// for ordinary BLIT only; no arbitrary DDR source interval is exposed.
 // Sample the SAME parameters/roles as graphics_engine and buffer_manager on
 // command_accept. graphics_engine reads this registered result one cycle later.
 // This module never gates acceptance: invalid commands still count and end 0x21.
 module blit_source_guard #(
     parameter FRAME_WIDTH = 1920,
     parameter FRAME_HEIGHT = 1080,
-    parameter FRAME_STRIDE = 7680
+    parameter FRAME_STRIDE = 7680,
+    parameter ALPHA_ENABLE = 0
 )(
     input wire clk, rst_n, command_accept,
     input wire [31:0] front_base, back_base,
-    input wire [31:0] src_addr, src_stride, width, height,
+    input wire [31:0] src_addr, src_stride, width, height, op,
+    input wire asset_ready,
+    input wire sprite_ready,
     output reg src_range_valid
 );
 localparam [63:0] FRAME_BYTES = 64'd1 * FRAME_STRIDE * FRAME_HEIGHT;
@@ -23,11 +27,25 @@ wire [31:0] source_x = (source_offset % FRAME_STRIDE) >> 2;
 // Extend before adding, so huge width/height cannot wrap into a valid rectangle.
 wire [32:0] source_right = {1'b0, source_x} + {1'b0, width};
 wire [32:0] source_bottom = {1'b0, source_row} + {1'b0, height};
-wire range_ok = front_base != back_base && front_base[1:0] == 0 &&
+wire sprite_address = src_addr >= 32'h01384000 && src_addr < 32'h014b0000;
+wire [31:0] sprite_offset=src_addr-32'h01384000;
+wire [31:0] sprite_row=sprite_offset/32'd2560;
+wire [31:0] sprite_x=(sprite_offset%32'd2560)>>2;
+wire [32:0] sprite_right={1'b0,sprite_x}+{1'b0,width};
+wire [32:0] sprite_bottom={1'b0,sprite_row}+{1'b0,height};
+wire front_ok = front_base != back_base && front_base[1:0] == 0 &&
     front_end <= 64'h100000000 && src_addr >= front_base &&
     {32'b0, source_offset} < FRAME_BYTES && src_addr[1:0] == 0 &&
     src_stride == FRAME_STRIDE && width != 0 && height != 0 &&
     source_right <= FRAME_WIDTH && source_bottom <= FRAME_HEIGHT;
+wire asset_base_ok = src_addr==32'h01000000 || src_addr==32'h0112c000 ||
+                     src_addr==32'h01258000;
+wire asset_ok = asset_base_ok && asset_ready && op==32'd1 &&
+    src_stride==32'd2560 && width==32'd640 && height==32'd480;
+wire sprite_ok=ALPHA_ENABLE && sprite_address && (op==32'd2 || op==32'd3) &&
+    sprite_ready && src_addr[3:0]==0 && src_stride==32'd2560 &&
+    width!=0 && height!=0 && sprite_right<=33'd640 && sprite_bottom<=33'd480;
+wire range_ok = front_ok || asset_ok || sprite_ok;
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) src_range_valid <= 0;

@@ -7,6 +7,7 @@ parser.add_argument('--apb-waits',type=int,nargs='+',default=[0,1,3])
 parser.add_argument('--graphics',action='store_true',help='Enable formal APB/shared-read BLIT integration scenarios')
 parser.add_argument('--color-key',action='store_true',help='Enable v5 color-key scenes (implies --graphics)')
 parser.add_argument('--cpu-ddr',action='store_true',help='Run M1a CPU session integration (implies --graphics)')
+parser.add_argument('--alpha',action='store_true',help='Run shared display/Alpha sprite read-modify-write integration')
 parser.add_argument('--output',type=Path,help='Artifact directory; default is a new temporary directory')
 parser.add_argument('--negative-control',choices=['display-data','display-quota','color-key-mask'],
                     help='With --graphics, intentionally miswire a temporary copy and require the matching checker to fail')
@@ -15,7 +16,9 @@ if args.color_key:
  args.graphics=True
 if args.cpu_ddr:
  args.graphics=True
-if args.cpu_ddr and (args.color_key or args.negative_control):
+if args.alpha:
+ args.graphics=True;args.color_key=True;args.cpu_ddr=True
+if args.cpu_ddr and (args.color_key or args.negative_control) and not args.alpha:
  parser.error('--cpu-ddr is a standalone M1a integration run')
 if args.negative_control and not args.graphics:
  parser.error('--negative-control requires --graphics')
@@ -39,7 +42,7 @@ sources=['sim/tb_checkpoint_d.v','rtl/test_pattern/rgb_tpg.v','rtl/framebuffer/r
  out/'DC_FIFO.v','rtl/frame_buffer_V4/bank_switch.v','rtl/frame_buffer_V4/rst_n_piple.v',
  'rtl/user_cvo_axi_v2/cvo_axi_v2.v',*d_modules]
 if args.graphics:
- sources.extend(['rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
+ sources.extend(['rtl/accelerator/alpha_pixel_pipeline.v','rtl/accelerator/alpha_blit_engine.v','rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
                  'rtl/framebuffer/blit_source_guard.v','rtl/framebuffer/ddr_read_arbiter.v'])
 if args.negative_control:
  target='rtl/accelerator/graphics_engine.v' if args.negative_control=='color-key-mask' else 'rtl/framebuffer/rgb_framebuffer.v'
@@ -62,7 +65,8 @@ if args.negative_control:
  sources[sources.index(target)]=broken
 for waits in args.apb_waits:
  overrides=[f'-Ptb_checkpoint_d.APB_WAITS={waits}',f'-Ptb_checkpoint_d.GRAPHICS={int(args.graphics)}',
-            f'-Ptb_checkpoint_d.COLOR_KEY={int(args.color_key)}',f'-Ptb_checkpoint_d.CPU_DDR={int(args.cpu_ddr)}']
+            f'-Ptb_checkpoint_d.COLOR_KEY={int(args.color_key)}',f'-Ptb_checkpoint_d.CPU_DDR={int(args.cpu_ddr)}',
+            f'-Ptb_checkpoint_d.ALPHA_ENABLE={int(args.alpha)}']
  if args.negative_control:
   binary=out/f'negative-{waits}.vvp'
   run(['iverilog','-g2005-sv','-s','tb_checkpoint_d',*overrides,'-o',binary,*sources])

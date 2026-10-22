@@ -55,6 +55,8 @@ for name in ('rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v'
              'rtl/framebuffer/blit_source_guard.v','rtl/framebuffer/ddr_read_arbiter.v'):
     assert name in files, f'Missing shared-read graphics source: {name}'
 assert '.BLIT_ENABLE(1)' in formal and 'ddr_read_arbiter #' in rgb_fb
+for name in ('rtl/accelerator/alpha_pixel_pipeline.v','rtl/accelerator/alpha_blit_engine.v'):
+    assert name in files, f'Missing Alpha design file: {name}'
 control = (ROOT / 'rtl/control/sapphire_control.v').read_text(encoding='utf8')
 assert '.BLIT_ENABLE(1)' in control
 generated_soc = (ROOT / 'ip/soc_control/soc_control.v').read_text(encoding='utf8')
@@ -69,6 +71,9 @@ assert 'io_memoryClk' in soc_inputs and 'io_ddrA_r_payload_data' in soc_inputs
 assert 'io_ddrMasters_0_clk' in soc_inputs
 assert 'localparam COLOR_KEY_ENABLE = 1;' in formal
 assert formal.count('.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)') == 2
+assert 'localparam ALPHA_ENABLE = 1;' in formal
+assert formal.count('.ALPHA_ENABLE(ALPHA_ENABLE)') == 2
+assert '.ALPHA_ENABLE(ALPHA_ENABLE)' in control and '.ALPHA_ENABLE(ALPHA_ENABLE)' in rgb_fb
 assert '.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)' in control and '.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)' in rgb_fb
 for port in ('cmd_op','cmd_src_addr','cmd_src_stride'):
     assert len(re.findall(r'\.'+port+r'\s*\(',formal))==2, f'Unpaired graphics command: {port}'
@@ -84,14 +89,15 @@ else:
 # Derive the offsets from the current sources instead of a checkpoint fingerprint.
 rtl = (ROOT / "rtl/control/accel_regs.v").read_text(encoding="utf8")
 header = (ROOT / "software/apb_reg_test/accel_regs.h").read_text(encoding="utf8")
-doc = (ROOT.parent / "docs/REGISTER_MAP_M1A.md").read_text(encoding="utf8")
+doc = (ROOT / "docs/REGISTER_MAP.md").read_text(encoding="utf8")
 cases = {int(value, 16) for value in re.findall(r"32'h([0-9A-Fa-f]+):", rtl)}
 offsets = {int(value, 16) for _, value in re.findall(
     r"^#define\s+(ACCEL_\w+)\s+0x([0-9A-Fa-f]+)u\s*$", header, re.M)}
 documented = {int(value, 16) for value in re.findall(
     r"^\| ([0-9A-Fa-f]{2}) \|", doc, re.M)}
 assert cases == offsets == documented, "RTL/header/REGISTER_MAP offsets disagree"
-assert '0x00050000' in header and "32'h00050000" in rtl
-assert '0x000000FB' in header and "32'h000000FB" in rtl
+assert '0x00060000' in header and "32'h00060000" in rtl
+assert '0x000001FB' in header and "32'h000001FB" in rtl
+assert 'ACCEL_CAP_ALPHA' in header and '0xE0u' in header and '0xE4u' in header
 print(f"PASS project: {len(files)} unique, existing design entries; current RGB/control integration")
 print(f"PASS register contract: {len(cases)} current RTL/header/documented offsets agree")

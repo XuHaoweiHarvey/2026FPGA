@@ -10,8 +10,8 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--ide-root', type=Path, default=Path('D:/Efinity/efinity-riscv-ide-2026.1'))
 parser.add_argument('--toolchain-prefix',type=Path,
                     help='Optional complete GNU cross-tool prefix, ending in a hyphen; default uses the formal IDE')
-parser.add_argument('--output', type=Path, default=ROOT / 'software/apb_reg_test/build')
-parser.add_argument('--program', choices=('apb','m1a'), default='apb')
+parser.add_argument('--output', type=Path)
+parser.add_argument('--program', choices=('apb','m1a','m1b','m2','advanced'), default='apb')
 parser.add_argument('--opt', choices=('Og','O2'), default='Og')
 parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
                     help='Optional C macro override, e.g. TEST_RECT_X=320; tests use a temporary output')
@@ -28,7 +28,7 @@ assert conf['CpuCount'] == '1' and conf['OCRSize'] == '65536'
 assert value('SYSTEM_RISCV_ISA_RV32I') == 1 and value('SYSTEM_RISCV_ISA_EXT_M') == 1
 for extension in ('A', 'C', 'F', 'D'):
     assert value('SYSTEM_RISCV_ISA_EXT_' + extension) == 0, 'Recheck generated ISA before rebuilding'
-assert value('IO_APB_SLAVE_0_INPUT_SIZE') >= 0xC8
+assert value('IO_APB_SLAVE_0_INPUT_SIZE') >= 0xE8
 assert value('SYSTEM_DDR_BMB') == 0x1000 and value('SYSTEM_DDR_BMB_SIZE') == 0xe0000000
 assert value('SYSTEM_RAM_A_SIZE') == value('SYSTEM_RAM_A_CTRL_SIZE') == 65536
 linker = bsp / 'linker/default.ld'
@@ -36,7 +36,12 @@ text = linker.read_text(encoding='utf8')
 origin = int(re.search(r'ORIGIN\s*=\s*(0x[0-9A-Fa-f]+)', text)[1], 0)
 length = int(re.search(r'LENGTH\s*=\s*(\d+)K', text)[1]) * 1024
 assert origin == value('SYSTEM_RAM_A_CTRL') and length == value('SYSTEM_RAM_A_CTRL_SIZE')
-out = args.output.resolve()
+default_output = ROOT / ('software/advanced_demo/build' if args.program=='advanced' else
+                         'software/m2_demo/build' if args.program=='m2' else
+                         'software/m1b_compare/build' if args.program=='m1b' else
+                         'software/m1a_ddr_smoke/build' if args.program=='m1a' else
+                         'software/apb_reg_test/build')
+out = (args.output or default_output).resolve()
 out.mkdir(parents=True, exist_ok=True)
 bin_dir = args.ide_root / 'toolchain/bin'
 tool_prefix = str(args.toolchain_prefix or (bin_dir / 'riscv-none-elf-'))
@@ -50,10 +55,19 @@ flags = ['-march=rv32im_zicsr_zifencei', '-mabi=ilp32', '-'+args.opt, '-g3', '-f
 for define in args.define:
     assert re.fullmatch(r'[A-Z][A-Z0-9_]*=[A-Za-z0-9_xX()+-]+',define), define
     flags.append('-D'+define)
+if args.program == 'm1b':
+    assert not any(d.startswith('DEMO_MODE=') for d in args.define)
+    flags.append('-DDEMO_MODE=5')
+if args.program == 'm2':
+    assert not any(d.startswith('DEMO_MODE=') for d in args.define)
+    flags.append('-DDEMO_MODE=6')
+if args.program == 'advanced':
+    assert not any(d.startswith('DEMO_MODE=') for d in args.define)
+    flags.append('-DDEMO_MODE=7')
 def run(command):
     subprocess.run([str(x) for x in command], cwd=ROOT, check=True)
 source = ROOT / ('software/m1a_ddr_smoke/main.c' if args.program=='m1a' else 'software/apb_reg_test/main.c')
-basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'apb_reg_test'
+basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'm1b_compare' if args.program=='m1b' else 'm2_demo' if args.program=='m2' else 'advanced_demo' if args.program=='advanced' else 'apb_reg_test'
 run([gcc, *flags, '-c', source, '-o', out / 'main.o'])
 run([gcc, *flags, '-c', startup, '-o', out / 'start.o'])
 elf = out / (basename+'.elf')
@@ -65,6 +79,9 @@ dump = subprocess.check_output([str(objdump), '-d', '-S', str(elf)], cwd=ROOT, t
 (out / (basename+'.disasm')).write_text(dump, encoding='utf8')
 symbols = subprocess.check_output([str(nm), '-n', '-S', str(elf)], text=True)
 required = ('_start','main','m1a_test_done','g_m1a_result','_sp') if args.program=='m1a' else \
+           ('_start','main','m1b_test_done','g_m1b_result','_sp') if args.program=='m1b' else \
+           ('_start','main','m2_error_stop','m2_cycle_boundary','g_m2_result','_sp') if args.program=='m2' else \
+           ('_start','main','advanced_demo_done','g_advanced_result','_sp') if args.program=='advanced' else \
            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')
 selected = [line for line in symbols.splitlines() if line.split()[-1] in
             required]

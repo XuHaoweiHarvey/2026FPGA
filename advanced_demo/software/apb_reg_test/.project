@@ -28,12 +28,12 @@
         <link>
             <name>common</name>
             <type>2</type>
-            <location>D:/Github_repositories/2026FPGA/advanced_demo/embedded_sw/soc_control/software/standalone/common</location>
+            <location>C:/Users/Xuhaowei/Desktop/2026FPGA/2026FPGA/advanced_demo/embedded_sw/soc_control/software/standalone/common</location>
         </link>
         <link>
             <name>bsp</name>
             <type>2</type>
-            <location>D:/Github_repositories/2026FPGA/advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc</location>
+            <location>C:/Users/Xuhaowei/Desktop/2026FPGA/2026FPGA/advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc</location>
         </link>
     </linkedResources>
 </projectDescription>

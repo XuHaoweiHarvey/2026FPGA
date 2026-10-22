@@ -8,13 +8,14 @@
 #ifndef IO_APB_SLAVE_0_INPUT_SIZE
 #error "Formal soc.h must declare the APB3 Slave 0 window size"
 #endif
-#if IO_APB_SLAVE_0_INPUT_SIZE < 0xC8
+#if IO_APB_SLAVE_0_INPUT_SIZE < 0xE8
 #error "APB window is smaller than the accel_regs register map"
 #endif
 #define ACCEL_BASE ((uintptr_t)IO_APB_SLAVE_0_INPUT)
 #define ACCEL_ID_EXPECTED      UINT32_C(0x4143434C)
-#define ACCEL_VERSION_EXPECTED UINT32_C(0x00050000)
-#define ACCEL_CAPABILITIES_EXPECTED UINT32_C(0x000000FB)
+#define ACCEL_VERSION_EXPECTED UINT32_C(0x00060000)
+#define ACCEL_CAPABILITIES_EXPECTED UINT32_C(0x000001FB)
+#define ACCEL_CAP_ALPHA (UINT32_C(1) << 8)
 #define ACCEL_CAP_COLOR_KEY (UINT32_C(1) << 7)
 #define ACCEL_ID          0x00u
 #define ACCEL_VERSION     0x04u
@@ -84,6 +85,11 @@
 #define ACCEL_CPU_DDR_CONTROL 0xCCu
 #define ACCEL_CPU_DDR_STATUS  0xD0u
 #define ACCEL_CPU_DDR_ERROR   0xD4u
+#define ACCEL_ASSET_CONTROL   0xD8u
+#define ACCEL_ASSET_STATUS    0xDCu
+#define ACCEL_SPRITE_CONTROL  0xE0u
+#define ACCEL_SPRITE_STATUS   0xE4u
+#define ACCEL_OP_ALPHA_BLEND UINT32_C(3)
 #define ACCEL_OP_FILL         UINT32_C(0)
 #define ACCEL_OP_BLIT         UINT32_C(1)
 #define ACCEL_OP_COLOR_KEY    UINT32_C(2)

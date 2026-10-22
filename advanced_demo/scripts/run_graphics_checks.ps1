@@ -82,6 +82,10 @@ try {
     Invoke-GraphicsSimulation -Name 'source_guard_small' -Overrides @(
         '-Ptb_blit_source_guard.FRAME_WIDTH=64', '-Ptb_blit_source_guard.FRAME_HEIGHT=48'
     ) -Top 'tb_blit_source_guard' -PassPattern '^PASS SOURCE GUARD:'
+    Invoke-GraphicsSimulation -Name 'sprite_source_guard' -Overrides @(
+        '-Ptb_blit_source_guard.FRAME_WIDTH=64', '-Ptb_blit_source_guard.FRAME_HEIGHT=48',
+        '-Ptb_blit_source_guard.ALPHA_ENABLE=1'
+    ) -Top 'tb_blit_source_guard' -PassPattern '^PASS SOURCE GUARD:'
     Invoke-GraphicsSimulation -Name 'basic' -Overrides @() -Wave:(-not $NoWave)
     Invoke-GraphicsSimulation -Name 'single_beat_remapped' -Overrides @(
         '-Ptb_graphics_engine.MAX_BURST_BEATS=1',

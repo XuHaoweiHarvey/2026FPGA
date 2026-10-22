@@ -1,7 +1,8 @@
 // CPU/APB control island and the platform-reset CPU DDR safety bridge.
 module sapphire_control #(
     parameter COLOR_KEY_ENABLE = 0,
-    parameter CPU_DDR_ENABLE = 0
+    parameter CPU_DDR_ENABLE = 0,
+    parameter ALPHA_ENABLE = 0
 )(
     input wire core_clk,
     input wire platform_rst_n,
@@ -29,6 +30,10 @@ module sapphire_control #(
     input wire cpu_ddr_session_active,
     input wire [31:0] cpu_ddr_session_status,
     output wire cpu_ddr_acquire, cpu_ddr_release, cpu_ddr_clear_error,
+    input wire [31:0] asset_status,
+    output wire asset_begin,asset_seal,
+    input wire [31:0] sprite_status,
+    output wire sprite_begin,sprite_seal,
     output wire cpu_ddr_busy, output wire [31:0] cpu_ddr_error,
     output wire [31:0] cpu_awaddr, output wire cpu_awvalid, input wire cpu_awready,
     output wire [127:0] cpu_wdata, output wire [15:0] cpu_wstrb,
@@ -109,9 +114,11 @@ soc_control u_soc_control (
     .io_ddrMasters_0_r_ready(1'b1)
 );
 generate if(CPU_DDR_ENABLE) begin: cpu_ddr
-    cpu_ddr_bridge bridge (
+    cpu_ddr_bridge #(.SPRITE_ENABLE(ALPHA_ENABLE)) bridge (
         .clk(core_clk),.rst_n(cpu_bridge_rst_n),.cpu_reset(system_reset || memory_reset),
         .session_active(cpu_ddr_session_active),
+        .asset_loading(asset_status[0]),.asset_ready(asset_status[1]),
+        .sprite_loading(sprite_status[0]),.sprite_ready(sprite_status[1]),
         .front_base(display_buffer_base),.back_base(tpg_write_buffer_base),
         .busy(cpu_ddr_busy),.error_code(cpu_ddr_error),.clear_error(cpu_ddr_clear_error),
         .s_awaddr(s_awaddr),.s_awid(s_awid),.s_awlen(s_awlen),.s_awsize(s_awsize),
@@ -140,7 +147,8 @@ end else begin: no_cpu_ddr
     assign cpu_araddr=0;assign cpu_arvalid=0;assign cpu_rready=0;
 end endgenerate
 accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1),
-    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(CPU_DDR_ENABLE)) u_accel_regs (
+    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(CPU_DDR_ENABLE),
+    .ALPHA_ENABLE(ALPHA_ENABLE)) u_accel_regs (
     .PCLK(core_clk), .PRESETn(soc_rst_n && !system_reset),
     .PADDR({16'b0,apb_addr}), .PSEL(apb_sel), .PENABLE(apb_enable), .PWRITE(apb_write),
     .PWDATA(apb_wdata), .PRDATA(apb_rdata), .PREADY(apb_ready), .PSLVERROR(apb_error),
@@ -164,6 +172,8 @@ accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1),
     .start_pulse(start_test_pulse),
     .cpu_ddr_status(cpu_ddr_session_status),.cpu_ddr_busy(cpu_ddr_busy),
     .cpu_ddr_error(cpu_ddr_error),.cpu_ddr_acquire(cpu_ddr_acquire),
-    .cpu_ddr_release(cpu_ddr_release),.cpu_ddr_clear_error(cpu_ddr_clear_error)
+    .cpu_ddr_release(cpu_ddr_release),.cpu_ddr_clear_error(cpu_ddr_clear_error),
+    .asset_status(asset_status),.asset_begin(asset_begin),.asset_seal(asset_seal),
+    .sprite_status(sprite_status),.sprite_begin(sprite_begin),.sprite_seal(sprite_seal)
 );
 endmodule

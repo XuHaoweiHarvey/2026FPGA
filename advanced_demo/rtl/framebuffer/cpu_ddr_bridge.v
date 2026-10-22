@@ -4,9 +4,15 @@
 module cpu_ddr_bridge #(
     parameter [31:0] CPU_BASE=32'h00001000,
     parameter [31:0] BUFFER1_BASE=32'h00800000,
-    parameter [31:0] FRAME_BYTES=32'h007e9000
+    parameter [31:0] FRAME_BYTES=32'h007e9000,
+    parameter [31:0] ASSET_BASE=32'h01000000,
+    parameter [31:0] ASSET_BYTES=32'h00384000,
+    parameter SPRITE_ENABLE=0,
+    parameter [31:0] SPRITE_BASE=32'h01384000,SPRITE_BYTES=32'h0012c000
 )(
     input wire clk, rst_n, cpu_reset, session_active,
+    input wire asset_loading, asset_ready,
+    input wire sprite_loading, sprite_ready,
     input wire [31:0] front_base, back_base,
     output wire busy, output reg [31:0] error_code,
     input wire clear_error,
@@ -53,25 +59,32 @@ reg [31:0] physical_addr;
 // The generated SoC passes the CPU byte address through unchanged and emits
 // SIZE=4/LEN=0 even for a 32-bit store. Align the DDR address to the 16-byte
 // word; keep its already-up-sized WDATA/WSTRB and full RDATA lane ordering.
-function valid_frame_word;
+function valid_region_word;
     input [31:0] cpu_addr;
-    input [31:0] frame_base;
-    reg [32:0] translated, last_byte;
+    input [31:0] region_base,region_bytes;
+    reg [32:0] translated, beat_start, last_byte;
     begin
         translated={1'b0,cpu_addr}-{1'b0,CPU_BASE};
-        last_byte={1'b0,frame_base}+{1'b0,FRAME_BYTES};
-        valid_frame_word=cpu_addr>=CPU_BASE && translated>={1'b0,frame_base} &&
-            (translated+33'd15)<last_byte && cpu_addr[1:0]==0;
+        beat_start=translated & ~33'd15;
+        last_byte={1'b0,region_base}+{1'b0,region_bytes};
+        valid_region_word=cpu_addr>=CPU_BASE && beat_start>={1'b0,region_base} &&
+            (beat_start+33'd15)<last_byte && cpu_addr[1:0]==0;
     end
 endfunction
-wire aw_range=valid_frame_word(aw_addr,back_base);
-wire ar_range=valid_frame_word(ar_addr,front_base) ||
-              valid_frame_word(ar_addr,back_base);
+wire aw_range=valid_region_word(aw_addr,back_base,FRAME_BYTES);
+wire ar_range=valid_region_word(ar_addr,front_base,FRAME_BYTES) ||
+              valid_region_word(ar_addr,back_base,FRAME_BYTES);
+wire asset_aw_range=valid_region_word(aw_addr,ASSET_BASE,ASSET_BYTES);
+wire asset_ar_range=valid_region_word(ar_addr,ASSET_BASE,ASSET_BYTES);
+wire sprite_aw_range=SPRITE_ENABLE && valid_region_word(aw_addr,SPRITE_BASE,SPRITE_BYTES);
+wire sprite_ar_range=SPRITE_ENABLE && valid_region_word(ar_addr,SPRITE_BASE,SPRITE_BYTES);
 wire [15:0] lane_mask=16'h000f << {aw_addr[3:2],2'b00};
-wire write_ok=session_active && aw_range && aw_len==0 && aw_size==4 &&
+wire write_ok=session_active && (aw_range || (asset_loading && !asset_ready && asset_aw_range) ||
+              (sprite_loading && !sprite_ready && sprite_aw_range)) && aw_len==0 && aw_size==4 &&
               aw_burst==1 && !aw_lock && w_last && w_strb!=0 &&
               (w_strb & ~lane_mask)==0;
-wire read_ok=session_active && ar_range && ar_len==0 && ar_size==4 &&
+wire read_ok=session_active && (ar_range || ((asset_loading || asset_ready) && asset_ar_range) ||
+             ((sprite_loading || sprite_ready) && sprite_ar_range)) && ar_len==0 && ar_size==4 &&
              ar_burst==1 && !ar_lock;
 assign busy=state!=IDLE || aw_seen || w_seen;
 assign s_arready=state==IDLE && !cpu_reset && !s_awvalid && !s_wvalid;

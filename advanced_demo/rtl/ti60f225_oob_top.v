@@ -245,6 +245,7 @@ localparam WR_FIFO_DEPTH  = 1024;
 localparam RD_FIFO_DEPTH  = 1024;
 // One switch keeps the APB capability and pixel execution path in agreement.
 localparam COLOR_KEY_ENABLE = 1;
+localparam ALPHA_ENABLE = 1;
 
 // localparam	MAX_HRES		= 12'd1920;
 // localparam	MAX_VRES		= 12'd1080;
@@ -460,6 +461,10 @@ wire [31:0] reader_r_max_stall,display_underflow_count,reader_frame_completions;
 wire [31:0] reader_fifo_level,writer_max_cycles,service_read_quota;
 wire [31:0] service_watermarks;
 wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_clear_error,cpu_ddr_busy,cpu_ddr_session_active;
+wire asset_begin,asset_seal;
+wire [31:0] asset_status;
+wire sprite_begin,sprite_seal;
+wire [31:0] sprite_status;
 wire [31:0] cpu_ddr_session_status,cpu_ddr_error,cpu_awaddr,cpu_araddr;
 wire cpu_awvalid,cpu_awready,cpu_wlast,cpu_wvalid,cpu_wready;
 wire [127:0] cpu_wdata,cpu_rdata;
@@ -471,7 +476,7 @@ rgb_framebuffer #(
     .FRAME_WIDTH(HACT), .FRAME_HEIGHT(VACT),
     .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH), .AXI_ID_WIDTH(AXI_ID_WIDTH),
     .WR_FIFO_DEPTH(1024), .RD_FIFO_DEPTH(1024), .BURST_LEN(127), .C_MODE(1), .D_MODE(1), .BLIT_ENABLE(1),
-    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1)
+    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),.ALPHA_ENABLE(ALPHA_ENABLE)
 ) checker0(
     .diag_wr_fifo_full(wr_fifo_full),
     .diag_wr_bank(wr_buffer_index), .diag_rd_bank(rd_buffer_index),
@@ -484,6 +489,8 @@ rgb_framebuffer #(
     .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
     .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),
     .cpu_ddr_error(cpu_ddr_error),
+    .asset_begin(asset_begin),.asset_seal(asset_seal),.asset_status(asset_status),
+    .sprite_begin(sprite_begin),.sprite_seal(sprite_seal),.sprite_status(sprite_status),
     .cpu_ddr_session_active(cpu_ddr_session_active),.cpu_ddr_session_status(cpu_ddr_session_status),
     .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
     .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(cpu_wlast),
@@ -935,7 +942,8 @@ assign tmds_tx_data2_TX_DATA = ~tmds_data2;
 // Control-island reset never resets the platform-owned writer or video path.
 // Sapphire is the only TDO driver. EDB and the former TDI/TDO placeholder are absent.
 (* syn_keep = 1 *) wire accel_start_test_pulse;
-sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1)) u_control (
+sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),
+                    .ALPHA_ENABLE(ALPHA_ENABLE)) u_control (
     .core_clk(core_clk), .platform_rst_n(i_arstn && w_arstn),
     .platform_ddr_rst_n(vid_rst_n),
     .jtag_tck(jtag_inst1_TCK), .jtag_tdi(jtag_inst1_TDI), .jtag_tdo(jtag_inst1_TDO),
@@ -964,6 +972,8 @@ sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1)) u_con
     .cpu_ddr_session_active(cpu_ddr_session_active),.cpu_ddr_session_status(cpu_ddr_session_status),
     .cpu_ddr_acquire(cpu_ddr_acquire),.cpu_ddr_release(cpu_ddr_release),
     .cpu_ddr_clear_error(cpu_ddr_clear_error),.cpu_ddr_busy(cpu_ddr_busy),.cpu_ddr_error(cpu_ddr_error),
+    .asset_status(asset_status),.asset_begin(asset_begin),.asset_seal(asset_seal),
+    .sprite_status(sprite_status),.sprite_begin(sprite_begin),.sprite_seal(sprite_seal),
     .cpu_awaddr(cpu_awaddr),.cpu_awvalid(cpu_awvalid),.cpu_awready(cpu_awready),
     .cpu_wdata(cpu_wdata),.cpu_wstrb(cpu_wstrb),.cpu_wlast(cpu_wlast),
     .cpu_wvalid(cpu_wvalid),.cpu_wready(cpu_wready),

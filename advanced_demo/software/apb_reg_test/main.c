@@ -1,3 +1,11 @@
+/* Modes 5, 6 and 7 have independent software; modes 0..4 keep their path. */
+#if defined(DEMO_MODE) && DEMO_MODE == 7u
+#include "../advanced_demo/main.c"
+#elif defined(DEMO_MODE) && DEMO_MODE == 5u
+#include "../m1b_compare/main.c"
+#elif defined(DEMO_MODE) && DEMO_MODE == 6u
+#include "../m2_demo/main.c"
+#else
 /* Checkpoint E: CPU submits commands only; FPGA performs every pixel write. */
 #include "accel_api.h"
 #include "demo_config.h"
@@ -8,7 +16,7 @@ typedef struct { uint32_t x,y,width,height,color; } rectangle_t;
 volatile rectangle_t g_test_rectangle={TEST_RECT_X,TEST_RECT_Y,TEST_RECT_W,TEST_RECT_H,TEST_RECT_COLOR};
 volatile uint32_t g_hold_frames=60;
 volatile uint32_t g_frame_limit=0; /* 0 = indefinite; otherwise number of presented scenes. */
-volatile uint32_t g_demo_mode=DEMO_MODE; /* 0 = rectangles; 1 = parameter; 2 = BLIT; 3 = key; 4 = benchmark. */
+volatile uint32_t g_demo_mode=DEMO_MODE; /* 0..4 only; modes 5/6 use separate software. */
 volatile uint32_t g_validation_target=1000; /* Records a milestone; never stops the loop. */
 
 enum { PHASE_INIT=1,PHASE_BUILD=2,PHASE_RECT=3,PHASE_BACK_READY=4,
@@ -288,3 +296,4 @@ int main(void) {
         scene^=1u;
     }
 }
+#endif /* DEMO_MODE == 5 */

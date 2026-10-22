@@ -64,6 +64,6 @@ run([args.iverilog, "-g2005-sv", "-Irtl", "-Irtl/ddr3_controller", "-s", "ti60f2
     "rtl/true_dual_port_ram.v",
     output / "ip_port_stubs.v", *control_sources,
     'rtl/framebuffer/cpu_ddr_bridge.v',
-    'rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
+    'rtl/accelerator/alpha_pixel_pipeline.v','rtl/accelerator/alpha_blit_engine.v','rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
     'rtl/framebuffer/blit_source_guard.v','rtl/framebuffer/ddr_read_arbiter.v'])
 print("PASS RGB regression and current top elaboration. No encrypted-IP or hardware verification.", flush=True)

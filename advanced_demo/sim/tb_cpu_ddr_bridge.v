@@ -2,6 +2,8 @@
 module tb_cpu_ddr_bridge;
 reg clk=0;always #5 clk=~clk;
 reg rst_n=0,cpu_reset=0,session_active=1,clear_error=0;
+reg asset_loading=0,asset_ready=0,sprite_loading=0,sprite_ready=0;
+parameter SPRITE_ENABLE=0;
 reg [31:0] front_base=0,back_base=32'h00800000;
 wire busy;wire [31:0] error_code;
 reg [31:0] s_awaddr=0,s_araddr=0;
@@ -19,7 +21,7 @@ reg [3:0] m_bid=0,m_rid=0;reg [1:0] m_bresp=0,m_rresp=0;
 reg [127:0] m_rdata=128'h00112233445566778899aabbccddeeff;
 wire [127:0] m_wdata;wire [15:0] m_wstrb;
 integer i;
-cpu_ddr_bridge dut(.*);
+cpu_ddr_bridge #(.SPRITE_ENABLE(SPRITE_ENABLE)) dut(.*);
 initial begin #200000;$fatal(1,"CPU DDR bridge timeout");end
 task write_case;
     input [31:0] addr;
@@ -92,6 +94,25 @@ initial begin
     read_case(32'h00001000,0,0,8'ha1);
     read_case(32'h0080100c,0,32'h00800000,8'ha2);
     read_case(32'h01001000,3,0,8'ha3);
+    asset_loading=1;
+    write_case(32'h01001000,16'h000f,0,32'h01000000,8'ha4);
+    write_case(32'h01384ffc,16'hf000,0,32'h01383ff0,8'ha5);
+    write_case(32'h01385000,16'h000f,3,0,8'ha6);
+    read_case(32'h01384ffc,0,32'h01383ff0,8'ha7);
+    asset_loading=0;asset_ready=1;
+    write_case(32'h01001000,16'h000f,3,0,8'ha8);
+    read_case(32'h01001000,0,32'h01000000,8'ha9);
+    asset_ready=0;
+    if(SPRITE_ENABLE) begin
+        sprite_loading=1;
+        write_case(32'h01385000,16'h000f,0,32'h01384000,8'hac);
+        write_case(32'h014b0ffc,16'hf000,0,32'h014afff0,8'had);
+        write_case(32'h014b1000,16'h000f,3,0,8'hae);
+        read_case(32'h01385000,0,32'h01384000,8'haf);
+        sprite_loading=0;sprite_ready=1;
+        write_case(32'h01385000,16'h000f,3,0,8'hb0);
+        read_case(32'h01385000,0,32'h01384000,8'hb3);
+    end
     session_active=0;
     write_case(32'h00801000,16'h000f,3,0,8'hb1);
     read_case(32'h00001000,3,0,8'hb2);

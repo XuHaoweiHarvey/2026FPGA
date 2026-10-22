@@ -13,7 +13,7 @@ module rgb_framebuffer #(
     parameter WRITE_SERVICE_ENABLE=1, WRITE_READ_QUOTA=128,
     parameter WRITE_FIFO_LOW=RD_FIFO_DEPTH*3/8, WRITE_FIFO_HIGH=RD_FIFO_DEPTH/2,
     parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000,
-    parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0
+    parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0, ALPHA_ENABLE=0
 )(
     input wire axi_clk, input wire rst_n,
     input wire i_clk, input wire i_frame_start, input wire i_de,
@@ -60,6 +60,9 @@ module rgb_framebuffer #(
     output wire [31:0] service_read_quota,service_watermarks,
     input wire cpu_ddr_acquire,cpu_ddr_release,cpu_ddr_busy,cpu_ddr_clear_error,
     input wire [31:0] cpu_ddr_error,
+    input wire asset_begin,asset_seal,
+    output wire [31:0] asset_status,
+    input wire sprite_begin,sprite_seal,output wire [31:0] sprite_status,
     output wire cpu_ddr_session_active,output wire [31:0] cpu_ddr_session_status,
     input wire [31:0] cpu_awaddr,input wire cpu_awvalid,output wire cpu_awready,
     input wire [127:0] cpu_wdata,input wire [15:0] cpu_wstrb,
@@ -89,7 +92,12 @@ wire manager_draw_ready;
 wire [31:0] display_error;
 wire read_fault;
 reg cpu_session=0,cpu_session_fault=0;
+reg asset_loading=0,asset_ready=0,sprite_loading=0,sprite_ready=0;
 wire cpu_owner=CPU_DDR_ENABLE && D_MODE && cpu_session;
+assign asset_status={1'b1,28'b0,(cpu_session_fault || cpu_ddr_error!=0),
+                     asset_ready,asset_loading};
+assign sprite_status={1'b1,28'b0,(cpu_session_fault || cpu_ddr_error!=0),
+                      sprite_ready,sprite_loading};
 assign cpu_ddr_session_active=cpu_owner;
 assign cpu_ddr_session_status={27'b0,(CPU_DDR_ENABLE!=0),1'b0,cpu_session_fault,
                                cpu_ddr_busy,cpu_owner};
@@ -108,6 +116,29 @@ always @(posedge axi_clk or negedge axi_rst_n) begin
             if(cpu_session && !cpu_ddr_busy && !cpu_awvalid && !cpu_wvalid && !cpu_arvalid)
                 cpu_session<=0;
             else cpu_session_fault<=1;
+        end
+    end
+end
+always @(posedge axi_clk or negedge axi_rst_n) begin
+    if(!axi_rst_n) begin asset_loading<=0;asset_ready<=0;sprite_loading<=0;sprite_ready<=0;end
+    else if(CPU_DDR_ENABLE && D_MODE) begin
+        if(asset_begin && !sprite_loading && !asset_loading && !asset_ready && !cpu_session &&
+           !cpu_ddr_busy && !engine_busy && !d_pending && init_done &&
+           cpu_ddr_error==0 && !cpu_session_fault && read_healthy)
+            asset_loading<=1;
+        if(asset_seal && asset_loading && !asset_ready && !cpu_session &&
+           !cpu_ddr_busy && !engine_busy && !d_pending &&
+           cpu_ddr_error==0 && !cpu_session_fault && read_healthy) begin
+            asset_loading<=0;asset_ready<=1;
+        end
+        if(sprite_begin && ALPHA_ENABLE && asset_ready && !sprite_loading && !sprite_ready &&
+           !asset_loading && !cpu_session && !cpu_ddr_busy && !engine_busy && !d_pending &&
+           init_done && cpu_ddr_error==0 && !cpu_session_fault && read_healthy)
+            sprite_loading<=1;
+        if(sprite_seal && ALPHA_ENABLE && sprite_loading && !sprite_ready &&
+           !cpu_session && !cpu_ddr_busy && !engine_busy && !d_pending &&
+           cpu_ddr_error==0 && !cpu_session_fault && read_healthy) begin
+            sprite_loading<=0;sprite_ready<=1;
         end
     end
 end
@@ -249,16 +280,19 @@ generate if(C_MODE) begin: c_control
     if(BLIT_ENABLE) begin: graphics
         wire source_valid;
         blit_source_guard #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
-            .FRAME_STRIDE(FRAME_WIDTH*4)) source_guard (
+            .FRAME_STRIDE(FRAME_WIDTH*4),.ALPHA_ENABLE(ALPHA_ENABLE)) source_guard (
             .clk(axi_clk),.rst_n(axi_rst_n),.command_accept(d_command_accept),
             .front_base(d_front_base),.back_base(d_back_base),
             .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),
+            .op(cmd_op),.asset_ready(asset_ready),.sprite_ready(sprite_ready),
             .width(cmd_width),.height(cmd_height),.src_range_valid(source_valid));
         graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
-            .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)) engine (
+            .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),
+            .ALPHA_ENABLE(ALPHA_ENABLE)) engine (
             .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
             .op(cmd_op),.x(cmd_x),.y(cmd_y),.width(cmd_width),.height(cmd_height),.color(cmd_color),
-            .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),.src_range_valid(source_valid),.accept(),
+            .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),.back_base(d_back_base),
+            .src_range_valid(source_valid),.accept(),
             .busy(engine_busy),.done(engine_done),.error_code(engine_error),.command_count(command_count),
             .araddr(b_araddr),.arlen(b_arlen),.arvalid(b_arvalid),.arready(b_arready),
             .rdata(b_rdata),.rid(b_rid),.rresp(b_rresp),.rlast(b_rlast),.rvalid(b_rvalid),.rready(b_rready),
