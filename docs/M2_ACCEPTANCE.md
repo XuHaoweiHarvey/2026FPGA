@@ -2,7 +2,7 @@
 
 > 目录整理后，本页所述 M2 工程位于 `basic_demo/`。在该目录运行软件与检查脚本，并在 Efinity 打开 `basic_demo/ti60f225_oob.xml`；不要使用 `advanced_demo/` 的 M1a bit/ELF。本次迁移复验的独立软件构建位于 `basic_demo/output/board_revalidation/m2/m2_demo.elf`，本地 Launch 已指向它，搬来的旧 ELF 保留原样。
 
-状态：**RTL/C 开发与本机检查完成；Efinity 完整 Compile、Programmer 下载和真实 FPGA 验收待负责人执行。** 不把仿真 FPS 当作实板 FPS，也不沿用旧 bit/ELF 证明 M2。
+状态（2026-10-22 更新）：**项目负责人反馈 M2 已完成实板功能验收。** 本次对话提供的五张实板视频截图已归档，可见 50 个矩形动画、640×480 图片场景，以及 CPU/FPGA Render FPS 对照。实板功能结果以负责人的验收反馈为准；本仓库尚未归档本次所用 bit/ELF 哈希、完整 Efinity 时序/资源报告及错误计数快照，因此这些构建溯源数据仍待补充。不要把仿真 FPS 当作实板 FPS，也不要用旧 bit/ELF 代替 M2 对应构建。
 
 实际修改文件：`.gitignore`；`rtl/control/{accel_regs,sapphire_control}.v`、`rtl/framebuffer/{blit_source_guard,cpu_ddr_bridge,rgb_framebuffer}.v`、`rtl/ti60f225_oob_top.v`；`software/apb_reg_test/{accel_regs.h,main.c}`、新增 `software/m2_demo/{main.c,scene.h,assets.h,metrics.h,render.h}`；`scripts/build_apb_software.py`、新增 `scripts/run_m2_software_checks.py`；`sim/{tb_blit_source_guard,tb_checkpoint_d,tb_cpu_ddr_bridge,tb_graphics_contract,tb_graphics_double_buffer}.v`、新增 `sim/{tb_m2_asset_regs,tb_m2_full_asset_blit,m2_software_checks.c}`；`docs/{BUILD,REGISTER_MAP,M2_ACCEPTANCE}.md`。`software/m2_demo/build/` 是新 ELF 输出，已加入 ignore；历史 bit/ELF 未覆盖。
 
@@ -49,19 +49,33 @@ iverilog -g2005-sv -s tb_m2_full_asset_blit -o output/m2_full_asset_blit.vvp sim
 vvp output/m2_full_asset_blit.vvp
 ```
 
-`-g2005-sv` 用于共享测试文件中历史变量名 `checker`；M2 设计 RTL 无此限制。本机软件行为检查不能证明 Efinity 时序、真实 DDR 带宽、HDMI 连续性或板上 FPS。
+`-g2005-sv` 用于共享测试文件中历史变量名 `checker`；M2 设计 RTL 无此限制。本机软件行为检查本身不能证明 Efinity 时序、真实 DDR 带宽、HDMI 连续性或板上 FPS；本次实板观察和可读数值见第 5 节。
 
-## 4. 负责人实板验收步骤
+## 4. 实板复测与完整记录步骤
+
+本节保留可重复的完整检查流程。负责人已反馈实板功能验收通过；以下步骤也可用于复测、补齐构建溯源和长期运行记录。
 
 1. 保持当前工作目录 `D:\Github_repositories\2026FPGA`。在 Efinity 2026.1 打开当前 `ti60f225_oob.xml`，确认 top=`ti60f225_oob_top`、`soc_control` 是现有 Sapphire IP、56 个 design entries 包含 CPU Bridge。不要 Generate IP。执行**完整 Compile（含布局布线与时序）**，检查 100 MHz 时钟是否满足约束、资源和新告警；保存 `outflow/ti60f225_oob.info.log`、timing report、bit 文件时间及 SHA256。现存历史 bit 不代表 M2。
 2. 关闭旧 OpenOCD/GDB。Programmer 只下载本次 Compile 输出的 `outflow/ti60f225_oob.bit`，记录下载日志与同一 SHA256；初始 HDMI 应稳定。不要烧录/覆盖历史镜像。
 3. 在当前目录执行 `python scripts/build_apb_software.py --program m2 --opt O2 --output software/m2_demo/build`，记录 `software/m2_demo/build/m2_demo.elf` 的 SHA256；**此 ELF 对应本次 M2 bit**。想尝试 50 方块时先用相同命令加 `--define RECT_COUNT=50` 重建并记录新哈希，两端负载自动保持一致。
 4. RISC-V IDE 复制已有 Titanium Hard JTAG Debug 配置，把 `bsp_loc`、OpenOCD `-f`、SVD/寄存器描述、image、symbols 均指向当前目录。image 和 symbols 指向 `software/m2_demo/build/m2_demo.elf`，Startup PC=`f9000000`，禁用 IDE 自动重建旧 `apb_reg_test`。在 `main` 可设一次启动断点；计时期间不得单步或暂停。推荐另设 `m2_error_stop` 故障断点及 `m2_cycle_boundary` 完整四阶段后断点（采完一轮再停）。继续观察无限循环时移除周期断点。
-5. 首次启动应看到 `g_m2_result.phase` 按 1→2→3→4→5/6/7/8 运行，`asset_rows_written=asset_rows_verified=1440`，`asset_hash[i]=asset_verify_hash[i]`，`asset_status.bit1=1` 且 bit0=0，`asset_write_ticks`、`asset_verify_ticks`、`asset_total_ticks` 非零。装载秒数分别为这些 tick 除以 BSP 的 `SYSTEM_CLINT_HZ`；当前只有本机构建/仿真，无实板装载耗时数值。装载时间单独记录，绝不并入 Render FPS。若 CPU Debug 重启而平台未复位，READY 可保留；软件会完整重新校验已封存的三张图片。平台复位后 READY 应重新清零并重新装载。
+5. 首次启动应看到 `g_m2_result.phase` 按 1→2→3→4→5/6/7/8 运行，`asset_rows_written=asset_rows_verified=1440`，`asset_hash[i]=asset_verify_hash[i]`，`asset_status.bit1=1` 且 bit0=0，`asset_write_ticks`、`asset_verify_ticks`、`asset_total_ticks` 非零。装载秒数分别为这些 tick 除以 BSP 的 `SYSTEM_CLINT_HZ`；本次提供的截图未显示素材装载 tick，因此不在本报告中填写实板装载耗时。装载时间单独记录，绝不并入 Render FPS。若 CPU Debug 重启而平台未复位，READY 可保留；软件会完整重新校验已封存的三张图片。平台复位后 READY 应重新清零并重新装载。
 6. HDMI 左上四行应持续显示 CPU Render FPS、FPGA Render FPS、Hardware Speedup 与 `MOVING RECTANGLES` / `IMAGE SWITCHING`；模式标签显示 CPU/FPGA。未取得对照样本时显示 WAIT。640×480 绘图区域在中下方，矩形持续运动且无残影；图片 0/1/2 色彩图案明显不同并循环切换。四阶段每段从**首帧实际出现**起至少 5 秒，完整一轮至少 20 秒加各阶段首帧等待；阶段之间无额外固定停顿，也不会 PASS 停止。
 7. 在 `m2_cycle_boundary` 暂停检查 `g_m2_result.cycle>=1`、`error=0`、`metric[0][0][0]` / `[0][1][0]` / `[1][0][0]` / `[1][1][0]` 的 `valid=1`、`fps_x100>0`、`last_frames>0`、`last_render_ticks>0`。首两帧的 `metric[0][mode][1]` 另记过渡成本；不与稳态 class0 混算。`presented_fps_x100[scene][mode]` 应为实际 Swap 的速率，通常低于或等于 Render FPS；不能把固定 HDMI 60 Hz 当成渲染值。记录同场景 CPU/FPGA 的原始 ticks 和 HUD 数值，速度比应与两 FPS 比值相符。
 8. 继续运行至少数轮、记录照片/视频和各场景耗时。检查 `stage_first_present_log[scene][mode]`、`stage_last_present_log[scene][mode]`：四项差值各至少 `5×SYSTEM_CLINT_HZ`；对应 `stage_presents_log>=1`。对 24 方块先测可观察运动与 CPU/FPGA 区别；若方块过少或 CPU 阶段不易形成连续动画，再以相同配置构建 **两种模式共同使用** 的 32/40/50/64 方块版本，保存每版 Render/Presented FPS、HDMI 视频和错误计数，由实板结果决定最终 `RECT_COUNT`。
 9. 错误诊断看 `g_m2_result.phase=255`、`error`（E400配置、E401会话、E402素材、E404时钟、E405系统健康、E406角色、E407超时；图形/API 错误直接记录其返回码），同时保存 `cpu_status`、`cpu_error`、`asset_status`、`reader_error`、`underflow_delta`、`missed_delta`、`front/back`、`command_delta`、`swap_delta`、`asset_image`、`asset_error_x/y`、`asset_expected/actual`、`row_progress`。从 APB 再读 `ERROR_CODE`、`CPU_DDR_STATUS/ERROR`、`READER_ERROR`、UNDERFLOW/MISSED 累计值；计数与启动稳定 baseline 比较应 **增量 0**。发生在途 AXI 故障时保留状态和板上日志，不通过 CPU 超时强制释放或切换 Front。
 10. 用相同板与本次 M2 bit 可分别加载保留的 Mode 0～5 ELF 做回归；至少复查 Mode 4、M1a CPU DDR Smoke、M1b Mode 5、原 FILL/普通 BLIT/Color Key 与 Front/Back Swap。ELF 不得错配；先记录并保存原有历史 bit/ELF，回退时按各阶段已验证的 bit+ELF 成对恢复。M2 新 bit 对旧功能的板级兼容性仍须由负责人确认。
 
-判定条件：三张资源写入并完整读回，READY 后只读；四阶段持续循环、每段首个有效画面后至少 5 秒且安全切换；CPU 与 FPGA 图元/图片任务一致，完整动态帧 FPS 与 Speedup 可追溯；显示无新增 underflow/missed，所有 DDR/reader/引擎错误为零，旧功能无退化。**收到负责人实板反馈前，本文件状态保持“待验收”。**
+## 5. 本次实板结果归档
+
+反馈日期：2026-10-22；实际上板测试日期、工程提交号及测试所用 bit/ELF 哈希未随截图提供。负责人反馈 M2 已完成实板验收。本节只记录截图中可直接读到的现象和数值，不从静态截图推断运行期间的错误计数或长期稳定性。
+
+| 场景 | 截图可见工作量 / 模式 | CPU Render FPS | FPGA Render FPS | HUD Speedup | 截图 |
+|---|---|---:|---:|---:|---|
+| 移动矩形样本 A | 50 个矩形 | 0.76 | 65.83 | 86.61× | [截图](evidence/m2_board_20261022/01_rectangles_run_a.png) |
+| 移动矩形样本 B | 50 个矩形 | 3.79 | 90.53 | 23.88× | [截图](evidence/m2_board_20261022/02_rectangles_run_b.png) |
+| 图片切换 | CPU/FPGA 640×480 图片阶段可见 | 0.81 | 99.39 | 122.70× | [阶段截图 1](evidence/m2_board_20261022/03_image_stage_a.png)、[阶段截图 2](evidence/m2_board_20261022/04_image_stage_b.png)、[阶段截图 3](evidence/m2_board_20261022/05_image_stage_c.png) |
+
+画面中可见矩形和图片场景、CPU/FPGA 模式标签及 FPS HUD；截图帧内没有明显花屏或黑屏。截图显示的数值是 **Render FPS**，代表所定义渲染区间的吞吐，不等于 HDMI 刷新率或安全换帧后的 `presented_fps`。矩形两组读数差别较大，且截图没有标明测量窗口和 metric class，故分别保留为样本，不直接平均或据此宣称稳态值。图片阶段的 0.81 / 99.39 / 122.70× 是 HUD 截图读数，不是本报告重新计算的多轮平均值。
+
+负责人反馈的实板功能验收结论为**通过**。为便于队友复核及追溯，本仓库后续仍可补录：实际测试日期和源码提交、Efinity 完整编译的时序/资源报告、本次下载 bit 与运行 ELF 的 SHA256 配对、完整四阶段运行时长，以及 `underflow_delta`、`missed_delta`、`reader_error`、DDR/引擎错误等数值。当前截图本身不展示这些诊断字段，因此本报告不替它们填写“零”。复测标准仍按第 4 节的判定条件执行。
