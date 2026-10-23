@@ -85,7 +85,7 @@
     *   Enable printing with semihosting.
     */
 ////////////////////////////////////////////////////////////////////////////////
-#define ENABLE_SEMIHOSTING_PRINT            1
+#define ENABLE_SEMIHOSTING_PRINT            0
 
 
 #if (ENABLE_BSP_PRINTF)

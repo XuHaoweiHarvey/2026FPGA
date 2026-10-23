@@ -1,90 +1,82 @@
-# Advanced graphics game demo
+# 高级图形与游戏演示
 
-This directory implements the competition's high-level challenges: hardware
-Alpha blending, Color Key sprites, and a high-load interactive game running on
-the RISC-V CPU with FPGA-accelerated drawing. `basic_demo` remains unchanged.
+`advanced_demo` 用于完成赛题高级挑战：硬件 Alpha 混合、不规则精灵图的
+Color Key 透明处理，以及由 RISC-V CPU 运行、FPGA 加速绘图的高负载互动游戏。
+`basic_demo` 仍是单独保留的 M2 基线工程。
 
-The final demonstration is a keyboard-controlled survival game. The player
-moves with WASD or the arrow keys, holds Space or Ctrl to fire, and presses P
-to pause. The game uses Color Key for opaque sprites with transparent borders
-and Alpha blending for the player's glow, projectiles, and hit effects. Enemy
-waves ramp up toward 48 simultaneous enemies. On-screen counters report the
-presented game FPS, current Sprite count, and maximum observed Sprite count so
-the team can measure the 60 FPS challenge on the board.
+最终演示是键盘控制的弹幕生存游戏：WASD 或方向键移动，空格或 Ctrl 开火，P
+暂停。玩家和敌人图片使用 Color Key 去除背景，光晕、子弹和受击效果使用 Alpha
+混合。敌人波次逐渐增加，最多接近 48 个同时活动的精灵。画面显示游戏帧率、当前
+精灵数量和运行期间观察到的最大精灵数量，用于上板测量性能。
 
-The game ELF issues Color Key and Alpha commands; it does not issue ordinary
-`OP_BLIT` commands. The RTL keeps BLIT support enabled because Color Key uses
-the shared source-transfer path and the accelerator's configuration requires
-that support. The retained M2 regression also exercises ordinary BLIT. BLIT is
-therefore a lower-level accelerator operation, not a separate advanced-game
-mode or a standalone demonstration. The game does not render a CPU/FPGA
-comparison scene.
+游戏 ELF 发送 Color Key 和 Alpha 命令，不发送普通 `OP_BLIT` 命令。RTL 仍保留
+BLIT 支持，因为 Color Key 使用共享的源图传输通路，且加速器配置需要该支持；
+保留的 M2 回归也会测试普通复制。高级游戏中没有 CPU/FPGA 对照模式。
 
-## Build and controls
+## 当前构建和上板状态
 
-The confirmed board is TI60F225I3-V4. Its UART pins are reserved in the top
-module, control wrapper and peripheral constraints: FPGA RX is R4/GPIOL_02,
-and FPGA TX is R14/GPIOR_28 (3.3 V LVCMOS). TX currently stays idle high because
-the checked-in generated SoC has no UART0. This is a reservation, not a working
-keyboard link. The generated Sapphire SoC/BSP must include UART0 before
-building the game ELF:
+已在重新生成的 Sapphire SoC/BSP 中启用 UART0。控制模块已将
+`system_uart_0_io_rxd` 接到板卡 UART 接收端，将 `system_uart_0_io_txd` 接到板卡
+UART 发送端。串口配置为 115200 波特率、8 数据位、无校验、1 停止位。TI60F225I3-V4
+引脚约束为 RX：R4/GPIOL_02，TX：R14/GPIOR_28，均为 3.3 V LVCMOS。
+`scripts/check_project.py` 已通过，并确认生成的 SoC/BSP 端口连接正确。
 
-```powershell
-py -3 scripts/build_apb_software.py --program game
-py -3 scripts/build_apb_software.py --program keyboard-test
-py -3 tools/keyboard_uart.py --list
-py -3 tools/keyboard_uart.py COM7
-```
+Efinity 2026.1.132 于 2026-10-23 完成完整编译，生成以下文件：
 
-The game ELF is written to `software/interactive_demo/build/game/`. The
-diagnostic ELF is separate under `software/interactive_demo/build/keyboard-test/`.
-Use the game ELF with the UART-enabled game bitstream. The diagnostic ELF is
-only for checking the keyboard link and is not the game.
+- FPGA 配置文件：`outflow/ti60f225_oob.bit`
+- 游戏程序：`software/interactive_demo/build/game/survival_game.elf`
+- UART 诊断程序：`software/interactive_demo/build/keyboard-test/uart_keyboard_test.elf`
 
-In this checkout, UART0 is disabled in `ip/soc_control/settings.json` and the
-generated BSP has no UART0 registers. Do not edit only that JSON file. Use
-Efinity IP Manager to enable UART0 and regenerate the SoC/BSP, then replace the
-idle TX assignment in `rtl/control/sapphire_control.v` with the actual generated
-RX/TX named-port connections. The V4 pin reservations are already in
-`ti60f225_oob.peri.xml`; do not copy the opposite-direction pin mapping from
-the older generic SoC example. Run `scripts/check_project.py` and a full
-Efinity build after connecting UART0. The game/diagnostic software builder also
-runs this connection check before compiling. The old v6 Alpha comparison
-ELF/bit package does not include this UART integration and is not the game
-build. Existing build outputs are ignored by Git.
+这些文件位于 Git 忽略的构建目录中，普通 Git 提交和推送不会包含它们。烧录时要
+配对使用同一次构建生成的 bit 和对应 ELF。UART 实际收发、游戏画面、游戏帧率和
+最大精灵数量还没有在实体板上验证。本机当前列出的 COM 口只有蓝牙虚拟串口；接上
+板卡后还需要确认 FT4232 对应的 UART 通道和 Windows 分配的 COM 号。详见
+[构建报告](docs/GAME_BUILD_REPORT.md)、[键盘串口说明](docs/KEYBOARD_UART_INPUT.md)
+和[上板验证清单](docs/BOARD_VALIDATION_CHECKLIST.md)。
 
-`COM7` above is only an example. Windows assigns the port on each PC; choose
-it when launching the sender, without editing or rebuilding FPGA/game sources.
-The teammate can identify the FT4232 COM channel during board validation.
-See `docs/KEYBOARD_UART_INPUT.md` for the handoff steps.
+## 构建与运行
 
-## Verification
-
-Run the portable game-logic checks and board-app syntax check on a host:
+在本机 PowerShell 中进入 `advanced_demo` 目录后，可用 Efinity 自带的 Python
+运行工程脚本。`PYTHONHOME` 只影响当前 PowerShell 窗口：
 
 ```powershell
-py -3 scripts/run_game_logic_checks.py
-py -3 scripts/run_uart_keyboard_checks.py
+$env:PYTHONHOME = 'D:\Efinity\python311'
+$efxPython = 'D:\Efinity\python311\bin\python.exe'
+& $efxPython scripts\check_project.py
+& $efxPython scripts\build_apb_software.py --program game
+& $efxPython scripts\build_apb_software.py --program keyboard-test
+& $efxPython tools\keyboard_uart.py --list
+& $efxPython tools\keyboard_uart.py COMx
 ```
 
-The game logic tests movement bounds, firing/scoring, pause/restart edges,
-preservation of effect/protection/cooldown timers while paused (including clock
-wrap), and Sprite accounting. UART protocol tests cover framing, CRC, replay rejection,
-release on timeout, and FIFO adapter behavior. These host tests do not verify
-the generated SoC, physical UART pins, DDR/display timing, or board FPS.
+其他装有可用 Python 3 启动器的电脑，可以用 `py -3` 替代 `$efxPython`。将
+`COMx` 换成接上板卡后实际显示的串口号；Windows 可能在不同电脑或 USB 插口上分配
+不同编号。启动键盘发送程序前，先关闭占用该 COM 口的串口终端。键盘测试和游戏
+运行顺序见串口说明。
 
-The graphics regressions remain available for the required hardware features:
+初次验证时，在 Efinity Programmer 中通过 JTAG 临时配置 bit，不要写入 SPI Flash。
+再通过 Efinity RISC-V IDE 加载与之匹配的诊断 ELF 或游戏 ELF。建议先运行诊断程序
+确认串口收到按键，再运行游戏。不要把这些 ELF 与早期仅含 Alpha 演示的 v6 bit
+混用。
+
+## 验证
+
+可在 PowerShell 中运行以下检查：
 
 ```powershell
-py -3 scripts/run_alpha_checks.py
-powershell -ExecutionPolicy Bypass -File scripts/run_color_key_checks.ps1
+$env:PYTHONHOME = 'D:\Efinity\python311'
+$efxPython = 'D:\Efinity\python311\bin\python.exe'
+& $efxPython scripts\check_project.py
+& $efxPython scripts\run_game_logic_checks.py
+& $efxPython scripts\run_uart_keyboard_checks.py
+& $efxPython scripts\run_alpha_checks.py
+powershell -ExecutionPolicy Bypass -File scripts\run_color_key_checks.ps1
 ```
 
-Record the board's presented FPS and maximum Sprite count while both Alpha and
-Color Key are active. Also record `error`, `reader_error`, underflow and missed
-boundary deltas. The stable simultaneous Sprite count at 60 FPS can only be
-established by running the UART-enabled game build on the target board.
+游戏逻辑和 UART 协议的 C 回归需要本机 C 编译器。主机测试不能验证板卡串口接线、
+显示时序、实际图像或帧率。上板时请记录显示帧率、最大精灵数量、`error`、
+`reader_error`、underflow、missed 计数变化以及 UART 接收计数。只有在目标板上才能
+确认键盘操作和持续 60 FPS 的表现。
 
-The M2 comparison sources, builders, and regression scripts that remain in this
-engineering checkout support earlier baselines and compatibility checks; they
-are not advanced-demo modes and are not linked into the game ELF.
+工程中保留的 M2 对照代码和回归脚本用于基线兼容性检查，不属于高级游戏模式，也
+没有链接进游戏 ELF。

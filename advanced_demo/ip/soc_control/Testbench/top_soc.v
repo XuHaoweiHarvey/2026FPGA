@@ -18,6 +18,8 @@
 `timescale 1ns / 1ps
 
 module top_soc (
+output		system_uart_0_io_txd,
+input		system_uart_0_io_rxd,
 input		io_memoryClk,
 output		memoryClk_rstn,
 input		memoryClk_locked,
@@ -59,6 +61,14 @@ wire 		reset;
 wire		io_systemReset;
 wire 	    io_memoryReset;				
 wire [1:0]  io_ddrA_b_payload_resp=2'b00;
+wire [15:0] io_apbSlave_0_PADDR;
+wire		io_apbSlave_0_PSEL;
+wire		io_apbSlave_0_PENABLE;
+wire		io_apbSlave_0_PREADY;
+wire		io_apbSlave_0_PWRITE;
+wire [31:0] io_apbSlave_0_PWDATA;
+wire [31:0] io_apbSlave_0_PRDATA;
+wire		io_apbSlave_0_PSLVERROR;
 wire [7:0] m_aid_0;
 wire [31:0] m_aaddr_0;
 wire [7:0]  m_alen_0;
@@ -107,42 +117,21 @@ wire [7:0] io_ddrA_aw_payload_len;
 wire [2:0] io_ddrA_aw_payload_size;
 wire [1:0] io_ddrA_aw_payload_burst;
 wire [1:0] io_ddrA_aw_payload_lock;
-wire [15:0] io_apbSlave_0_PADDR;
-wire		io_apbSlave_0_PSEL;
-wire		io_apbSlave_0_PENABLE;
-wire		io_apbSlave_0_PREADY;
-wire		io_apbSlave_0_PWRITE;
-wire [31:0] io_apbSlave_0_PWDATA;
-wire [31:0] io_apbSlave_0_PRDATA;
-wire		io_apbSlave_0_PSLVERROR;
 
 
 /////////////////////////////////////////////////////////////////////////////
 //Reset and PLL
 assign reset 	= ~( io_asyncResetn & systemClk_locked);
 assign systemClk_rstn 	= 1'b1;
-assign io_ddrA_w_payload_id='h0;
-assign memoryClk_rstn=1'b1;
 assign memoryCheckerPass=m_pass_0;
+assign memoryClk_rstn=1'b1;
 assign m_aready_0=(m_atype_0 & m_awready_0) | (!m_atype_0 & m_arready_0);
 assign m_awvalid_0=m_avalid_0 & m_atype_0;
 assign m_arvalid_0=m_avalid_0 & ~m_atype_0;
+assign io_ddrA_w_payload_id='h0;
 
 
 /////////////////////////////////////////////////////////////////////////////
-apb3_slave #(
-.ADDR_WIDTH(16)) apb_slave_0 (
-.clk(io_systemClk),
-.resetn(~io_systemReset),
-.PADDR(io_apbSlave_0_PADDR),
-.PSEL(io_apbSlave_0_PSEL),
-.PENABLE(io_apbSlave_0_PENABLE),
-.PREADY(io_apbSlave_0_PREADY),
-.PWRITE(io_apbSlave_0_PWRITE),
-.PWDATA(io_apbSlave_0_PWDATA),
-.PRDATA(io_apbSlave_0_PRDATA),
-.PSLVERROR(io_apbSlave_0_PSLVERROR));
-
 timer_start #(
 .MHZ(100),
 .SECOND(3)
@@ -186,6 +175,19 @@ memory_checker #(
 .bready(m_bready_0),
 .pass(m_pass_0));
 
+apb3_slave #(
+.ADDR_WIDTH(16)) apb_slave_0 (
+.clk(io_systemClk),
+.resetn(~io_systemReset),
+.PADDR(io_apbSlave_0_PADDR),
+.PSEL(io_apbSlave_0_PSEL),
+.PENABLE(io_apbSlave_0_PENABLE),
+.PREADY(io_apbSlave_0_PREADY),
+.PWRITE(io_apbSlave_0_PWRITE),
+.PWDATA(io_apbSlave_0_PWDATA),
+.PRDATA(io_apbSlave_0_PRDATA),
+.PSLVERROR(io_apbSlave_0_PSLVERROR));
+
 fd_to_hd_wrapper fd_to_hd_wrapper_inst(
 .clk(io_memoryClk),
 .reset(io_memoryReset),
@@ -221,45 +223,6 @@ fd_to_hd_wrapper fd_to_hd_wrapper_inst(
 
 soc_control soc_inst
 (
-.io_ddrA_aw_valid(io_ddrA_aw_valid),
-.io_ddrA_aw_ready(io_ddrA_aw_ready),
-.io_ddrA_aw_payload_addr(io_ddrA_aw_payload_addr),
-.io_ddrA_aw_payload_id(io_ddrA_aw_payload_id),
-.io_ddrA_aw_payload_len(io_ddrA_aw_payload_len),
-.io_ddrA_aw_payload_size(io_ddrA_aw_payload_size),
-.io_ddrA_aw_payload_burst(io_ddrA_aw_payload_burst),
-.io_ddrA_aw_payload_lock(io_ddrA_aw_payload_lock[0]),
-.io_ddrA_aw_payload_prot(),
-.io_ddrA_aw_payload_qos(),
-.io_ddrA_aw_payload_cache(),
-.io_ddrA_aw_payload_region(),
-.io_ddrA_ar_valid(io_ddrA_ar_valid),
-.io_ddrA_ar_ready(io_ddrA_ar_ready),
-.io_ddrA_ar_payload_addr(io_ddrA_ar_payload_addr),
-.io_ddrA_ar_payload_id(io_ddrA_ar_payload_id),
-.io_ddrA_ar_payload_len(io_ddrA_ar_payload_len),
-.io_ddrA_ar_payload_size(io_ddrA_ar_payload_size),
-.io_ddrA_ar_payload_burst(io_ddrA_ar_payload_burst),
-.io_ddrA_ar_payload_lock(io_ddrA_ar_payload_lock[0]),
-.io_ddrA_ar_payload_prot(),
-.io_ddrA_ar_payload_qos(),
-.io_ddrA_ar_payload_cache(),
-.io_ddrA_ar_payload_region(),
-.io_ddrA_w_valid(io_ddrA_w_valid),
-.io_ddrA_w_ready(io_ddrA_w_ready),
-.io_ddrA_w_payload_data(io_ddrA_w_payload_data),
-.io_ddrA_w_payload_strb(io_ddrA_w_payload_strb),
-.io_ddrA_w_payload_last(io_ddrA_w_payload_last),
-.io_ddrA_b_valid(io_ddrA_b_valid),
-.io_ddrA_b_ready(io_ddrA_b_ready),
-.io_ddrA_b_payload_id(io_ddrA_b_payload_id),
-.io_ddrA_b_payload_resp(io_ddrA_b_payload_resp),
-.io_ddrA_r_valid(io_ddrA_r_valid),
-.io_ddrA_r_ready(io_ddrA_r_ready),
-.io_ddrA_r_payload_data(io_ddrA_r_payload_data),
-.io_ddrA_r_payload_id(io_ddrA_r_payload_id),
-.io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
-.io_ddrA_r_payload_last(io_ddrA_r_payload_last),
 .io_apbSlave_0_PADDR(io_apbSlave_0_PADDR),
 .io_apbSlave_0_PSEL(io_apbSlave_0_PSEL),
 .io_apbSlave_0_PENABLE(io_apbSlave_0_PENABLE),
@@ -268,16 +231,8 @@ soc_control soc_inst
 .io_apbSlave_0_PWDATA(io_apbSlave_0_PWDATA),
 .io_apbSlave_0_PRDATA(io_apbSlave_0_PRDATA),
 .io_apbSlave_0_PSLVERROR(io_apbSlave_0_PSLVERROR),
-.io_memoryClk(io_memoryClk),
-.io_memoryReset(io_memoryReset),
-.jtagCtrl_tck(),
-.jtagCtrl_tdi(),
-.jtagCtrl_tdo(),
-.jtagCtrl_enable(),
-.jtagCtrl_capture(),
-.jtagCtrl_shift(),
-.jtagCtrl_update(),
-.jtagCtrl_reset(),
+.system_uart_0_io_txd(system_uart_0_io_txd),
+.system_uart_0_io_rxd(system_uart_0_io_rxd),
 .io_ddrMasters_0_clk(io_memoryClk),
 .io_ddrMasters_0_reset(io_axiMasterReset_0),
 .io_ddrMasters_0_aw_valid(m_awvalid_0),
@@ -319,6 +274,55 @@ soc_control soc_inst
 .io_ddrMasters_0_r_payload_id(m_rid_0),
 .io_ddrMasters_0_r_payload_resp(m_rresp_0),
 .io_ddrMasters_0_r_payload_last(m_rlast_0),
+.io_ddrA_aw_valid(io_ddrA_aw_valid),
+.io_ddrA_aw_ready(io_ddrA_aw_ready),
+.io_ddrA_aw_payload_addr(io_ddrA_aw_payload_addr),
+.io_ddrA_aw_payload_id(io_ddrA_aw_payload_id),
+.io_ddrA_aw_payload_len(io_ddrA_aw_payload_len),
+.io_ddrA_aw_payload_size(io_ddrA_aw_payload_size),
+.io_ddrA_aw_payload_burst(io_ddrA_aw_payload_burst),
+.io_ddrA_aw_payload_lock(io_ddrA_aw_payload_lock[0]),
+.io_ddrA_aw_payload_prot(),
+.io_ddrA_aw_payload_qos(),
+.io_ddrA_aw_payload_cache(),
+.io_ddrA_aw_payload_region(),
+.io_ddrA_ar_valid(io_ddrA_ar_valid),
+.io_ddrA_ar_ready(io_ddrA_ar_ready),
+.io_ddrA_ar_payload_addr(io_ddrA_ar_payload_addr),
+.io_ddrA_ar_payload_id(io_ddrA_ar_payload_id),
+.io_ddrA_ar_payload_len(io_ddrA_ar_payload_len),
+.io_ddrA_ar_payload_size(io_ddrA_ar_payload_size),
+.io_ddrA_ar_payload_burst(io_ddrA_ar_payload_burst),
+.io_ddrA_ar_payload_lock(io_ddrA_ar_payload_lock[0]),
+.io_ddrA_ar_payload_prot(),
+.io_ddrA_ar_payload_qos(),
+.io_ddrA_ar_payload_cache(),
+.io_ddrA_ar_payload_region(),
+.io_ddrA_w_valid(io_ddrA_w_valid),
+.io_ddrA_w_ready(io_ddrA_w_ready),
+.io_ddrA_w_payload_data(io_ddrA_w_payload_data),
+.io_ddrA_w_payload_strb(io_ddrA_w_payload_strb),
+.io_ddrA_w_payload_last(io_ddrA_w_payload_last),
+.io_ddrA_b_valid(io_ddrA_b_valid),
+.io_ddrA_b_ready(io_ddrA_b_ready),
+.io_ddrA_b_payload_id(io_ddrA_b_payload_id),
+.io_ddrA_b_payload_resp(io_ddrA_b_payload_resp),
+.io_ddrA_r_valid(io_ddrA_r_valid),
+.io_ddrA_r_ready(io_ddrA_r_ready),
+.io_ddrA_r_payload_data(io_ddrA_r_payload_data),
+.io_ddrA_r_payload_id(io_ddrA_r_payload_id),
+.io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
+.io_ddrA_r_payload_last(io_ddrA_r_payload_last),
+.jtagCtrl_tck(),
+.jtagCtrl_tdi(),
+.jtagCtrl_tdo(),
+.jtagCtrl_enable(),
+.jtagCtrl_capture(),
+.jtagCtrl_shift(),
+.jtagCtrl_update(),
+.jtagCtrl_reset(),
+.io_memoryClk(io_memoryClk),
+.io_memoryReset(io_memoryReset),
 
 .io_systemClk(io_systemClk),
 .io_asyncReset(reset),

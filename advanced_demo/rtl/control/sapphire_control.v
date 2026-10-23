@@ -70,13 +70,8 @@ wire s_bvalid,s_bready,s_arvalid,s_arready,s_rlast,s_rvalid,s_rready;
 wire [127:0] s_wdata,s_rdata;
 wire [15:0] s_wstrb;
 
-// UART0 reservation only: the checked-in generated SoC has no UART ports.
-// After IP Manager regenerates UART0 and the BSP, replace this idle driver
-// with the actual RX/TX named-port connections on u_soc_control below.
-// uart_rx is deliberately unused until then; do not infer a second receiver.
-assign uart_tx = 1'b1;
-
-// Ports are taken from the user's generated ip/soc_control/soc_control_tmpl.v.
+// UART0 ports are taken from the regenerated ip/soc_control/soc_control_tmpl.v.
+// The board's RX pad drives the SoC receiver; the SoC transmitter drives TX.
 soc_control u_soc_control (
     .io_systemClk(core_clk), .io_asyncReset(!soc_rst_n),
     .io_systemReset(system_reset),.io_memoryClk(core_clk),.io_memoryReset(memory_reset),
@@ -87,6 +82,7 @@ soc_control u_soc_control (
     .io_apbSlave_0_PENABLE(apb_enable), .io_apbSlave_0_PWRITE(apb_write),
     .io_apbSlave_0_PWDATA(apb_wdata), .io_apbSlave_0_PRDATA(apb_rdata),
     .io_apbSlave_0_PREADY(apb_ready), .io_apbSlave_0_PSLVERROR(apb_error),
+    .system_uart_0_io_rxd(uart_rx), .system_uart_0_io_txd(uart_tx),
     .io_ddrA_aw_payload_addr(s_awaddr),.io_ddrA_aw_payload_id(s_awid),
     .io_ddrA_aw_payload_len(s_awlen),.io_ddrA_aw_payload_size(s_awsize),
     .io_ddrA_aw_payload_burst(s_awburst),.io_ddrA_aw_payload_lock(s_awlock),

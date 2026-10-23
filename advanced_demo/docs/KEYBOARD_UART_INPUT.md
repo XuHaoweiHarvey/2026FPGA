@@ -1,116 +1,108 @@
-# PC keyboard input over UART for the advanced game
+# 通过 UART 使用电脑键盘控制高级游戏
 
-The survival game uses a USB-UART key-state link. The PC helper sends a
-complete key bitmap at 50 Hz; the board parser rejects corrupt, duplicate and
-old frames. If no good frame arrives for 150 ms, it releases every key so a
-disconnected cable cannot leave movement stuck.
+游戏通过 USB-UART 串口接收电脑键盘状态。电脑端小程序每秒发送 50 次完整按键状态；
+板端解析程序会拒绝校验错误、重复或过期的数据帧。如果连续 150 ms 没有收到有效帧，
+板端会释放全部按键，避免串口断开后角色一直移动。
 
-## Frame format
+## 数据帧格式
 
-All bytes are sent 8-N-1 at 115200 baud, least-significant bit first as standard
-UART. Every packet is six bytes:
+串口参数为 115200 波特率、8-N-1，按标准 UART 顺序发送。每帧共 6 字节：
 
-| Byte | Meaning |
+| 字节 | 含义 |
 |---|---|
-| 0–1 | Sync: `A5 5A` |
-| 2 | Protocol version: `01` |
-| 3 | Unsigned sequence number, wraps at 255 |
-| 4 | Current key bitmap |
-| 5 | CRC-8/ATM (polynomial `07`, initial value `00`, no reflection/xorout), over bytes 2–4 |
+| 0–1 | 帧同步标志：`A5 5A` |
+| 2 | 协议版本：`01` |
+| 3 | 无符号序号，每发送一帧加一，最大 255 后回到 0 |
+| 4 | 当前按键位图 |
+| 5 | CRC-8/ATM，生成多项式 `07`、初值 `00`、不反射且无异或输出；校验字节 2–4 |
 
-Button bits: bit 0 up, bit 1 down, bit 2 left, bit 3 right, bit 4 fire, and
-bit 5 pause. Reserved bits must be zero. The sequence difference must be 1–127
-modulo 256; the receiver accepts wraparound and rejects duplicates/replays.
-Packets describe current state rather than key transitions, so releases are
-sent as part of the next frame. The PC utility sends two all-released frames
-on exit, and the board has the 150 ms timeout as a second release path.
+按键位定义：bit 0 上、bit 1 下、bit 2 左、bit 3 右、bit 4 开火、bit 5 暂停；
+保留位必须为 0。板端只接受模 256 后序号差为 1–127 的新帧，因此允许序号回绕，
+拒绝重复帧和重放帧。每帧携带完整按键状态，不只发送按下/抬起事件。电脑程序退出时
+会连续发送两帧“全部松开”；板端的 150 ms 超时也是一层保护。
 
-## PC sender
+## 电脑端键盘发送程序
 
-`tools/keyboard_uart.py` uses only Python's standard library and Windows
-Win32 serial/keyboard APIs; it does not need pyserial or administrator rights.
-Close any terminal program that already has the COM port open. List ports and
-start the sender from PowerShell in this directory:
+`tools/keyboard_uart.py` 使用 Python 标准库和 Windows 自带的 Win32 键盘、串口接口；
+不需要安装 pyserial，也不需要管理员权限。先关闭已经占用该 COM 口的串口终端。在
+`advanced_demo` 目录下打开 PowerShell，运行：
 
 ```powershell
-py -3 tools/keyboard_uart.py --list
-py -3 tools/keyboard_uart.py COM7
+$env:PYTHONHOME = 'D:\Efinity\python311'
+$efxPython = 'D:\Efinity\python311\bin\python.exe'
+& $efxPython tools\keyboard_uart.py --list
+& $efxPython tools\keyboard_uart.py COMx
 ```
 
-Replace `COM7` with the board's serial port from Device Manager. The COM number
-can differ on each PC and is selected only when running this utility; it is
-not an FPGA parameter and does not block further game development. The sender
-reads keyboard state globally, so it does not need its window focused. WASD or
-the arrow keys move, Space or Ctrl fires, P pauses, and Esc exits after sending
-released keys. `--baud` and `--rate` can override the defaults when the board
-configuration is changed.
+把 `COMx` 替换为接上板卡后 `--list` 显示的板卡 UART 串口号。COM 编号由 Windows
+分配，不同电脑或 USB 插口可能不同。本机当前的 `py -3` 启动器无法正常启动它登记的
+Python，因此本机请使用上面的 Efinity Python 命令。`PYTHONHOME` 仅影响当前
+PowerShell 窗口。
 
-## Game and FPGA integration status
+发送程序在后台读取全局键盘状态，不要求窗口处于前台。WASD 或方向键移动，空格或
+Ctrl 开火，P 暂停，Esc 退出并发送松键状态。若固件串口参数改变，可通过 `--baud`
+和 `--rate` 更改发送端的波特率和发送频率。
 
-The reusable nonblocking receiver is in
-`software/interactive_demo/uart_keyboard_input.h`; the game polls it between
-render commands, reads the current bitmap, and latches press/release edges for
-taps that arrive between game frames. Polling is capped at 128 bytes per call
-so a busy or corrupt stream cannot monopolize rendering. The separate
-`software/interactive_demo/uart_keyboard_test.c` diagnostic firmware exposes
-`g_uart_keyboard_result` for debugger inspection. In this checkout UART0 is
-disabled in `ip/soc_control/settings.json`, and the generated SoC has no UART
-ports, so neither the game ELF nor the diagnostic ELF can yet be built against
-the checked-in BSP. Do not enable it by hand only in the JSON: regenerate the
-SoC and BSP through Efinity IP Manager before using the game on the board.
+## FPGA 接入情况
 
-The board model is confirmed as TI60F225I3-V4. The manual's UART table (PDF
-page 35, printed page 34) identifies UART_RX as GPIOL_02 (R4, FPGA input) and
-UART_TX as GPIOR_28 (R14, FPGA output). The reservation is already in source:
+UART0 已在 `ip/soc_control/settings.json` 中启用，并已生成到 Sapphire SoC 和 BSP。
+`rtl/control/sapphire_control.v` 将生成端口 `system_uart_0_io_rxd` 和
+`system_uart_0_io_txd` 接到板卡 UART 输入、输出。TI60F225I3-V4 的引脚约束如下：
 
-| File | Current reservation |
-|---|---|
-| `rtl/ti60f225_oob_top.v` | `uart_rx` / `uart_tx` ports, connected to the control wrapper |
-| `rtl/control/sapphire_control.v` | UART ports; TX held high, RX unused until UART0 is generated |
-| `ti60f225_oob.peri.xml` | RX GPIOL_02 / TX GPIOR_28, 3.3 V LVCMOS; RX weak pull-up |
+| 信号 | FPGA 方向 | 引脚 | IO 标准 |
+|---|---|---|---|
+| `uart_rx` | 输入 | R4 / GPIOL_02 | 3.3 V LVCMOS |
+| `uart_tx` | 输出 | R14 / GPIOR_28 | 3.3 V LVCMOS |
 
-To finish the hardware connection:
+Efinity 2026.1.132 完整编译和两个固件构建已于 2026-10-23 完成。
+`scripts/check_project.py` 检查了生成的 SoC/BSP 端口和 V4 引脚连接，目前通过。
+实体板尚未测试：FT4232 UART 通道与 COM 号的对应关系、JTAG 和 UART 是否能同时使用、
+按键是否能收到以及游戏实际效果都需要拿到板后确认。本机目前能看到的 COM 口是蓝牙
+虚拟串口，不能据此判断板载 UART 的端口号。
 
-1. Enable UART0 in Efinity IP Manager and regenerate both SoC and BSP.
-2. Inspect the regenerated `soc_control` port list/template. In
-   `rtl/control/sapphire_control.v`, replace `assign uart_tx = 1'b1;` with
-   connections from `uart_rx` / `uart_tx` to those actual generated RX/TX ports.
-   Do not guess generated port names or edit generated RTL/BSP by hand.
-3. Retain the reserved V4 peripheral mapping. The older generic
-   `ip/soc_control/Ti60F225_devkit/soc.peri.xml` is not this board's pin map.
-   Keep the existing video and DDR assignments intact.
-4. Run `py -3 scripts/check_project.py`, build matching bit/ELF files, and
-   validate the link on the board before gameplay acceptance.
+## 建议的上板测试顺序
 
-Which FT4232 COM port/channel maps to the UART, and simultaneous JTAG/COM
-behavior, still need checking on the teammate's PC. A host-side test does not
-validate that channel or physical RX/TX wiring. The PC-side default remains
-115200 baud; the firmware configures the UART divider using the generated BSP.
+1. 接上 TI60F225I3-V4 板卡和 USB 线。在 Windows 设备管理器中查看新出现的 FT4232
+   UART COM 口。UART 串口与 JTAG 是不同通道；不要照搬其他电脑上的 COM 编号。
+2. 在 Efinity Programmer 中通过 JTAG 加载 `outflow/ti60f225_oob.bit`。第一次验证先
+   使用临时 JTAG 配置，不要写入 SPI Flash。
+3. 在 Efinity RISC-V IDE 中加载
+   `software/interactive_demo/build/keyboard-test/uart_keyboard_test.elf`，运行 CPU，
+   并在调试器中查看 `g_uart_keyboard_result`。
+4. 在上面的 PowerShell 命令中选择板卡 COM 口并运行键盘发送程序。依次按下、松开方向
+   键、开火键和暂停键。`phase` 应为 2，`accepted_frames` 应持续增加，`buttons` 应
+   对应按键位图；bad CRC、version、flags、stale 计数应保持为 0。按 Esc 退出后确认
+   `buttons == 0`；停止串口数据后确认 `timeout_releases` 增加。
+5. 停止或复位诊断程序，加载
+   `software/interactive_demo/build/game/survival_game.elf`，使用同一个 bitstream 运行
+   游戏和键盘发送程序，测试移动、开火、暂停/恢复、重新开始以及按键释放。
 
-After UART0 is regenerated and board pads are connected, build the game with
-`py -3 scripts/build_apb_software.py --program game`. The separate diagnostic
-image can be built with `py -3 scripts/build_apb_software.py --program keyboard-test`.
-Load each ELF only with its matching UART-enabled bitstream. For the diagnostic,
-resume it and inspect
-`g_uart_keyboard_result` in the debugger, and run the PC sender. `phase == 2`
-means the receiver loop is live; `buttons` must follow the key map, accepted
-frames must increase, and the CRC/version/flags/stale counters should remain
-zero. Stop the PC sender and verify `buttons == 0` and `timeout_releases`
-increments. This diagnostic build is kept separate from the existing v6 ELF.
+游戏和诊断 ELF 是两个不同程序。不要把诊断 ELF 当作游戏运行，也不要将这两个 ELF
+与早期仅含 v6 Alpha 演示的 bit 混用。上面所有文件必须来自同一 UART 版本和同一次
+源码构建。bit 和 ELF 都被 Git 忽略，需要单独复制给烧录人员，或在对方电脑上重新构建。
 
-## Offline verification
+## 离线检查
 
-Run the portable parser regression using a host C compiler. On Windows this can
-be a Visual Studio Developer PowerShell:
+在 `advanced_demo` 目录下的 PowerShell 中运行工程连接检查和 UART 协议回归：
 
 ```powershell
-py -3 scripts/run_uart_keyboard_checks.py
+$env:PYTHONHOME = 'D:\Efinity\python311'
+$efxPython = 'D:\Efinity\python311\bin\python.exe'
+& $efxPython scripts\check_project.py
+& $efxPython scripts\run_uart_keyboard_checks.py
 ```
 
-The checks cover CRC, garbage and partial-frame recovery, corrupt/unsupported
-frames, sequence replay/wrap, timeout release, reconnection and millisecond
-counter rollover. A mocked MMIO FIFO test also checks UART setup, bounded
-draining, state and press/release latching. These checks verify software only;
-the USB-UART and display/game behavior need the board. `scripts/check_project.py`
-also checks UART pad uniqueness, port directions, wrapper connections and the
-idle TX reservation against the current UART0 configuration.
+UART 协议回归需要本机 C 编译器，例如在 Visual Studio Developer PowerShell 中运行。
+它会检查 CRC、垃圾数据和不完整帧恢复、错误或不支持的帧、序号重放和回绕、超时释放、
+重连以及毫秒计数回绕。模拟 MMIO FIFO 的测试还会检查 UART 初始化、单次读取上限、
+按键状态和按下/抬起事件。离线测试只能检查软件，不能确认 USB-UART 通道选择或板卡接线。
+
+## 本机重新生成 SoC/BSP 时的 Java 提示
+
+当前源码中的 UART0 已启用并已生成；仅为上板使用不需要再次生成 IP。如果将来修改硬件
+后，在 Efinity IP Configuration 生成时遇到 `'java' is not recognized`，请关闭所有
+Efinity 和 IP Configuration 窗口，并在任务管理器中确认 `efinity.exe` 已退出。然后在
+`advanced_demo` 目录运行 `open_efinity_with_java.cmd`，它会用本机 Efinity 安装自带的
+Java 启动 Efinity。也可以在命令提示符中运行 `open_efinity_with_java.cmd --check`，
+先检查 Java 和 Efinity 是否存在。该脚本路径针对本机 `D:\Efinity` 安装；重新生成时
+保持 UART0 启用，并重新运行 `scripts/check_project.py` 和完整 Efinity 编译。

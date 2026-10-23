@@ -98,7 +98,9 @@ port (
     io_asyncReset : in std_logic;
     io_memoryClk : in std_logic;
     io_systemReset : out std_logic;
+    system_uart_0_io_txd : out std_logic;
     io_memoryReset : out std_logic;
+    system_uart_0_io_rxd : in std_logic;
     io_ddrMasters_0_reset : out std_logic;
     io_ddrMasters_0_clk : in std_logic;
     io_ddrMasters_0_r_payload_last : out std_logic;
@@ -206,7 +208,9 @@ port map (
     io_asyncReset => io_asyncReset,
     io_memoryClk => io_memoryClk,
     io_systemReset => io_systemReset,
+    system_uart_0_io_txd => system_uart_0_io_txd,
     io_memoryReset => io_memoryReset,
+    system_uart_0_io_rxd => system_uart_0_io_rxd,
     io_ddrMasters_0_reset => io_ddrMasters_0_reset,
     io_ddrMasters_0_clk => io_ddrMasters_0_clk,
     io_ddrMasters_0_r_payload_last => io_ddrMasters_0_r_payload_last,

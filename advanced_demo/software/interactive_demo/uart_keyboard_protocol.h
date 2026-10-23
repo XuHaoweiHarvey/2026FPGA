@@ -40,8 +40,11 @@ static inline uint8_t uart_key_crc8(const uint8_t *data, uint8_t length) {
     for (i = 0; i < length; ++i) {
         uint8_t bit;
         crc ^= data[i];
-        for (bit = 0; bit < 8; ++bit)
-            crc = (uint8_t)((crc & 0x80u) ? ((crc << 1) ^ 0x07u) : (crc << 1));
+        for (bit = 0; bit < 8; ++bit) {
+            uint8_t shifted = (uint8_t)(crc << 1);
+            if (crc & 0x80u) shifted ^= UINT8_C(0x07);
+            crc = shifted;
+        }
     }
     return crc;
 }

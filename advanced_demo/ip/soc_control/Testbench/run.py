@@ -16,7 +16,7 @@ from shutil import which
 #ALDEC_PATH=Path('PUT', 'YOUR', 'OWN', 'ALDEC', 'PATH')
 
 spi0_en='0'
-uart0_en='0'
+uart0_en='1'
 
 binDl = []
 binDbl= []
@@ -44,13 +44,13 @@ def genMEM(args,cp,dp):
         print('[EFX_ERR]: Application binary file '+str(fb)+' was not found!')
         print('[EFX_ERR]: Aborting simulation...')
         quit()
-
+    
     for i in binDl:
         binDv = ord(i)
         binDb = '{0:02x}'.format(binDv)
         binDbl.append(binDb)
-
-    ft=len(binDbl) % 16
+    
+    ft=len(binDbl) % 16 
     if(ft != 0):
         for x in range(16-ft):
             binDbl.append('00')

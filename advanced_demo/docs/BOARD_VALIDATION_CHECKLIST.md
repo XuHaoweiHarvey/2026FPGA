@@ -1,83 +1,78 @@
-# Advanced game board validation checklist
+# 高级游戏上板验证清单
 
-This checklist is for the final UART-controlled Alpha/Color Key game. The
-existing v6 Alpha-comparison bit/ELF package is not a game build. In the
-current checkout UART0 is disabled in the generated SoC/BSP, so do not use
-that package to claim the keyboard game is board-ready.
+## 上板前的构建状态
 
-## Before creating game images
+UART 键盘游戏目前已完成编译，可以开始实体板验证：
 
-The board model and pins are confirmed from the V4 manual. Record the remaining
-PC/tool and hardware observations on the teammate's machine:
+- Efinity 2026.1.132 于 2026-10-23 完成完整编译，生成
+  `outflow/ti60f225_oob.bit`。
+- 游戏 ELF：`software/interactive_demo/build/game/survival_game.elf`。
+- UART 诊断 ELF：`software/interactive_demo/build/keyboard-test/uart_keyboard_test.elf`。
+- `scripts/check_project.py` 检查生成的 UART0 和 V4 引脚连接通过。
 
-| Item | Record |
+bit 和 ELF 位于 Git 忽略的构建目录，Git 上传不会带上它们。需要把这三个文件单独
+交给上板的人，或在上板电脑上重新构建。使用时请确保 bit 和所加载的 ELF 来自同一
+源码构建。编译详情见[游戏构建报告](GAME_BUILD_REPORT.md)。
+
+## 上板前记录
+
+| 项目 | 记录 |
 |---|---|
-| Full Ti60F225 board model and PCB revision | TI60F225I3-V4 (confirmed) |
-| Efinity Programmer, Efinity IDE and RISC-V IDE versions | |
-| UART_RX/TX pads and pin constraints for this revision | RX R4/GPIOL_02 input; TX R14/GPIOR_28 output; reserved in source |
-| FT4232 channel and Windows COM port mapping | |
-| Whether JTAG and UART can be used at the same time | |
-| HDMI display model/input | |
+| Ti60F225 完整板卡型号和 PCB 版本 | TI60F225I3-V4 |
+| Efinity Programmer、Efinity IDE、RISC-V IDE 版本 | |
+| 板卡供电和 USB 线连接方式 | |
+| FT4232 UART 通道及设备管理器显示的 COM 号 | |
+| JTAG 和 UART 是否可同时使用 | |
+| HDMI 显示器型号和输入口 | |
 
-Then enable UART0 in Efinity IP Manager, regenerate the Sapphire SoC and BSP,
-replace the idle TX driver in `rtl/control/sapphire_control.v` with connections
-to the actual generated UART RX/TX ports. The top-level ports and V4 peripheral
-pin assignments are already reserved. Keep existing HDMI and DDR assignments
-unchanged. Do not edit only `settings.json` or combine a new ELF with the old
-UART-disabled bitstream.
+FPGA UART RX 为 R4/GPIOL_02，TX 为 R14/GPIOR_28，均为 3.3 V LVCMOS。电脑端默认
+串口参数为 115200、8-N-1。COM 号由 Windows 分配，不要照搬其他电脑上的编号。测试前
+关闭可能占用该 COM 口的串口工具。
 
-Run `py -3 scripts/check_project.py` after connecting the regenerated UART.
-The COM number is a PC runtime choice and may differ between computers; it
-does not need to be fixed in the FPGA or game code. Check the FT4232 channel
-on the board PC. See `KEYBOARD_UART_INPUT.md` for the exact handoff steps.
+## 加载与测试
 
-## Build and load
+1. 在 Efinity Programmer 中通过 JTAG 加载 `outflow/ti60f225_oob.bit`。第一次验证使用
+   临时 JTAG 配置，不要写入 SPI Flash。
+2. 在 Efinity RISC-V IDE 中加载
+   `software/interactive_demo/build/keyboard-test/uart_keyboard_test.elf`，运行 CPU，
+   并在调试器中查看 `g_uart_keyboard_result`。
+3. 运行 `tools/keyboard_uart.py --list`，选择新出现的板卡 UART COM 口并启动发送程序。
+   按下和松开各个控制键，确认 `phase == 2`、`accepted_frames` 增加，`buttons` 与按键
+   对应，CRC/version/flags/stale 计数保持 0。按 Esc 退出后确认 `buttons == 0`；停止
+   串口数据后确认 `timeout_releases` 增加。
+4. 停止或复位诊断固件，再加载
+   `software/interactive_demo/build/game/survival_game.elf`，仍使用同一个 bitstream。
+   运行游戏和键盘发送程序，测试移动、开火、暂停/恢复、重新开始和按键自动释放。
+5. 先连续观察 60 秒，再进入敌人数量较多的波次，确保画面同时出现 Alpha 和 Color Key
+   精灵，并记录游戏画面和调试器计数。
 
-After regenerated UART-enabled BSP and a successful full Efinity build:
+具体串口命令见[键盘 UART 说明](KEYBOARD_UART_INPUT.md)。诊断 ELF 不是游戏程序。两个
+ELF 都不能配合早期仅含 v6 Alpha 演示的 bit 使用。
 
-1. Build the game with `py -3 scripts/build_apb_software.py --program game`.
-2. Build/load the matching UART-enabled bitstream with Efinity Programmer.
-   Initially use temporary JTAG configuration; do not program SPI Flash.
-3. Load `software/interactive_demo/build/game/survival_game.elf` through the
-   matching Efinity RISC-V IDE/OpenOCD configuration and resume the CPU.
-4. Run `py -3 tools/keyboard_uart.py --list`, then start the sender on the
-   verified board COM port, for example `py -3 tools/keyboard_uart.py COM7`.
-5. Use WASD/arrows to move, Space/Ctrl to fire, and P to pause. When the game
-   ends, release and press fire to restart.
+## 验收数据
 
-Use `--program keyboard-test` only with the UART diagnostic firmware. It is a
-separate diagnostic image, not the gameplay ELF.
-
-## Acceptance measurements
-
-Observe at least 60 seconds after startup. Confirm that the player and enemies
-draw with Color Key transparency, and the glow, shots, and hit effects use
-Alpha blending. Keep both types visible during the high-load section.
-
-Record these values from the screen and `g_game_result`:
-
-| Measurement | Result |
+| 测量项 | 结果 |
 |---|---|
-| Stable presented game FPS | |
-| Maximum simultaneous Sprite count | |
-| FPS at maximum Sprite count | |
+| 连续 60 秒的稳定显示帧率 | |
+| 可重复运行的最大同时精灵数 | |
+| 最大精灵数量时的帧率 | |
 | `error` / `phase` | |
 | `underflow_delta` / `missed_delta` | |
 | `reader_error` / `command_delta` / `swap_delta` | |
-| UART accepted / bad CRC / version / flags / stale / timeout-release counts | |
-| Keyboard response and reconnect behavior | |
-| Pause preserves effects, damage protection, firing cooldown and wave timing | |
+| UART 收到帧数 / CRC 错误 / 版本错误 / 标志错误 / 过期帧 / 超时释放次数 | |
+| 键盘响应和断开重连表现 | |
+| 暂停时效果、防护、冷却和波次计时是否保持 | |
 
-The target is a stable 60 FPS with the largest repeatable Sprite load while
-Alpha and Color Key are both active. Report the measured Sprite limit if 60
-FPS cannot be sustained; do not infer a successful result from host tests.
+目标是在 Alpha 和 Color Key 同时显示时，以最大可重复精灵负载稳定达到 60 FPS。如果
+无法保持 60 FPS，请记录实际测得的精灵数量和相关计数，不要用主机测试代替上板结果。
 
-## If the board run fails
+## 上板注意事项和故障记录
 
-Save the screen photo, debugger state, Programmer/OpenOCD output, exact bit and
-ELF paths, and board revision. Check that the ELF and bit came from the same
-UART-enabled build. For a black screen inspect `phase/error`; for visual
-discontinuity inspect underflow/missed deltas and `reader_error`; for missing
-input inspect the UART counters, COM selection, TX/RX crossing, and pin map.
-Do not switch to old M2 or Alpha-comparison artifacts and label them as the
-game result.
+最新布线报告将 `pll_inst4_RSTN` 列为未分配的核心输出；另有 GPIO 与 LVDS 间距警告。
+虽然 Efinity 生成了 bitstream，这些报告项还没有通过实板验证确认无影响。上板时请
+留意相关现象并记录 Programmer、调试器或显示器的报错。
+
+如果测试失败，请保存屏幕照片、`g_uart_keyboard_result`、`g_game_result`、
+Programmer/OpenOCD 输出、板卡版本、COM 口和 bit/ELF 的准确路径。键盘无响应时先检查
+COM 通道、UART 计数和 RX/TX 接线；黑屏或画面不稳定时记录游戏 `phase/error`、
+`reader_error`、underflow 和 missed 计数。不要把旧 Alpha 对照程序的结果记录成键盘游戏结果。

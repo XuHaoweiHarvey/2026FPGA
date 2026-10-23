@@ -106,7 +106,7 @@
         "APBSlave2_M_Addr": "32'd3145728",
         "APBSlave3_M_Addr": "32'd4194304",
         "APBSlave4_M_Addr": "32'd5242880",
-        "UART0": "1'b0",
+        "UART0": "1'b1",
         "UART2": "1'b0",
         "UART1_FIFODEPTH": "128",
         "UART1_INT_ID": "2",

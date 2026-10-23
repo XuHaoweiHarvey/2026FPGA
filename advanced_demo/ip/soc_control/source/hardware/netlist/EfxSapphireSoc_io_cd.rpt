@@ -1,6 +1,6 @@
 io_systemClk sampled by 
 io_asyncReset sampled by 
-io_memoryClk sampled by
+io_memoryClk sampled by 
 io_memoryReset clocked by io_memoryClk
 jtagCtrl_tck sampled by 
 io_systemReset clocked by io_systemClk
@@ -89,8 +89,10 @@ io_ddrMasters_0_b_valid clocked by io_ddrMasters_0_clk
 io_ddrMasters_0_b_ready sampled by io_ddrMasters_0_clk
 io_ddrMasters_0_b_payload_id clocked by io_ddrMasters_0_clk
 io_ddrMasters_0_b_payload_resp clocked by io_ddrMasters_0_clk
-io_ddrMasters_0_clk sampled by
+io_ddrMasters_0_clk sampled by 
 io_ddrMasters_0_reset clocked by io_ddrMasters_0_clk
+system_uart_0_io_txd clocked by io_systemClk
+system_uart_0_io_rxd sampled by 
 io_apbSlave_0_PADDR clocked by io_systemClk
 io_apbSlave_0_PSEL clocked by io_systemClk
 io_apbSlave_0_PENABLE clocked by io_systemClk

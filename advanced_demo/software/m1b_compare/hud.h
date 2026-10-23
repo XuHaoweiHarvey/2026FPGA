@@ -42,7 +42,7 @@ static void m1b_hud_text(volatile uint32_t *dst,uint32_t x,uint32_t y,
                 dst[(y+row*3u+dy)*1920u+x+index*18u+col*3u+dx]=color;
     }
 }
-static char *m1b_append(char *p,const char *s) { while(*s) *p++=*s++;return p; }
+static inline char *m1b_append(char *p,const char *s) { while(*s) *p++=*s++;return p; }
 static char *m1b_u32(char *p,uint32_t n) {
     char tmp[10];uint32_t count=0;
     do {tmp[count++]=(char)('0'+n%10u);n/=10u;} while(n);

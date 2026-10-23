@@ -19,10 +19,10 @@
 
 module tb_soc ();
 
-localparam  MHZ=100000000;
-localparam  MEMDEPTH=$clog2(469762048/128);
 localparam PMHZ=50000000;
+localparam  MEMDEPTH=$clog2(469762048/128);
 localparam  MEMWIDTH=128;
+localparam  MHZ=100000000;
 
 /////////////////////////////////////////////////////////////////////////////
 wire		io_systemClk; 
@@ -56,8 +56,8 @@ reg		    system_uart_0_io_rxd	= 1'b1;
 wire        memoryCheckerPass;
 wire		baudClk=io_systemClk;
 reg  [10:0] BAUDRATE=(MHZ/115200);
-wire ext_mem_ctrl_clk;
-wire ext_mem_ctrl_resetn;
+wire ext_mem_ctrl_clk; 
+wire ext_mem_ctrl_resetn; 
 wire			io_ddrA_arw_valid;
 wire			io_ddrA_arw_ready;
 wire  [31:0]	io_ddrA_arw_payload_addr;
@@ -288,6 +288,8 @@ top_soc_wrapper dut_wrapper(
 .io_ddrA_r_payload_id(io_ddrA_r_payload_id),
 .io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
 .io_ddrA_r_payload_last(io_ddrA_r_payload_last),
+.system_uart_0_io_txd(system_uart_0_io_txd),
+.system_uart_0_io_rxd(system_uart_0_io_rxd),
 
 //clock and reset
 .io_asyncResetn(~rst),
@@ -297,8 +299,6 @@ top_soc_wrapper dut_wrapper(
 .memoryCheckerPass(memoryCheckerPass)
 );
 
-assign ext_mem_ctrl_clk = io_memoryClk;
-assign ext_mem_ctrl_resetn = memoryClk_locked;
 ext_mem_controller #(
 .WIDTH(MEMWIDTH),
 .DEPTH(MEMDEPTH)
@@ -329,6 +329,8 @@ ext_mem_controller #(
 .bid_0(io_ddrA_b_payload_id),
 .bvalid_0(io_ddrA_b_valid),
 .bready_0(io_ddrA_b_ready));
+assign ext_mem_ctrl_clk = io_memoryClk;
+assign ext_mem_ctrl_resetn = memoryClk_locked;
 
 
 W25Q32JVxxIM spi_flash(
@@ -349,6 +351,8 @@ module top_soc_wrapper(
 output		memoryClk_rstn,
 input		memoryClk_locked,
 input		io_memoryClk,
+output		system_uart_0_io_txd,
+input		system_uart_0_io_rxd,
 output		io_ddrA_arw_valid,
 input		io_ddrA_arw_ready,
 output [31:0] io_ddrA_arw_payload_addr,
@@ -413,6 +417,8 @@ top_soc dut (
 .io_memoryClk(io_memoryClk),
 .memoryClk_rstn(memoryClk_rstn),
 .memoryClk_locked(memoryClk_locked),
+.system_uart_0_io_txd(system_uart_0_io_txd),
+.system_uart_0_io_rxd(system_uart_0_io_rxd),
 
 //clock and reset
 .io_asyncResetn(io_asyncResetn),

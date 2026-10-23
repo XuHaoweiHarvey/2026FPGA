@@ -1,69 +1,52 @@
-# Advanced challenge game implementation
+# 高级挑战游戏：实现情况和下一阶段
 
-`advanced_demo` is scoped to the competition's advanced challenges:
+`advanced_demo` 目前围绕赛题高级挑战开发：
 
-1. Hardware Alpha blending while drawing foreground sprites.
-2. Hardware Color Key transparency for irregular sprites.
-3. A high-load interactive game on RISC-V, measuring how many simultaneous
-   sprites can be presented at a stable 60 FPS with both graphics features in
-   use.
+1. 绘制前景精灵时使用硬件 Alpha 混合。
+2. 使用硬件 Color Key 处理不规则精灵图的透明背景。
+3. 在 RISC-V 上运行高负载互动游戏，测量两种图形效果同时使用时，能够以稳定 60 FPS
+   显示的精灵数量。
 
-The final demonstration is the keyboard-controlled survival game. The game
-uses Color Key for player/enemy artwork, Alpha for glow/projectile/effect
-sprites, and on-screen FPS/current Sprite/maximum Sprite counters. There is no
-CPU-versus-FPGA comparison mode and no standalone BLIT showcase. The game ELF
-sends Color Key and Alpha commands, not ordinary `OP_BLIT` commands. BLIT
-support remains enabled in RTL because Color Key uses the shared source-transfer
-path and the accelerator configuration requires BLIT support; the retained M2
-regression also exercises ordinary copies.
+当前演示是一款由 UART 键盘控制的弹幕生存游戏。玩家和敌人素材使用 Color Key，光晕、
+子弹和受击效果使用 Alpha 混合。屏幕显示 FPS、当前和最大精灵数量；自动敌人波次最多
+接近 48 个同时活动的敌人。游戏包含移动、开火、暂停/恢复和重新开始。高级游戏没有
+CPU/FPGA 对照模式，也没有单独展示 BLIT 的模式。BLIT 支持仍保留在共享加速器中，供
+Color Key 源图传输通路和回归测试使用；游戏本身发送 Alpha 和 Color Key 命令。
 
-## Software organization
+## 当前实现状态
 
-- `software/interactive_demo/game_logic.[ch]` contains portable movement,
-  enemy-wave, projectile, collision, score, lives, pause/restart, and Sprite
-  accounting logic.
-- `software/interactive_demo/game_main.c` initializes the v6 accelerator,
-  seals the generated sprite atlas, receives keyboard state over UART, renders
-  with Alpha/Color Key commands, and records runtime diagnostics.
-- `software/interactive_demo/uart_keyboard_test.c` remains a separate link
-  diagnostic. It is not a game mode.
-- `scripts/build_apb_software.py --program game` builds a separate game ELF;
-  the inherited M2 comparison and register-check code is not linked into it.
+- 生成的 Sapphire SoC 和 BSP 中已启用 UART0。
+- 控制模块已将 UART RX/TX 端口接到 TI60F225I3-V4 预留引脚：RX R4/GPIOL_02，
+  TX R14/GPIOR_28。
+- Efinity 完整编译已生成 UART 版本的 bitstream。
+- 游戏固件和独立的键盘诊断固件都已构建。
+- `scripts/check_project.py` 对生成端口和板卡引脚的检查通过。
+- 实体板上的运行、FT4232 通道选择、JTAG/UART 同时使用、实际游戏 FPS 和最大精灵数量
+  仍未验证。
 
-The automated game wave ramps toward 48 enemies. The player can move with
-WASD/arrows, fire with Space/Ctrl, and pause with P. The host logic suite checks
-the rules and bounds, but it cannot establish actual board FPS or simultaneous
-Sprite capacity.
+## 当前阶段：上板验证和测量
 
-## Board integration status
+下一步是上板调试和记录数据，暂时不需要继续增加游戏功能。先运行 UART 诊断固件，
+单独确认串口接线和 Windows COM 通道，再用配套 bit 和游戏 ELF 运行游戏，记录普通
+波次和最大敌人波次下的计数。
 
-The checked-in generated SoC/BSP currently has UART0 disabled. A game ELF
-cannot be built against this BSP, and the existing v6 Alpha package has no
-keyboard connection. Do not hand-edit `settings.json` alone. Before board
-integration, the team holding the board must confirm the exact Ti60F225 board
-revision, FT4232 UART channel/COM mapping, and whether JTAG can remain connected
-while UART is used. Then enable UART0 in Efinity IP Manager, regenerate the SoC
-and BSP, route the generated `io_uart_0` signals through the platform wrapper,
-and add the verified board pins without disturbing DDR/video assignments.
+控制方式为 WASD 或方向键移动、空格或 Ctrl 开火、P 暂停/恢复；按 Esc 退出电脑端发送
+程序并释放按键。电脑端以 115200、8-N-1、每秒 50 帧发送完整按键状态。板端在 150 ms
+没有收到有效串口帧时自动释放按键。COM 编号由 Windows 在每台电脑、每个 USB 连接上
+分配，接入板卡后再选择实际端口。
 
-The documented manual lists UART_RX at GPIOL_02 (R4) and UART_TX at GPIOR_28
-(R14), but the exact board revision and USB bridge mapping still need teammate
-confirmation. The existing PC sender and parser can be checked offline with
-`py -3 scripts/run_uart_keyboard_checks.py`.
+操作顺序见[键盘 UART 说明](KEYBOARD_UART_INPUT.md)，验收数据见
+[上板验证清单](BOARD_VALIDATION_CHECKLIST.md)。bitstream 要与当前正在运行的固件 ELF 配套使用；
+诊断程序和游戏是两个不同 ELF。生成的 bit/ELF 被 Git 忽略，需要单独复制或在上板电脑
+上重建。
 
-## Acceptance measurements
+## 首次上板后如何决定后续工作
 
-After UART integration and full Efinity build:
+- 如果 UART 计数不增加，先排查 COM 通道、RX/TX 接线或串口连接，再改游戏逻辑。
+- 如果 Alpha/Color Key 效果或显示连续性有问题，根据 `error`、`reader_error`、
+  underflow 和 missed 计数定位问题。
+- 如果游戏运行稳定但低于 60 FPS，依据测得的显示帧率调整可重复的最大精灵负载。
+- 如果达到目标，保存准确的构建文件和板上测量结果，作为赛题验收记录。
 
-1. Run the game ELF with the matching UART-enabled bitstream and confirm
-   movement, firing, pause, restart, and automatic key release after unplug.
-2. Verify the game HUD and debugger record agree on presented FPS and active
-   Sprite counts while Alpha and Color Key sprites overlap on screen.
-3. Increase enemy waves to the maximum and record the maximum simultaneous
-   Sprite count at a stable 60 FPS, together with error, underflow, and missed
-   boundary deltas.
-4. Repeat with both Alpha and Color Key visible throughout the load test.
-
-The CPU/FPGA comparison belongs to the earlier M2 baseline and is not an
-advanced-challenge acceptance item. The old Alpha comparison program is not
-part of the final game build.
+最新编译报告还记录了未分配的 `pll_inst4_RSTN` 输出和 GPIO/LVDS 间距警告。上板时
+留意这些项目；仅仅编译并生成 bitstream 还不能说明它们对实体板没有影响。
