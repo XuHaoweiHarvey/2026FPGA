@@ -106,8 +106,22 @@ uint32_t survival_game_sprite_count(const survival_game_t *game, uint32_t now_ms
     return count;
 }
 
+static void freeze_game_timers(survival_game_t *game, uint32_t elapsed_ms) {
+    uint32_t i;
+    /* Deadlines stay in the wall-clock domain used by rendering, but retain
+       their remaining duration while paused, including across clock wrap. */
+    game->started_ms += elapsed_ms;
+    game->next_spawn_ms += elapsed_ms;
+    game->next_fire_ms += elapsed_ms;
+    if (game->invulnerable) game->invulnerable_until_ms += elapsed_ms;
+    for (i = 0; i < GAME_EFFECT_LIMIT; ++i)
+        if (game->effects[i].active) game->effects[i].expires_ms += elapsed_ms;
+}
+
 void survival_game_step(survival_game_t *game, uint8_t buttons, uint32_t now_ms) {
     uint32_t i;
+    uint32_t elapsed_ms = now_ms - game->last_ms;
+    uint8_t was_paused = game->paused;
     int32_t dx = 0, dy = 0;
     if (game->game_over) {
         if ((buttons & UART_KEY_FIRE) && !(game->previous_buttons & UART_KEY_FIRE))
@@ -120,6 +134,7 @@ void survival_game_step(survival_game_t *game, uint8_t buttons, uint32_t now_ms)
         game->paused ^= 1u;
     game->previous_buttons = buttons;
     game->last_ms = now_ms;
+    if (was_paused || game->paused) freeze_game_timers(game, elapsed_ms);
     if (game->paused) return;
 
     if (buttons & UART_KEY_LEFT) dx -= PLAYER_STEP;

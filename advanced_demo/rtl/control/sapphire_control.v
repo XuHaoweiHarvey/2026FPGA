@@ -7,6 +7,7 @@ module sapphire_control #(
     input wire core_clk,
     input wire platform_rst_n,
     input wire platform_ddr_rst_n,
+    input wire uart_rx, output wire uart_tx,
     input wire jtag_tck, input wire jtag_tdi, output wire jtag_tdo,
     input wire jtag_sel, input wire jtag_capture, input wire jtag_shift,
     input wire jtag_update, input wire jtag_reset,
@@ -68,6 +69,12 @@ wire s_awlock,s_arlock,s_awvalid,s_awready,s_wlast,s_wvalid,s_wready;
 wire s_bvalid,s_bready,s_arvalid,s_arready,s_rlast,s_rvalid,s_rready;
 wire [127:0] s_wdata,s_rdata;
 wire [15:0] s_wstrb;
+
+// UART0 reservation only: the checked-in generated SoC has no UART ports.
+// After IP Manager regenerates UART0 and the BSP, replace this idle driver
+// with the actual RX/TX named-port connections on u_soc_control below.
+// uart_rx is deliberately unused until then; do not infer a second receiver.
+assign uart_tx = 1'b1;
 
 // Ports are taken from the user's generated ip/soc_control/soc_control_tmpl.v.
 soc_control u_soc_control (

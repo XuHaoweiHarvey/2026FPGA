@@ -57,6 +57,9 @@ module ti60f225_oob_top #(
 
    //Clocks 
 	input	wire	i_arstn,
+    // TI60F225I3-V4 board USB-UART: RX R4 / TX R14.
+    input   wire uart_rx,
+    output  wire uart_tx,
     input	wire	i_mipi_rx_pclk,
     input wire  vid_clk_dvi2,
     input wire hdmi_tx_slow_clk,
@@ -945,6 +948,7 @@ assign tmds_tx_data2_TX_DATA = ~tmds_data2;
 sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),
                     .ALPHA_ENABLE(ALPHA_ENABLE)) u_control (
     .core_clk(core_clk), .platform_rst_n(i_arstn && w_arstn),
+    .uart_rx(uart_rx), .uart_tx(uart_tx),
     .platform_ddr_rst_n(vid_rst_n),
     .jtag_tck(jtag_inst1_TCK), .jtag_tdi(jtag_inst1_TDI), .jtag_tdo(jtag_inst1_TDO),
     .jtag_sel(jtag_inst1_SEL), .jtag_capture(jtag_inst1_CAPTURE),

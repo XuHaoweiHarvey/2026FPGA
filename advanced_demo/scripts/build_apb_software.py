@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -33,6 +34,9 @@ assert value('SYSTEM_DDR_BMB') == 0x1000 and value('SYSTEM_DDR_BMB_SIZE') == 0xe
 if args.program in ('game', 'keyboard-test'):
     assert conf['UART0'] == "1'b1", 'Enable UART0 in Efinity IP Manager before building UART software'
     assert 'SYSTEM_UART_0_IO_CTRL' in macros, 'Regenerate the Sapphire SoC/BSP with UART0 enabled'
+    # An enabled IP/BSP alone is insufficient while the wrapper still reserves
+    # RX/TX with an idle driver. Check the physical-port bindings before linking.
+    subprocess.run([sys.executable, str(ROOT / 'scripts/check_project.py')], cwd=ROOT, check=True)
 assert value('SYSTEM_RAM_A_SIZE') == value('SYSTEM_RAM_A_CTRL_SIZE') == 65536
 linker = bsp / 'linker/default.ld'
 text = linker.read_text(encoding='utf8')

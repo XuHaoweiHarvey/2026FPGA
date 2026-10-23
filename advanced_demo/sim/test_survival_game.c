@@ -60,6 +60,41 @@ static void sprite_count_includes_transient_effects(void) {
     assert(survival_game_sprite_count(&game, 100u) == 4u);
 }
 
+static void pause_preserves_remaining_time(uint32_t origin) {
+    survival_game_t game;
+    uint32_t resumed = origin + 3020u;
+    int16_t initial_x;
+    survival_game_reset(&game, origin);
+    initial_x = game.player_x;
+    game.next_spawn_ms = origin + 500u;
+    game.next_fire_ms = origin + 700u;
+    game.invulnerable = 1u;
+    game.invulnerable_until_ms = origin + 600u;
+    game.effects[0].active = 1u;
+    game.effects[0].expires_ms = origin + 520u;
+    survival_game_step(&game, UART_KEY_PAUSE | UART_KEY_RIGHT, origin + 20u);
+    survival_game_step(&game, UART_KEY_PAUSE | UART_KEY_RIGHT, origin + 1020u);
+    survival_game_step(&game, UART_KEY_RIGHT, origin + 2020u);
+    assert(game.player_x == initial_x);
+    assert(game.frames == 0u);
+    assert(game.lives == 3u);
+    survival_game_step(&game, UART_KEY_PAUSE, resumed);
+    assert(game.paused == 0u);
+    assert(game.started_ms == resumed); /* Difficulty did not advance. */
+    assert(game.next_spawn_ms - resumed == 500u);
+    assert(game.next_fire_ms - resumed == 700u);
+    assert(game.invulnerable && game.invulnerable_until_ms - resumed == 600u);
+    assert(game.effects[0].expires_ms - resumed == 520u);
+    assert(survival_game_sprite_count(&game, resumed) == 3u);
+    survival_game_step(&game, 0u, resumed + 520u);
+    assert(game.enemies[0].active); /* Spawning resumes at its deadline. */
+    assert(game.invulnerable);
+    assert(survival_game_sprite_count(&game, resumed + 520u) == 3u);
+    survival_game_step(&game, UART_KEY_FIRE, resumed + 700u);
+    assert(!game.invulnerable);
+    assert(game.bullets[0].active);
+}
+
 static void enemy_wave_reaches_high_load(void) {
     survival_game_t game;
     uint32_t i;
@@ -75,6 +110,8 @@ int main(void) {
     movement_is_bounded();
     firing_and_scoring_work();
     pause_and_restart_are_edge_triggered();
+    pause_preserves_remaining_time(100u);
+    pause_preserves_remaining_time(UINT32_MAX - 500u);
     sprite_count_includes_transient_effects();
     enemy_wave_reaches_high_load();
     return 0;

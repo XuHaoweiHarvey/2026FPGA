@@ -37,7 +37,9 @@ py -3 tools/keyboard_uart.py --list
 py -3 tools/keyboard_uart.py COM7
 ```
 
-Replace `COM7` with the board's serial port from Device Manager. The sender
+Replace `COM7` with the board's serial port from Device Manager. The COM number
+can differ on each PC and is selected only when running this utility; it is
+not an FPGA parameter and does not block further game development. The sender
 reads keyboard state globally, so it does not need its window focused. WASD or
 the arrow keys move, Space or Ctrl fires, P pauses, and Esc exits after sending
 released keys. `--baud` and `--rate` can override the defaults when the board
@@ -55,16 +57,35 @@ so a busy or corrupt stream cannot monopolize rendering. The separate
 disabled in `ip/soc_control/settings.json`, and the generated SoC has no UART
 ports, so neither the game ELF nor the diagnostic ELF can yet be built against
 the checked-in BSP. Do not enable it by hand only in the JSON: regenerate the
-SoC and BSP through Efinity IP Manager, then connect the generated `io_uart_0`
-pins at the platform wrapper and map them to the board's actual FT4232 UART
-RX/TX pads in the peripheral constraints. Keep the existing video and DDR pin
-assignments intact.
+SoC and BSP through Efinity IP Manager before using the game on the board.
 
-The board manual identifies UART_RX as GPIOL_02 (R4) and UART_TX as GPIOR_28
-(R14) for the documented Ti60F225 revision. The exact board revision, which
-FT4232 COM port/channel maps to those pins, and simultaneous JTAG/COM behavior
-still need confirmation from the teammate holding the board. A host-side test
-does not validate the FT4232 channel or physical RX/TX wiring.
+The board model is confirmed as TI60F225I3-V4. The manual's UART table (PDF
+page 35, printed page 34) identifies UART_RX as GPIOL_02 (R4, FPGA input) and
+UART_TX as GPIOR_28 (R14, FPGA output). The reservation is already in source:
+
+| File | Current reservation |
+|---|---|
+| `rtl/ti60f225_oob_top.v` | `uart_rx` / `uart_tx` ports, connected to the control wrapper |
+| `rtl/control/sapphire_control.v` | UART ports; TX held high, RX unused until UART0 is generated |
+| `ti60f225_oob.peri.xml` | RX GPIOL_02 / TX GPIOR_28, 3.3 V LVCMOS; RX weak pull-up |
+
+To finish the hardware connection:
+
+1. Enable UART0 in Efinity IP Manager and regenerate both SoC and BSP.
+2. Inspect the regenerated `soc_control` port list/template. In
+   `rtl/control/sapphire_control.v`, replace `assign uart_tx = 1'b1;` with
+   connections from `uart_rx` / `uart_tx` to those actual generated RX/TX ports.
+   Do not guess generated port names or edit generated RTL/BSP by hand.
+3. Retain the reserved V4 peripheral mapping. The older generic
+   `ip/soc_control/Ti60F225_devkit/soc.peri.xml` is not this board's pin map.
+   Keep the existing video and DDR assignments intact.
+4. Run `py -3 scripts/check_project.py`, build matching bit/ELF files, and
+   validate the link on the board before gameplay acceptance.
+
+Which FT4232 COM port/channel maps to the UART, and simultaneous JTAG/COM
+behavior, still need checking on the teammate's PC. A host-side test does not
+validate that channel or physical RX/TX wiring. The PC-side default remains
+115200 baud; the firmware configures the UART divider using the generated BSP.
 
 After UART0 is regenerated and board pads are connected, build the game with
 `py -3 scripts/build_apb_software.py --program game`. The separate diagnostic
@@ -90,4 +111,6 @@ The checks cover CRC, garbage and partial-frame recovery, corrupt/unsupported
 frames, sequence replay/wrap, timeout release, reconnection and millisecond
 counter rollover. A mocked MMIO FIFO test also checks UART setup, bounded
 draining, state and press/release latching. These checks verify software only;
-the USB-UART and display/game behavior need the board.
+the USB-UART and display/game behavior need the board. `scripts/check_project.py`
+also checks UART pad uniqueness, port directions, wrapper connections and the
+idle TX reservation against the current UART0 configuration.

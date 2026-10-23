@@ -26,22 +26,25 @@ with tempfile.TemporaryDirectory(prefix="survival-game-check-") as temp_name:
         subprocess.run([*compiler, "/nologo", "/TC", "/W4", "/WX",
                         str(ROOT / "sim/test_survival_game.c"),
                         str(ROOT / "software/interactive_demo/game_logic.c"),
-                        "/Fe:" + str(executable)], cwd=ROOT, check=True)
+                        "/Fe:" + str(executable)], cwd=temp, check=True)
+        subprocess.run([str(executable)], cwd=temp, check=True)
         subprocess.run([*compiler, "/nologo", "/TC", "/W4", "/WX", "/Zs",
                         "/DSURVIVAL_GAME_HOST_SYNTAX",
                         "/I" + str(ROOT / "sim/mock_game"),
                         "/I" + str(ROOT / "sim/mock_uart"),
                         str(ROOT / "software/interactive_demo/game_main.c")],
-                       cwd=ROOT, check=True)
+                       cwd=temp, check=True)
     else:
-        executable = temp / "game_logic_test"
+        executable = temp / ("game_logic_test.exe" if os.name == "nt" else "game_logic_test")
         common = [*compiler, "-std=c99", "-Wall", "-Wextra", "-Werror"]
         subprocess.run([*common, str(ROOT / "sim/test_survival_game.c"),
                         str(ROOT / "software/interactive_demo/game_logic.c"),
                         "-o", str(executable)], cwd=ROOT, check=True)
         subprocess.run([str(executable)], cwd=ROOT, check=True)
-        subprocess.run([*common, "-fsyntax-only", "-I", str(ROOT / "sim/mock_uart"),
+        subprocess.run([*common, "-fsyntax-only", "-DSURVIVAL_GAME_HOST_SYNTAX",
+                        "-I", str(ROOT / "sim/mock_game"),
+                        "-I", str(ROOT / "sim/mock_uart"),
                         str(ROOT / "software/interactive_demo/game_main.c")],
                        cwd=ROOT, check=True)
-print("PASS survival game movement, firing, scoring, pause/restart and sprite accounting")
+print("PASS survival game movement, firing, scoring, pause/restart, frozen timers/clock wrap and sprite accounting")
 print("PASS UART-enabled board game source syntax")

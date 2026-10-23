@@ -7,26 +7,29 @@ that package to claim the keyboard game is board-ready.
 
 ## Before creating game images
 
-The teammate holding the board must confirm and record:
+The board model and pins are confirmed from the V4 manual. Record the remaining
+PC/tool and hardware observations on the teammate's machine:
 
 | Item | Record |
 |---|---|
-| Full Ti60F225 board model and PCB revision | |
+| Full Ti60F225 board model and PCB revision | TI60F225I3-V4 (confirmed) |
 | Efinity Programmer, Efinity IDE and RISC-V IDE versions | |
-| UART_RX/TX pads and pin constraints for this revision | |
+| UART_RX/TX pads and pin constraints for this revision | RX R4/GPIOL_02 input; TX R14/GPIOR_28 output; reserved in source |
 | FT4232 channel and Windows COM port mapping | |
 | Whether JTAG and UART can be used at the same time | |
 | HDMI display model/input | |
 
 Then enable UART0 in Efinity IP Manager, regenerate the Sapphire SoC and BSP,
-route the generated UART pins through the platform wrapper, and add the
-verified board pin assignments. Keep existing HDMI and DDR assignments
+replace the idle TX driver in `rtl/control/sapphire_control.v` with connections
+to the actual generated UART RX/TX ports. The top-level ports and V4 peripheral
+pin assignments are already reserved. Keep existing HDMI and DDR assignments
 unchanged. Do not edit only `settings.json` or combine a new ELF with the old
 UART-disabled bitstream.
 
-The board manual lists UART_RX as GPIOL_02 (R4) and UART_TX as GPIOR_28 (R14)
-for the documented revision. Verify those pins against the actual board
-revision and schematic before using them.
+Run `py -3 scripts/check_project.py` after connecting the regenerated UART.
+The COM number is a PC runtime choice and may differ between computers; it
+does not need to be fixed in the FPGA or game code. Check the FT4232 channel
+on the board PC. See `KEYBOARD_UART_INPUT.md` for the exact handoff steps.
 
 ## Build and load
 
@@ -63,6 +66,7 @@ Record these values from the screen and `g_game_result`:
 | `reader_error` / `command_delta` / `swap_delta` | |
 | UART accepted / bad CRC / version / flags / stale / timeout-release counts | |
 | Keyboard response and reconnect behavior | |
+| Pause preserves effects, damage protection, firing cooldown and wave timing | |
 
 The target is a stable 60 FPS with the largest repeatable Sprite load while
 Alpha and Color Key are both active. Report the measured Sprite limit if 60

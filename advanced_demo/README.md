@@ -22,8 +22,12 @@ comparison scene.
 
 ## Build and controls
 
-The generated Sapphire SoC/BSP must include UART0 and the board wrapper must
-route its pins to the verified USB-UART channel before building the game ELF:
+The confirmed board is TI60F225I3-V4. Its UART pins are reserved in the top
+module, control wrapper and peripheral constraints: FPGA RX is R4/GPIOL_02,
+and FPGA TX is R14/GPIOR_28 (3.3 V LVCMOS). TX currently stays idle high because
+the checked-in generated SoC has no UART0. This is a reservation, not a working
+keyboard link. The generated Sapphire SoC/BSP must include UART0 before
+building the game ELF:
 
 ```powershell
 py -3 scripts/build_apb_software.py --program game
@@ -39,11 +43,20 @@ only for checking the keyboard link and is not the game.
 
 In this checkout, UART0 is disabled in `ip/soc_control/settings.json` and the
 generated BSP has no UART0 registers. Do not edit only that JSON file. Use
-Efinity IP Manager to enable UART0 and regenerate the SoC/BSP, then connect the
-generated pins in the platform wrapper and board constraints after the team
-confirms the board revision and FT4232 COM channel. The old v6 Alpha comparison
+Efinity IP Manager to enable UART0 and regenerate the SoC/BSP, then replace the
+idle TX assignment in `rtl/control/sapphire_control.v` with the actual generated
+RX/TX named-port connections. The V4 pin reservations are already in
+`ti60f225_oob.peri.xml`; do not copy the opposite-direction pin mapping from
+the older generic SoC example. Run `scripts/check_project.py` and a full
+Efinity build after connecting UART0. The game/diagnostic software builder also
+runs this connection check before compiling. The old v6 Alpha comparison
 ELF/bit package does not include this UART integration and is not the game
 build. Existing build outputs are ignored by Git.
+
+`COM7` above is only an example. Windows assigns the port on each PC; choose
+it when launching the sender, without editing or rebuilding FPGA/game sources.
+The teammate can identify the FT4232 COM channel during board validation.
+See `docs/KEYBOARD_UART_INPUT.md` for the handoff steps.
 
 ## Verification
 
@@ -54,8 +67,9 @@ py -3 scripts/run_game_logic_checks.py
 py -3 scripts/run_uart_keyboard_checks.py
 ```
 
-The game logic tests movement bounds, firing/scoring, pause/restart edges, and
-Sprite accounting. UART protocol tests cover framing, CRC, replay rejection,
+The game logic tests movement bounds, firing/scoring, pause/restart edges,
+preservation of effect/protection/cooldown timers while paused (including clock
+wrap), and Sprite accounting. UART protocol tests cover framing, CRC, replay rejection,
 release on timeout, and FIFO adapter behavior. These host tests do not verify
 the generated SoC, physical UART pins, DDR/display timing, or board FPS.
 

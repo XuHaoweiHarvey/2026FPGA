@@ -1,5 +1,6 @@
 """Read-only current project/source and register-contract checks (no snapshots)."""
 from pathlib import Path
+import json
 import re
 import xml.etree.ElementTree as ET
 
@@ -64,11 +65,45 @@ soc_start = generated_soc.index('module soc_control')
 soc_header = generated_soc[soc_start:generated_soc.index(');',soc_start)]
 soc_inputs = set(re.findall(r'\binput\s+(?:\[[^]]+\]\s+)?(\w+)',soc_header))
 connection_start = control.index('soc_control u_soc_control')
-soc_connections = set(re.findall(r'\.(\w+)\s*\(',
-    control[connection_start:control.index(');',connection_start)]))
+soc_connection_text = control[connection_start:control.index(');',connection_start)]
+soc_connections = set(re.findall(r'\.(\w+)\s*\(', soc_connection_text))
 assert not (soc_inputs-soc_connections), f'Unconnected generated SoC inputs: {sorted(soc_inputs-soc_connections)}'
 assert 'io_memoryClk' in soc_inputs and 'io_ddrA_r_payload_data' in soc_inputs
 assert 'io_ddrMasters_0_clk' in soc_inputs
+# Reserve the V4 board UART pads without fabricating a UART-enabled SoC/BSP.
+peri_ns = {"p": "http://www.efinixinc.com/peri_design_db"}
+peripheral = ET.parse(ROOT / 'ti60f225_oob.peri.xml').getroot()
+gpios = peripheral.findall('.//p:comp_gpio', peri_ns)
+for port, pad, direction in [('uart_rx', 'GPIOL_02', 'input'),
+                             ('uart_tx', 'GPIOR_28', 'output')]:
+    matches = [gpio for gpio in gpios if gpio.get('gpio_def') == pad]
+    assert len(matches) == 1, f'UART pad {pad} must have exactly one assignment'
+    assert sum(gpio.get('name') == port for gpio in gpios) == 1
+    assert matches[0].get('name') == port and matches[0].get('mode') == direction
+    assert matches[0].get('io_standard') == '3.3 V LVCMOS'
+    config = matches[0].find('p:' + direction + '_config', peri_ns)
+    assert config is not None and config.get('name') == port
+    assert re.search(r'\b' + direction + r'\s+wire\s+' + port + r'\b', formal)
+    assert re.search(r'\b' + direction + r'\s+wire\s+' + port + r'\b', control)
+    assert re.search(r'\.' + port + r'\s*\(\s*' + port + r'\s*\)', formal)
+uart_enabled = json.loads((ROOT / 'ip/soc_control/settings.json').read_text(encoding='utf8'))['conf']['UART0']
+if uart_enabled == "1'b0":
+    assert not any('uart' in name.lower() for name in soc_inputs)
+    assert "assign uart_tx = 1'b1;" in control, 'Reserved UART TX must remain idle high'
+    uart_status = 'reserved; UART0 disabled, TX idle high'
+else:
+    assert uart_enabled == "1'b1", f'Unexpected UART0 configuration: {uart_enabled}'
+    assert "assign uart_tx = 1'b1;" not in control, \
+        'UART0 enabled: replace the reservation driver with regenerated SoC RX/TX connections'
+    soc_outputs = set(re.findall(r'\boutput\s+(?:(?:wire|reg)\s+)?(?:\[[^]]+\]\s+)?(\w+)', soc_header))
+    bindings = dict(re.findall(r'\.(\w+)\s*\(\s*(\w+)\s*\)', soc_connection_text))
+    for signal, ports in [('uart_rx', soc_inputs), ('uart_tx', soc_outputs)]:
+        assert any('uart' in name.lower() and bindings.get(name) == signal for name in ports), \
+            f'Connect {signal} to the actual regenerated SoC UART port'
+    bsp_header = (ROOT / 'embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/soc.h').read_text(encoding='utf8')
+    assert re.search(r'^#define\s+SYSTEM_UART_0_IO_CTRL\s+', bsp_header, re.M), \
+        'Regenerate the UART0 BSP before building the game'
+    uart_status = 'SoC/BSP connected; physical link still requires board validation'
 assert 'localparam COLOR_KEY_ENABLE = 1;' in formal
 assert formal.count('.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE)') == 2
 assert 'localparam ALPHA_ENABLE = 1;' in formal
@@ -101,3 +136,4 @@ assert '0x000001FB' in header and "32'h000001FB" in rtl
 assert 'ACCEL_CAP_ALPHA' in header and '0xE0u' in header and '0xE4u' in header
 print(f"PASS project: {len(files)} unique, existing design entries; current RGB/control integration")
 print(f"PASS register contract: {len(cases)} current RTL/header/documented offsets agree")
+print(f"PASS V4 UART pad reservation: RX R4/GPIOL_02, TX R14/GPIOR_28; {uart_status}")
