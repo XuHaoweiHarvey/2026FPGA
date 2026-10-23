@@ -34,3 +34,5 @@
 /advanced_demo/software/*/build/
 /advanced_demo/scripts/__pycache__/
 **/.metadata/
+/advanced_demo/tools/__pycache__/
+/advanced_demo/sim/__pycache__/

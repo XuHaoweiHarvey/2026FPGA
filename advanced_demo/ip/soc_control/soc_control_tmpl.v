@@ -93,6 +93,19 @@ soc_control u_soc_control
     .io_ddrA_ar_payload_addr ( io_ddrA_ar_payload_addr ),
     .io_ddrA_ar_ready ( io_ddrA_ar_ready ),
     .io_ddrA_ar_valid ( io_ddrA_ar_valid ),
+    .system_spi_0_io_data_0_read ( system_spi_0_io_data_0_read ),
+    .system_spi_0_io_data_0_write ( system_spi_0_io_data_0_write ),
+    .system_spi_0_io_data_0_writeEnable ( system_spi_0_io_data_0_writeEnable ),
+    .system_spi_0_io_data_1_read ( system_spi_0_io_data_1_read ),
+    .system_spi_0_io_data_1_write ( system_spi_0_io_data_1_write ),
+    .system_spi_0_io_data_1_writeEnable ( system_spi_0_io_data_1_writeEnable ),
+    .system_spi_0_io_data_2_read ( system_spi_0_io_data_2_read ),
+    .system_spi_0_io_data_2_write ( system_spi_0_io_data_2_write ),
+    .system_spi_0_io_data_2_writeEnable ( system_spi_0_io_data_2_writeEnable ),
+    .system_spi_0_io_data_3_read ( system_spi_0_io_data_3_read ),
+    .system_spi_0_io_data_3_write ( system_spi_0_io_data_3_write ),
+    .system_spi_0_io_data_3_writeEnable ( system_spi_0_io_data_3_writeEnable ),
+    .system_spi_0_io_sclk_write ( system_spi_0_io_sclk_write ),
     .io_apbSlave_0_PADDR ( io_apbSlave_0_PADDR ),
     .io_apbSlave_0_PENABLE ( io_apbSlave_0_PENABLE ),
     .io_apbSlave_0_PRDATA ( io_apbSlave_0_PRDATA ),
@@ -147,5 +160,6 @@ soc_control u_soc_control
     .io_ddrMasters_0_aw_payload_id ( io_ddrMasters_0_aw_payload_id ),
     .io_ddrMasters_0_aw_payload_addr ( io_ddrMasters_0_aw_payload_addr ),
     .io_ddrMasters_0_aw_ready ( io_ddrMasters_0_aw_ready ),
-    .io_ddrMasters_0_aw_valid ( io_ddrMasters_0_aw_valid )
+    .io_ddrMasters_0_aw_valid ( io_ddrMasters_0_aw_valid ),
+    .system_spi_0_io_ss ( system_spi_0_io_ss )
 );

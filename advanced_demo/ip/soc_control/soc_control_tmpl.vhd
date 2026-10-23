@@ -87,6 +87,19 @@ port (
     io_ddrA_ar_payload_addr : out std_logic_vector(31 downto 0);
     io_ddrA_ar_ready : in std_logic;
     io_ddrA_ar_valid : out std_logic;
+    system_spi_0_io_data_0_read : in std_logic;
+    system_spi_0_io_data_0_write : out std_logic;
+    system_spi_0_io_data_0_writeEnable : out std_logic;
+    system_spi_0_io_data_1_read : in std_logic;
+    system_spi_0_io_data_1_write : out std_logic;
+    system_spi_0_io_data_1_writeEnable : out std_logic;
+    system_spi_0_io_data_2_read : in std_logic;
+    system_spi_0_io_data_2_write : out std_logic;
+    system_spi_0_io_data_2_writeEnable : out std_logic;
+    system_spi_0_io_data_3_read : in std_logic;
+    system_spi_0_io_data_3_write : out std_logic;
+    system_spi_0_io_data_3_writeEnable : out std_logic;
+    system_spi_0_io_sclk_write : out std_logic;
     io_apbSlave_0_PADDR : out std_logic_vector(15 downto 0);
     io_apbSlave_0_PENABLE : out std_logic;
     io_apbSlave_0_PRDATA : in std_logic_vector(31 downto 0);
@@ -141,7 +154,8 @@ port (
     io_ddrMasters_0_aw_payload_id : in std_logic_vector(3 downto 0);
     io_ddrMasters_0_aw_payload_addr : in std_logic_vector(31 downto 0);
     io_ddrMasters_0_aw_ready : out std_logic;
-    io_ddrMasters_0_aw_valid : in std_logic
+    io_ddrMasters_0_aw_valid : in std_logic;
+    system_spi_0_io_ss : out std_logic_vector(0 to 0)
 );
 end component soc_control;
 
@@ -197,6 +211,19 @@ port map (
     io_ddrA_ar_payload_addr => io_ddrA_ar_payload_addr,
     io_ddrA_ar_ready => io_ddrA_ar_ready,
     io_ddrA_ar_valid => io_ddrA_ar_valid,
+    system_spi_0_io_data_0_read => system_spi_0_io_data_0_read,
+    system_spi_0_io_data_0_write => system_spi_0_io_data_0_write,
+    system_spi_0_io_data_0_writeEnable => system_spi_0_io_data_0_writeEnable,
+    system_spi_0_io_data_1_read => system_spi_0_io_data_1_read,
+    system_spi_0_io_data_1_write => system_spi_0_io_data_1_write,
+    system_spi_0_io_data_1_writeEnable => system_spi_0_io_data_1_writeEnable,
+    system_spi_0_io_data_2_read => system_spi_0_io_data_2_read,
+    system_spi_0_io_data_2_write => system_spi_0_io_data_2_write,
+    system_spi_0_io_data_2_writeEnable => system_spi_0_io_data_2_writeEnable,
+    system_spi_0_io_data_3_read => system_spi_0_io_data_3_read,
+    system_spi_0_io_data_3_write => system_spi_0_io_data_3_write,
+    system_spi_0_io_data_3_writeEnable => system_spi_0_io_data_3_writeEnable,
+    system_spi_0_io_sclk_write => system_spi_0_io_sclk_write,
     io_apbSlave_0_PADDR => io_apbSlave_0_PADDR,
     io_apbSlave_0_PENABLE => io_apbSlave_0_PENABLE,
     io_apbSlave_0_PRDATA => io_apbSlave_0_PRDATA,
@@ -251,7 +278,8 @@ port map (
     io_ddrMasters_0_aw_payload_id => io_ddrMasters_0_aw_payload_id,
     io_ddrMasters_0_aw_payload_addr => io_ddrMasters_0_aw_payload_addr,
     io_ddrMasters_0_aw_ready => io_ddrMasters_0_aw_ready,
-    io_ddrMasters_0_aw_valid => io_ddrMasters_0_aw_valid
+    io_ddrMasters_0_aw_valid => io_ddrMasters_0_aw_valid,
+    system_spi_0_io_ss => system_spi_0_io_ss
 );
 
 ------------------------ End INSTANTIATION Template ---------

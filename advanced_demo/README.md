@@ -1,5 +1,8 @@
 # 高级图形与游戏演示
 
+> 2026-10-24 新增 Flash 游戏实现：SPI0、图片/特效图集、最高分和难度存档、维护与只读导出工具。每次仍由电脑 JTAG/IDE 下载运行。详见 [Flash 封装与操作交付](docs/FLASH_DELIVERY.md) 和 [验证记录](docs/FLASH_VALIDATION.md)。下文原游戏报告保留为 Flash 接入前的基线记录。
+
+
 `advanced_demo` 用于完成赛题高级挑战：硬件 Alpha 混合、不规则精灵图的
 Color Key 透明处理，以及由 RISC-V CPU 运行、FPGA 加速绘图的高负载互动游戏。
 `basic_demo` 仍是单独保留的 M2 基线工程。

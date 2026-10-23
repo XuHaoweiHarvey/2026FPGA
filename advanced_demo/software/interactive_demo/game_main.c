@@ -9,6 +9,12 @@
 #include "../m1b_compare/hud.h"
 #include "game_logic.h"
 #include "uart_keyboard_input.h"
+#ifndef GAME_FLASH_ENABLE
+#define GAME_FLASH_ENABLE 1
+#endif
+#if GAME_FLASH_ENABLE
+#include "../flash/game_flash.h"
+#endif
 
 #if defined(__GNUC__)
 #define GAME_NORETURN __attribute__((noinline, noreturn))
@@ -140,6 +146,7 @@ static void cpu_session_end(void) {
     fail(ERROR_SESSION);
 }
 
+#if !GAME_FLASH_ENABLE
 static uint32_t asset_pixel(uint32_t image, uint32_t x, uint32_t y) {
     uint32_t r, g, b, band;
     if (image == 0u) {
@@ -263,6 +270,60 @@ static void initialize_sprite_atlas(void) {
     g_game_result.sprite_status = accel_read(ACCEL_SPRITE_STATUS);
 }
 
+#else
+/* Flash is a storage device; rendering always reads the existing guarded DDR.
+ * Verify both the incoming bytes and the DDR readback before sealing windows. */
+static uint32_t flash_line[640];
+static void flash_load_window(uint32_t index, uint32_t physical, int write_pixels) {
+    uint32_t y,x,crc=0,readback=0;
+    uint8_t bytes[4];
+    volatile uint32_t *dst=ddr(physical);
+    cpu_session_begin();
+    for(y=0;y<480;y++) {
+        int rc=game_flash_row(index,y,flash_line);
+        if(rc) fail(ERROR_ASSET);
+        crc=flash_crc32(crc,flash_line,sizeof(flash_line));
+        for(x=0;x<640;x++) {
+            if(write_pixels) dst[y*640+x]=flash_line[x];
+            else if(dst[y*640+x]!=flash_line[x]) fail(ERROR_ASSET);
+        }
+    }
+    GAME_FENCE();
+    for(y=0;y<480;y++) for(x=0;x<640;x++) {
+        flash_put32(bytes,dst[y*640+x]);
+        readback=flash_crc32(readback,bytes,4);
+    }
+    cpu_session_end();
+    g_flash_result.asset_crc=crc;
+    if(crc!=game_flash_expected_crc(index) || readback!=crc) {
+        g_flash_result.error=FLASH_CRC;fail(ERROR_ASSET);
+    }
+}
+static void initialize_assets(void) {
+    uint32_t i,status=accel_read(ACCEL_ASSET_STATUS);
+    int write_pixels=!(status&2u);
+    g_game_result.phase=PHASE_ASSETS;
+    if(!(status&0x80000000u))fail(ERROR_ASSET);
+    if(write_pixels && !(status&1u)) {
+        accel_write(ACCEL_ASSET_CONTROL,1u);
+        if(!(accel_read(ACCEL_ASSET_STATUS)&1u))fail(ERROR_ASSET);
+    }
+    for(i=0;i<3;i++)flash_load_window(i,ASSET_BASE+i*ASSET_BYTES,write_pixels);
+    if(write_pixels)accel_write(ACCEL_ASSET_CONTROL,2u);
+    if(!(accel_read(ACCEL_ASSET_STATUS)&2u))fail(ERROR_ASSET);
+    g_game_result.asset_status=accel_read(ACCEL_ASSET_STATUS);
+}
+static void initialize_sprite_atlas(void) {
+    uint32_t status=accel_read(ACCEL_SPRITE_STATUS);
+    g_game_result.phase=PHASE_SPRITES;
+    if(!(status&0x80000000u))fail(ERROR_SPRITE);
+    if(!(status&2u))require(accel_sprite_begin());
+    flash_load_window(3,SPRITE_PHYS,!(status&2u));
+    if(!(status&2u))require(accel_sprite_seal());
+    g_game_result.sprite_status=accel_read(ACCEL_SPRITE_STATUS);
+}
+#endif
+
 static void poll_keyboard(void) {
     g_now_ms = milliseconds();
     (void)uart_keyboard_input_poll(&g_keyboard, g_now_ms);
@@ -372,6 +433,12 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
         p = append(p, " MAX:"); p = append_u32(p, g_game_result.max_active_sprites, 2u); *p = 0;
         m1b_hud_text(dst, VIEW_X + 12u, VIEW_Y + 34u, line, UINT32_C(0x004bd9ef));
     }
+#if GAME_FLASH_ENABLE
+    p=line;p=append(p,"BEST:");p=append_u32(p,g_flash_result.high_score,1u);
+    p=append(p," D:");p=append_u32(p,g_flash_result.difficulty,1u);
+    p=append(p,g_flash_result.error?" SAVE ERROR":" FLASH OK");*p=0;
+    m1b_hud_text(dst,VIEW_X+12u,VIEW_Y+52u,line,UINT32_C(0x00ffd878));
+#endif
     cpu_session_end();
     (void)now_ms;
 }
@@ -394,7 +461,12 @@ static void render_frame(uint32_t now_ms) {
     if (back == front || (back != 0u && back != UINT32_C(0x00800000)) ||
         (front != 0u && front != UINT32_C(0x00800000))) fail(ERROR_RENDER);
 
+#if GAME_FLASH_ENABLE
+    issue_command(accel_blit(ASSET_BASE+((g_game.score/1000u)%3u)*ASSET_BYTES,
+                            2560u,VIEW_X,VIEW_Y,VIEW_W,VIEW_H));
+#else
     issue_command(accel_fill_rect(VIEW_X, VIEW_Y, VIEW_W, VIEW_H, BACKGROUND));
+#endif
     for (i = 0; i < GAME_EFFECT_LIMIT; ++i) {
         const game_effect_t *effect = &g_game.effects[i];
         if (effect->active && (int32_t)(effect->expires_ms - now_ms) > 0)
@@ -431,6 +503,9 @@ static void render_frame(uint32_t now_ms) {
 
 int main(void) {
     uint32_t now_ms;
+#if GAME_FLASH_ENABLE
+    uint32_t saved_game_over=0;
+#endif
     GAME_DISABLE_INTERRUPTS();
     g_game_result.magic = UINT32_C(0x53555256);
     g_game_result.phase = PHASE_STARTUP;
@@ -443,6 +518,9 @@ int main(void) {
     g_missed_base = accel_read(ACCEL_MISSED_BOUNDARY_COUNT);
     g_command_base = accel_read(ACCEL_COMMAND_COUNT);
     g_swap_base = accel_read(ACCEL_SWAP_COUNT);
+#if GAME_FLASH_ENABLE
+    if(game_flash_begin())fail(ERROR_ASSET);
+#endif
     initialize_assets();
     initialize_sprite_atlas();
 
@@ -456,7 +534,17 @@ int main(void) {
         uint8_t buttons;
         poll_keyboard();
         buttons = uart_keyboard_input_consume_buttons(&g_keyboard);
+#if GAME_FLASH_ENABLE
+        g_game.difficulty=(uint8_t)g_flash_result.difficulty;
+#endif
         survival_game_step(&g_game, buttons, g_now_ms);
+#if GAME_FLASH_ENABLE
+        /* One attempt per game-over transition; no repeated erase after errors. */
+        if(g_game.game_over && !saved_game_over) {
+            (void)game_flash_update_score(g_game.score);saved_game_over=1;
+        }
+        if(!g_game.game_over)saved_game_over=0;
+#endif
         render_frame(g_now_ms);
     }
 }

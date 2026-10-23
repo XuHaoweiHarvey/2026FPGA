@@ -107,6 +107,11 @@ static void enemy_wave_reaches_high_load(void) {
 }
 
 int main(void) {
+    survival_game_t easy,normal,hard;
+    survival_game_reset(&easy,0);survival_game_reset(&normal,0);survival_game_reset(&hard,0);
+    easy.difficulty=0;hard.difficulty=2;
+    survival_game_step(&easy,0,0);survival_game_step(&normal,0,0);survival_game_step(&hard,0,0);
+    assert(easy.next_spawn_ms>normal.next_spawn_ms && normal.next_spawn_ms>hard.next_spawn_ms);
     movement_is_bounded();
     firing_and_scoring_work();
     pause_and_restart_are_edge_triggered();

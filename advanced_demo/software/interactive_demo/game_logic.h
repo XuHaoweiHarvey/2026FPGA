@@ -35,7 +35,7 @@ typedef struct {
     uint32_t score, frames, max_sprites_seen;
     uint32_t rng;
     uint8_t lives, paused, game_over, previous_buttons;
-    uint8_t invulnerable;
+    uint8_t invulnerable, difficulty; /* 0 easy, 1 normal, 2 hard */
     uint32_t invulnerable_until_ms;
     game_enemy_t enemies[GAME_ENEMY_LIMIT];
     game_bullet_t bullets[GAME_BULLET_LIMIT];

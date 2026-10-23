@@ -1,5 +1,8 @@
 # Ti60F225-DK Flash：2D射击游戏图片存储与SPI配置说明
 
+> 实现状态更新（2026-10-24）：本文保留早期只读调查与方案推导。`advanced_demo` 现已增加 SPI0、图片/特效和 A/B 存档实现，实际地址与操作步骤以 [Flash 交付说明](../advanced_demo/docs/FLASH_DELIVERY.md) 为准。下文“SPI 未启用”“待新增”“未运行构建”等描述对应早期调查时点，不能用作当前状态。
+
+
 更新日期：2026-10-23  
 适用板卡：本文资料中的 Ti60F225I3-V4／Ti60F225-DK，板载 GD25LQ64。  
 工程检查位置：`D:/desktop/qiansai/2026FPGA`，含 `basic_demo` 与 `advanced_demo`。  

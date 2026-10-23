@@ -15,7 +15,7 @@ from shutil import which
 ## Define your aldec simulator's install path, example: '/somewhere/aldec/Riviera-PRO/2023.10.106'
 #ALDEC_PATH=Path('PUT', 'YOUR', 'OWN', 'ALDEC', 'PATH')
 
-spi0_en='0'
+spi0_en='1'
 uart0_en='1'
 
 binDl = []

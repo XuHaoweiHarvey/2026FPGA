@@ -101,3 +101,17 @@ io_apbSlave_0_PWRITE clocked by io_systemClk
 io_apbSlave_0_PWDATA clocked by io_systemClk
 io_apbSlave_0_PRDATA sampled by io_systemClk
 io_apbSlave_0_PSLVERROR sampled by io_systemClk
+system_spi_0_io_sclk_write clocked by io_systemClk
+system_spi_0_io_data_0_writeEnable clocked by io_systemClk
+system_spi_0_io_data_0_read sampled by io_systemClk
+system_spi_0_io_data_0_write clocked by io_systemClk
+system_spi_0_io_data_1_writeEnable clocked by io_systemClk
+system_spi_0_io_data_1_read sampled by io_systemClk
+system_spi_0_io_data_1_write clocked by io_systemClk
+system_spi_0_io_data_2_writeEnable clocked by io_systemClk
+system_spi_0_io_data_2_read sampled by io_systemClk
+system_spi_0_io_data_2_write clocked by io_systemClk
+system_spi_0_io_data_3_writeEnable clocked by io_systemClk
+system_spi_0_io_data_3_read sampled by io_systemClk
+system_spi_0_io_data_3_write clocked by io_systemClk
+system_spi_0_io_ss clocked by io_systemClk

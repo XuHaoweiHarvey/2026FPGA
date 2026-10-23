@@ -8,11 +8,11 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--ide-root', type=Path, default=Path('D:/Efinity/efinity-riscv-ide-2026.1'))
+parser.add_argument('--ide-root', type=Path, default=Path('C:/Efinity/efinity-riscv-ide-2026.1'))
 parser.add_argument('--toolchain-prefix',type=Path,
                     help='Optional complete GNU cross-tool prefix, ending in a hyphen; default uses the formal IDE')
 parser.add_argument('--output', type=Path)
-parser.add_argument('--program', choices=('apb','m1a','m1b','m2','game','keyboard-test'), default='apb')
+parser.add_argument('--program', choices=('apb','m1a','m1b','m2','game','keyboard-test','flash-probe','flash-maint'), default='apb')
 parser.add_argument('--opt', choices=('Og','O2'), default='Og')
 parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
                     help='Optional C macro override, e.g. TEST_RECT_X=320; tests use a temporary output')
@@ -38,7 +38,7 @@ if args.program in ('game', 'keyboard-test'):
     # RX/TX with an idle driver. Check the physical-port bindings before linking.
     subprocess.run([sys.executable, str(ROOT / 'scripts/check_project.py')], cwd=ROOT, check=True)
 assert value('SYSTEM_RAM_A_SIZE') == value('SYSTEM_RAM_A_CTRL_SIZE') == 65536
-linker = bsp / 'linker/default.ld'
+linker = ROOT / 'software/flash/ocram.ld'  # explicit JTAG/OCRAM, no DDR boot
 text = linker.read_text(encoding='utf8')
 origin = int(re.search(r'ORIGIN\s*=\s*(0x[0-9A-Fa-f]+)', text)[1], 0)
 length = int(re.search(r'LENGTH\s*=\s*(\d+)K', text)[1]) * 1024
@@ -48,6 +48,7 @@ default_output = ROOT / ('software/interactive_demo/build/game' if args.program=
                          'software/m2_demo/build' if args.program=='m2' else
                          'software/m1b_compare/build' if args.program=='m1b' else
                          'software/m1a_ddr_smoke/build' if args.program=='m1a' else
+                         'software/flash/build/'+args.program if args.program.startswith('flash-') else
                          'software/apb_reg_test/build')
 out = (args.output or default_output).resolve()
 out.mkdir(parents=True, exist_ok=True)
@@ -74,16 +75,26 @@ def run(command):
 source = ROOT / ('software/m1a_ddr_smoke/main.c' if args.program=='m1a' else
                  'software/interactive_demo/game_main.c' if args.program=='game' else
                  'software/interactive_demo/uart_keyboard_test.c' if args.program=='keyboard-test' else
+                 'software/flash/flash_probe.c' if args.program=='flash-probe' else
+                 'software/flash/flash_maint.c' if args.program=='flash-maint' else
                  'software/apb_reg_test/main.c')
 basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'm1b_compare' if args.program=='m1b' else 'm2_demo' if args.program=='m2' else 'apb_reg_test'
 if args.program == 'game': basename = 'survival_game'
 if args.program == 'keyboard-test': basename = 'uart_keyboard_test'
+if args.program.startswith('flash-'): basename = args.program.replace('-', '_')
+if args.program == 'flash-maint': flags.append('-DFLASH_MAINTENANCE_BUILD=1')
 run([gcc, *flags, '-c', source, '-o', out / 'main.o'])
 objects = [out / 'start.o', out / 'main.o']
 if args.program == 'game':
     game_logic = ROOT / 'software/interactive_demo/game_logic.c'
     run([gcc, *flags, '-c', game_logic, '-o', out / 'game_logic.o'])
     objects.append(out / 'game_logic.o')
+if args.program == 'game' or args.program.startswith('flash-'):
+    extra = ['flash_store', 'flash_spi']
+    if args.program == 'game': extra.append('game_flash')
+    for unit in extra:
+        run([gcc, *flags, '-c', ROOT / ('software/flash/'+unit+'.c'), '-o', out / (unit+'.o')])
+        objects.append(out / (unit+'.o'))
 run([gcc, *flags, '-c', startup, '-o', out / 'start.o'])
 elf = out / (basename+'.elf')
 run([gcc, *flags, '-nostdlib', '-nostartfiles', '-Wl,--gc-sections', '-T', linker,
@@ -98,6 +109,8 @@ required = ('_start','main','m1a_test_done','g_m1a_result','_sp') if args.progra
            ('_start','main','m2_error_stop','m2_cycle_boundary','g_m2_result','_sp') if args.program=='m2' else \
            ('_start','main','game_demo_done','g_game_result','_sp') if args.program=='game' else \
            ('_start','main','g_uart_keyboard_result','_sp') if args.program=='keyboard-test' else \
+           ('_start','main','flash_dump_ready','g_flash_dump','_sp') if args.program=='flash-probe' else \
+           ('_start','main','flash_maint_ready','g_flash_maint','_sp') if args.program=='flash-maint' else \
            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')
 selected = [line for line in symbols.splitlines() if line.split()[-1] in
             required]
