@@ -1,4 +1,4 @@
-"""Build the RAM-only APB test against the formal soc_control BSP."""
+"""Build APB checks, inherited benchmarks, or the UART-controlled game."""
 import argparse
 import json
 from pathlib import Path
@@ -11,7 +11,7 @@ parser.add_argument('--ide-root', type=Path, default=Path('D:/Efinity/efinity-ri
 parser.add_argument('--toolchain-prefix',type=Path,
                     help='Optional complete GNU cross-tool prefix, ending in a hyphen; default uses the formal IDE')
 parser.add_argument('--output', type=Path)
-parser.add_argument('--program', choices=('apb','m1a','m1b','m2','advanced'), default='apb')
+parser.add_argument('--program', choices=('apb','m1a','m1b','m2','game','keyboard-test'), default='apb')
 parser.add_argument('--opt', choices=('Og','O2'), default='Og')
 parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
                     help='Optional C macro override, e.g. TEST_RECT_X=320; tests use a temporary output')
@@ -30,13 +30,17 @@ for extension in ('A', 'C', 'F', 'D'):
     assert value('SYSTEM_RISCV_ISA_EXT_' + extension) == 0, 'Recheck generated ISA before rebuilding'
 assert value('IO_APB_SLAVE_0_INPUT_SIZE') >= 0xE8
 assert value('SYSTEM_DDR_BMB') == 0x1000 and value('SYSTEM_DDR_BMB_SIZE') == 0xe0000000
+if args.program in ('game', 'keyboard-test'):
+    assert conf['UART0'] == "1'b1", 'Enable UART0 in Efinity IP Manager before building UART software'
+    assert 'SYSTEM_UART_0_IO_CTRL' in macros, 'Regenerate the Sapphire SoC/BSP with UART0 enabled'
 assert value('SYSTEM_RAM_A_SIZE') == value('SYSTEM_RAM_A_CTRL_SIZE') == 65536
 linker = bsp / 'linker/default.ld'
 text = linker.read_text(encoding='utf8')
 origin = int(re.search(r'ORIGIN\s*=\s*(0x[0-9A-Fa-f]+)', text)[1], 0)
 length = int(re.search(r'LENGTH\s*=\s*(\d+)K', text)[1]) * 1024
 assert origin == value('SYSTEM_RAM_A_CTRL') and length == value('SYSTEM_RAM_A_CTRL_SIZE')
-default_output = ROOT / ('software/advanced_demo/build' if args.program=='advanced' else
+default_output = ROOT / ('software/interactive_demo/build/game' if args.program=='game' else
+                         'software/interactive_demo/build/keyboard-test' if args.program=='keyboard-test' else
                          'software/m2_demo/build' if args.program=='m2' else
                          'software/m1b_compare/build' if args.program=='m1b' else
                          'software/m1a_ddr_smoke/build' if args.program=='m1a' else
@@ -61,18 +65,25 @@ if args.program == 'm1b':
 if args.program == 'm2':
     assert not any(d.startswith('DEMO_MODE=') for d in args.define)
     flags.append('-DDEMO_MODE=6')
-if args.program == 'advanced':
-    assert not any(d.startswith('DEMO_MODE=') for d in args.define)
-    flags.append('-DDEMO_MODE=7')
 def run(command):
     subprocess.run([str(x) for x in command], cwd=ROOT, check=True)
-source = ROOT / ('software/m1a_ddr_smoke/main.c' if args.program=='m1a' else 'software/apb_reg_test/main.c')
-basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'm1b_compare' if args.program=='m1b' else 'm2_demo' if args.program=='m2' else 'advanced_demo' if args.program=='advanced' else 'apb_reg_test'
+source = ROOT / ('software/m1a_ddr_smoke/main.c' if args.program=='m1a' else
+                 'software/interactive_demo/game_main.c' if args.program=='game' else
+                 'software/interactive_demo/uart_keyboard_test.c' if args.program=='keyboard-test' else
+                 'software/apb_reg_test/main.c')
+basename = 'm1a_ddr_smoke' if args.program=='m1a' else 'm1b_compare' if args.program=='m1b' else 'm2_demo' if args.program=='m2' else 'apb_reg_test'
+if args.program == 'game': basename = 'survival_game'
+if args.program == 'keyboard-test': basename = 'uart_keyboard_test'
 run([gcc, *flags, '-c', source, '-o', out / 'main.o'])
+objects = [out / 'start.o', out / 'main.o']
+if args.program == 'game':
+    game_logic = ROOT / 'software/interactive_demo/game_logic.c'
+    run([gcc, *flags, '-c', game_logic, '-o', out / 'game_logic.o'])
+    objects.append(out / 'game_logic.o')
 run([gcc, *flags, '-c', startup, '-o', out / 'start.o'])
 elf = out / (basename+'.elf')
 run([gcc, *flags, '-nostdlib', '-nostartfiles', '-Wl,--gc-sections', '-T', linker,
-     '-Wl,-Map,' + str(out / (basename+'.map')), out / 'start.o', out / 'main.o', '-lgcc', '-o', elf])
+     '-Wl,-Map,' + str(out / (basename+'.map')), *objects, '-lgcc', '-o', elf])
 run([objcopy, '-O', 'binary', elf, out / (basename+'.bin')])
 run([objcopy, '-O', 'ihex', elf, out / (basename+'.hex')])
 dump = subprocess.check_output([str(objdump), '-d', '-S', str(elf)], cwd=ROOT, text=True)
@@ -81,7 +92,8 @@ symbols = subprocess.check_output([str(nm), '-n', '-S', str(elf)], text=True)
 required = ('_start','main','m1a_test_done','g_m1a_result','_sp') if args.program=='m1a' else \
            ('_start','main','m1b_test_done','g_m1b_result','_sp') if args.program=='m1b' else \
            ('_start','main','m2_error_stop','m2_cycle_boundary','g_m2_result','_sp') if args.program=='m2' else \
-           ('_start','main','advanced_demo_done','g_advanced_result','_sp') if args.program=='advanced' else \
+           ('_start','main','game_demo_done','g_game_result','_sp') if args.program=='game' else \
+           ('_start','main','g_uart_keyboard_result','_sp') if args.program=='keyboard-test' else \
            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')
 selected = [line for line in symbols.splitlines() if line.split()[-1] in
             required]

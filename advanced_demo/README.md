@@ -1,74 +1,76 @@
-# Advanced Alpha Demo
+# Advanced graphics game demo
 
-This directory is the experimental v6 branch of the graphics-engine work. The
-accepted v5/M2 demonstration remains under `basic_demo`; all changes described
-here are local to `advanced_demo`. Its source starting point is M2 baseline
-commit `be4a02d36b83eefb03009c4457b9225d321e99e3` on `main`.
+This directory implements the competition's high-level challenges: hardware
+Alpha blending, Color Key sprites, and a high-load interactive game running on
+the RISC-V CPU with FPGA-accelerated drawing. `basic_demo` remains unchanged.
 
-## What it demonstrates
+The final demonstration is a keyboard-controlled survival game. The player
+moves with WASD or the arrow keys, holds Space or Ctrl to fire, and presses P
+to pause. The game uses Color Key for opaque sprites with transparent borders
+and Alpha blending for the player's glow, projectiles, and hit effects. Enemy
+waves ramp up toward 48 simultaneous enemies. On-screen counters report the
+presented game FPS, current Sprite count, and maximum observed Sprite count so
+the team can measure the 60 FPS challenge on the board.
 
-The independent `advanced_demo` software mode generates a sealed 640x480
-ARGB8888 sprite atlas in DDR and draws one deterministic scene in two ways:
+The game ELF issues Color Key and Alpha commands; it does not issue ordinary
+`OP_BLIT` commands. The RTL keeps BLIT support enabled because Color Key uses
+the shared source-transfer path and the accelerator's configuration requires
+that support. The retained M2 regression also exercises ordinary BLIT. BLIT is
+therefore a lower-level accelerator operation, not a separate advanced-game
+mode or a standalone demonstration. The game does not render a CPU/FPGA
+comparison scene.
 
-- ordinary Front-to-Back BLIT;
-- magenta Color Key from the atlas;
-- two overlapping straight-alpha light sprites over a prepared background.
+## Build and controls
 
-The CPU reference and FPGA renderers use the same atlas, background and source
-rectangle. The sprites fade automatically. Render FPS counts the render phase;
-presented FPS includes HUD drawing and the safe frame swap. The debugger result
-record is `g_advanced_result`; no input devices are needed.
-
-The older M2 software remains available as mode 6 and the new demo as mode 7:
+The generated Sapphire SoC/BSP must include UART0 and the board wrapper must
+route its pins to the verified USB-UART channel before building the game ELF:
 
 ```powershell
-py -3 scripts/build_apb_software.py --program m2
-py -3 scripts/build_apb_software.py --program advanced
+py -3 scripts/build_apb_software.py --program game
+py -3 scripts/build_apb_software.py --program keyboard-test
+py -3 tools/keyboard_uart.py --list
+py -3 tools/keyboard_uart.py COM7
 ```
 
-ELFs and bitstreams are intentionally not checked into this source tree. Build
-outputs go to separate `software/m2_demo/build` and `software/advanced_demo/build`
-directories. The builder expects the Efinity RISC-V IDE toolchain and generated
-formal BSP at their configured paths; an alternate GNU tool prefix can be
-provided with `--toolchain-prefix`.
+The game ELF is written to `software/interactive_demo/build/game/`. The
+diagnostic ELF is separate under `software/interactive_demo/build/keyboard-test/`.
+Use the game ELF with the UART-enabled game bitstream. The diagnostic ELF is
+only for checking the keyboard link and is not the game.
 
-## Hardware contract
-
-- Version: `0x00060000`; capabilities: `0x000001FB` (Alpha is bit 8).
-- Opcode 3 uses source ARGB alpha and `RECT_COLOR[7:0]` global alpha. It rounds
-  `Aeff=(pixel_alpha*global_alpha+127)/255` and each RGB result as
-  `(src*Aeff+dst*(255-Aeff)+127)/255`. Destination X is preserved.
-- The sprite atlas starts at `0x01384000`, contains 640x480 pixels at a 2560
-  byte stride and ends exclusively at `0x014B0000`. It follows the three sealed
-  M2 images. Only sealed, in-bounds Color Key and Alpha rectangles may read it;
-  ordinary BLIT continues to use Front or one of the three full M2 images.
-- Alpha reuses the existing graphics read channel and display-priority
-  arbiter. Each segment reads foreground and Back, blends, then writes Back.
-  The buffer manager retains Back ownership until the final write response.
-- The CPU DDR alias is `0x1000 + physical DDR address`. Sprite writes are
-  accepted only during the platform-controlled loading session. Sealing is
-  permanent until platform reset.
-
-The complete register contract is in [docs/REGISTER_MAP.md](docs/REGISTER_MAP.md).
-The local Efinity synthesis and timing results are recorded in
-[docs/ALPHA_BUILD_REPORT.md](docs/ALPHA_BUILD_REPORT.md).
+In this checkout, UART0 is disabled in `ip/soc_control/settings.json` and the
+generated BSP has no UART0 registers. Do not edit only that JSON file. Use
+Efinity IP Manager to enable UART0 and regenerate the SoC/BSP, then connect the
+generated pins in the platform wrapper and board constraints after the team
+confirms the board revision and FT4232 COM channel. The old v6 Alpha comparison
+ELF/bit package does not include this UART integration and is not the game
+build. Existing build outputs are ignored by Git.
 
 ## Verification
 
-Focused Alpha regressions:
+Run the portable game-logic checks and board-app syntax check on a host:
+
+```powershell
+py -3 scripts/run_game_logic_checks.py
+py -3 scripts/run_uart_keyboard_checks.py
+```
+
+The game logic tests movement bounds, firing/scoring, pause/restart edges, and
+Sprite accounting. UART protocol tests cover framing, CRC, replay rejection,
+release on timeout, and FIFO adapter behavior. These host tests do not verify
+the generated SoC, physical UART pins, DDR/display timing, or board FPS.
+
+The graphics regressions remain available for the required hardware features:
 
 ```powershell
 py -3 scripts/run_alpha_checks.py
+powershell -ExecutionPolicy Bypass -File scripts/run_color_key_checks.ps1
 ```
 
-The suite checks 537 deterministic and random pixel vectors, the Alpha DMA
-pixel scoreboard and command snapshot, sprite-window boundaries, Alpha APB
-begin/seal at several wait counts, and CPU DDR sprite loading/sealed access.
-Other regression entry points remain `run_graphics_checks.ps1`,
-`run_d_checks.py`, `run_apb_checks.py`, `run_rgb_checks.py`, and
-`run_m2_software_checks.py`.
+Record the board's presented FPS and maximum Sprite count while both Alpha and
+Color Key are active. Also record `error`, `reader_error`, underflow and missed
+boundary deltas. The stable simultaneous Sprite count at 60 FPS can only be
+established by running the UART-enabled game build on the target board.
 
-The source and testbenches do not replace a full Efinity map/place-and-route,
-board run, or performance measurement. Record on-board error counters,
-render/present FPS, actual swap cadence, resource use and timing after building
-the v6 project and loading its matching ELF/bitstream.
+The M2 comparison sources, builders, and regression scripts that remain in this
+engineering checkout support earlier baselines and compatibility checks; they
+are not advanced-demo modes and are not linked into the game ELF.

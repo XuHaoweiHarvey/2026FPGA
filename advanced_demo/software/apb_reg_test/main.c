@@ -1,7 +1,5 @@
-/* Modes 5, 6 and 7 have independent software; modes 0..4 keep their path. */
-#if defined(DEMO_MODE) && DEMO_MODE == 7u
-#include "../advanced_demo/main.c"
-#elif defined(DEMO_MODE) && DEMO_MODE == 5u
+/* Modes 5 and 6 remain independent M1b/M2 regression software. */
+#if defined(DEMO_MODE) && DEMO_MODE == 5u
 #include "../m1b_compare/main.c"
 #elif defined(DEMO_MODE) && DEMO_MODE == 6u
 #include "../m2_demo/main.c"

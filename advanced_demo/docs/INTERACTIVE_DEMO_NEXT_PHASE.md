@@ -1,53 +1,69 @@
-# 互动演示下一阶段草案
+# Advanced challenge game implementation
 
-## 目标与进入条件
+`advanced_demo` is scoped to the competition's advanced challenges:
 
-在 v6 Alpha 演示通过实体板卡验证后，再做一个独立的互动模式：用户控制图层位置、透明度或效果类型，同时保留 CPU/FPGA 同场景对照。互动模式用于展示输入响应与图形加速；第一步不扩展成完整游戏，也不修改已验收的 M2 基线。
+1. Hardware Alpha blending while drawing foreground sprites.
+2. Hardware Color Key transparency for irregular sprites.
+3. A high-load interactive game on RISC-V, measuring how many simultaneous
+   sprites can be presented at a stable 60 FPS with both graphics features in
+   use.
 
-进入编码前先满足两项条件：
+The final demonstration is the keyboard-controlled survival game. The game
+uses Color Key for player/enemy artwork, Alpha for glow/projectile/effect
+sprites, and on-screen FPS/current Sprite/maximum Sprite counters. There is no
+CPU-versus-FPGA comparison mode and no standalone BLIT showcase. The game ELF
+sends Color Key and Alpha commands, not ordinary `OP_BLIT` commands. BLIT
+support remains enabled in RTL because Color Key uses the shared source-transfer
+path and the accelerator configuration requires BLIT support; the retained M2
+regression also exercises ordinary copies.
 
-1. 按 [v6 上板验证表](BOARD_VALIDATION_CHECKLIST.md) 得到稳定画面，并记录 FPS、错误和显示连续性数据。
-2. 确认实际板卡修订版及可用输入外设，查到对应原理图/引脚表，并确认信号能接入当前设计。
+## Software organization
 
-## 先做外设盘点
+- `software/interactive_demo/game_logic.[ch]` contains portable movement,
+  enemy-wave, projectile, collision, score, lives, pause/restart, and Sprite
+  accounting logic.
+- `software/interactive_demo/game_main.c` initializes the v6 accelerator,
+  seals the generated sprite atlas, receives keyboard state over UART, renders
+  with Alpha/Color Key commands, and records runtime diagnostics.
+- `software/interactive_demo/uart_keyboard_test.c` remains a separate link
+  diagnostic. It is not a game mode.
+- `scripts/build_apb_software.py --program game` builds a separate game ELF;
+  the inherited M2 comparison and register-check code is not linked into it.
 
-不要先假设板上按键或 UART 可直接使用。当前 SoC 配置中 GPIO0、GPIO1 与 UART0/1/2 均未启用；当前 demo 也没有输入驱动。因此先让队友填写：
+The automated game wave ramps toward 48 enemies. The player can move with
+WASD/arrows, fire with Space/Ctrl, and pause with P. The host logic suite checks
+the rules and bounds, but it cannot establish actual board FPS or simultaneous
+Sprite capacity.
 
-| 需要确认的项目 | 结果 / 依据 |
-|---|---|
-| Ti60F225 开发板完整型号、PCB 修订号 | |
-| 板载按键、拨码、旋钮/编码器的数量和引脚 | |
-| USB 连接器是否提供可用的 USB-UART，以及对应 FPGA 引脚 | |
-| 扩展接口是否可接外部按钮/摇杆，电压与引脚约束 | |
-| 当前 HDMI、DDR、JTAG 外还被占用的 FPGA 引脚 | |
-| 原理图、用户手册、pinout 文件位置 | |
-| 建议的首选输入及队友确认人 | |
+## Board integration status
 
-优先级建议：若有已在约束文件中引出的板载按键/拨码，优先用它；否则确认扩展接口可用后接简单按钮；若只方便 USB-UART，则先确认桥接芯片和引脚，再评估启用 UART 所需的 SoC/BSP 改动。每种方案都要先核对电平、电气约束、复用和复位行为。
+The checked-in generated SoC/BSP currently has UART0 disabled. A game ELF
+cannot be built against this BSP, and the existing v6 Alpha package has no
+keyboard connection. Do not hand-edit `settings.json` alone. Before board
+integration, the team holding the board must confirm the exact Ti60F225 board
+revision, FT4232 UART channel/COM mapping, and whether JTAG can remain connected
+while UART is used. Then enable UART0 in Efinity IP Manager, regenerate the SoC
+and BSP, route the generated `io_uart_0` signals through the platform wrapper,
+and add the verified board pins without disturbing DDR/video assignments.
 
-## 互动内容建议
+The documented manual lists UART_RX at GPIOL_02 (R4) and UART_TX at GPIOR_28
+(R14), but the exact board revision and USB bridge mapping still need teammate
+confirmation. The existing PC sender and parser can be checked offline with
+`py -3 scripts/run_uart_keyboard_checks.py`.
 
-保持现有场景和 Alpha 算法不变，新增一个单独的互动演示入口，避免改写当前自动 CPU/FPGA 基准。候选操作映射如下，最终数量按盘点到的输入器件缩减：
+## Acceptance measurements
 
-- 一个输入切换普通复制、Color Key、Alpha 效果；
-- 两个方向输入移动前景光斑；
-- 一个输入在自动淡入淡出与手动透明度间切换，或调节透明度档位。
+After UART integration and full Efinity build:
 
-程序对输入做消抖和边沿检测；每次更新位置/透明度后限制图形矩形在演示区内。CPU 与 FPGA 基准仍使用同一组坐标和 Alpha 参数，避免输入变化造成比较不公平。若实际输入很少，先实现“移动 + 切换效果”即可，不必为凑控制数量增加外设。
+1. Run the game ELF with the matching UART-enabled bitstream and confirm
+   movement, firing, pause, restart, and automatic key release after unplug.
+2. Verify the game HUD and debugger record agree on presented FPS and active
+   Sprite counts while Alpha and Color Key sprites overlap on screen.
+3. Increase enemy waves to the maximum and record the maximum simultaneous
+   Sprite count at a stable 60 FPS, together with error, underflow, and missed
+   boundary deltas.
+4. Repeat with both Alpha and Color Key visible throughout the load test.
 
-## 建议实施顺序
-
-1. 收集板卡型号、外设照片/手册、pinout 与约束，确认一个最小可行输入方案。
-2. 先为该输入写硬件接线/寄存器接口小设计，并跑独立仿真或 GPIO/UART 回环验证；此阶段不改 Alpha 数据路径。
-3. 在独立的高级模式中接入输入采样、消抖、状态更新和画面 HUD；保留现有自动基准入口，新增互动入口。
-4. 验证按键/串口输入不重复触发、不越界、不破坏安全换帧；复跑现有 Alpha、Color Key、M2 和共享显示回归。
-5. 完整编译，生成新的配套 bit/ELF，并按同一张上板表记录互动响应、FPS、underflow 和 missed 计数。
-
-## 需要团队先确认
-
-- 首选输入是什么，板卡文档里如何证明它可用？
-- 互动阶段只展示“移动 + 效果切换”，还是还要手动控制透明度？
-- 自动基准与互动演示要由启动菜单选择，还是先用单独 ELF 分开验证？
-
-在这三项明确之前，保持 v6 bit/ELF 不变，先完成当前上板验收。
-
+The CPU/FPGA comparison belongs to the earlier M2 baseline and is not an
+advanced-challenge acceptance item. The old Alpha comparison program is not
+part of the final game build.

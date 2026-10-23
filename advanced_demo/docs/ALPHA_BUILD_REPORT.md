@@ -23,7 +23,10 @@ functional in simulation; their logic mapping contributes to XLR use and is a
 clear target for future memory-inference optimization. The build has no
 reported compile or timing failure.
 
-The matching RV32 ELF was built at `output/toolchain/advanced/advanced_demo.elf`
-with the formal 64 KiB OCRAM linker layout. Neither this build nor the bitstream
-has been run on the physical board; on-board Alpha/Color Key output, error
-counters, FPS and actual presentation cadence remain to be measured.
+At the time of this report, an RV32 Alpha comparison ELF was built with the
+formal 64 KiB OCRAM linker layout. That CPU/FPGA comparison application has
+since been removed from the advanced game path; its ignored output artifacts
+are historical and are not the game ELF. The report remains evidence for the
+v6 hardware compile only. Neither the hardware nor game has been run on the
+physical board; on-board Alpha/Color Key output, game FPS, Sprite capacity,
+error counters and presentation cadence remain to be measured.
