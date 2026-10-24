@@ -13,6 +13,7 @@ static uint32_t mock_read(uint32_t offset) {
 
 #define MOCK_GAME_REG_READ mock_read
 #define SURVIVAL_GAME_HOST_SYNTAX
+#define GAME_FLASH_ENABLE 0
 #define main board_game_main
 #include "../software/interactive_demo/game_main.c"
 #undef main

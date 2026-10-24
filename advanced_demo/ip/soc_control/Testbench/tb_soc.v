@@ -19,10 +19,10 @@
 
 module tb_soc ();
 
+localparam  MHZ=100000000;
 localparam PMHZ=50000000;
 localparam  MEMDEPTH=$clog2(469762048/128);
 localparam  MEMWIDTH=128;
-localparam  MHZ=100000000;
 
 /////////////////////////////////////////////////////////////////////////////
 wire		io_systemClk; 
@@ -54,8 +54,6 @@ wire 		system_spi_0_io_data_1;
 wire		system_uart_0_io_txd;
 reg		    system_uart_0_io_rxd	= 1'b1;
 wire        memoryCheckerPass;
-wire		baudClk=io_systemClk;
-reg  [10:0] BAUDRATE=(MHZ/115200);
 wire ext_mem_ctrl_clk; 
 wire ext_mem_ctrl_resetn; 
 wire			io_ddrA_arw_valid;
@@ -82,6 +80,8 @@ wire  [127:0]	io_ddrA_r_payload_data;
 wire  [7:0]		io_ddrA_r_payload_id;
 wire  [1:0]		io_ddrA_r_payload_resp;
 wire			io_ddrA_r_payload_last;
+wire		baudClk=io_systemClk;
+reg  [10:0] BAUDRATE=(MHZ/115200);
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -261,6 +261,12 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
 top_soc_wrapper dut_wrapper(
+.system_uart_0_io_txd(system_uart_0_io_txd),
+.system_uart_0_io_rxd(system_uart_0_io_rxd),
+.system_spi_0_io_data_0(system_spi_0_io_data_0),
+.system_spi_0_io_data_1(system_spi_0_io_data_1),
+.system_spi_0_io_sclk_write(system_spi_0_io_sclk_write),
+.system_spi_0_io_ss(system_spi_0_io_ss),
 .io_memoryClk(io_memoryClk),
 .memoryClk_rstn(memoryClk_rstn),
 .memoryClk_locked(memoryClk_locked),
@@ -288,8 +294,6 @@ top_soc_wrapper dut_wrapper(
 .io_ddrA_r_payload_id(io_ddrA_r_payload_id),
 .io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
 .io_ddrA_r_payload_last(io_ddrA_r_payload_last),
-.system_uart_0_io_txd(system_uart_0_io_txd),
-.system_uart_0_io_rxd(system_uart_0_io_rxd),
 
 //clock and reset
 .io_asyncResetn(~rst),
@@ -299,6 +303,8 @@ top_soc_wrapper dut_wrapper(
 .memoryCheckerPass(memoryCheckerPass)
 );
 
+assign ext_mem_ctrl_clk = io_memoryClk;
+assign ext_mem_ctrl_resetn = memoryClk_locked;
 ext_mem_controller #(
 .WIDTH(MEMWIDTH),
 .DEPTH(MEMDEPTH)
@@ -329,8 +335,6 @@ ext_mem_controller #(
 .bid_0(io_ddrA_b_payload_id),
 .bvalid_0(io_ddrA_b_valid),
 .bready_0(io_ddrA_b_ready));
-assign ext_mem_ctrl_clk = io_memoryClk;
-assign ext_mem_ctrl_resetn = memoryClk_locked;
 
 
 W25Q32JVxxIM spi_flash(
@@ -348,11 +352,13 @@ endmodule
 //////////////////////////////////////////////////////////////////////////////
 
 module top_soc_wrapper(
+output [0:0] system_spi_0_io_ss,
+output		system_spi_0_io_sclk_write,
+inout		system_spi_0_io_data_0,
+inout		system_spi_0_io_data_1,
 output		memoryClk_rstn,
 input		memoryClk_locked,
 input		io_memoryClk,
-output		system_uart_0_io_txd,
-input		system_uart_0_io_rxd,
 output		io_ddrA_arw_valid,
 input		io_ddrA_arw_ready,
 output [31:0] io_ddrA_arw_payload_addr,
@@ -377,6 +383,8 @@ input [127:0] io_ddrA_r_payload_data,
 input [7:0] io_ddrA_r_payload_id,
 input [1:0] io_ddrA_r_payload_resp,
 input		io_ddrA_r_payload_last,
+output		system_uart_0_io_txd,
+input		system_uart_0_io_rxd,
 
 output      systemClk_rstn,
 input       systemClk_locked,
@@ -385,11 +393,36 @@ input       io_asyncResetn,
 output      memoryCheckerPass
 );
 //////////////////////////////////////////////////////////////////////////////
+wire  [0:0]	spi_0_io_ss;
+wire		spi_0_io_data_0_writeEnable;
+wire		system_spi_0_io_data_0_read;
+wire		spi_0_io_data_0_write;
+wire		spi_0_io_data_1_writeEnable;
+wire		system_spi_0_io_data_1_read;
+wire		spi_0_io_data_1_write;
+wire		spi_0_io_sclk_write;
 
 
+
+io_sim  #(.WIDTH(1+1),.REG(1)) spi0_io_aux (
+.clk(io_systemClk),
+.out_pad({spi_0_io_sclk_write,spi_0_io_ss}),
+.out_oe({1+1{1'b1}}),
+.in_pad(),
+.io({system_spi_0_io_sclk_write,system_spi_0_io_ss}));
+
+io_sim  #(.WIDTH(2),.REG(1)) spi0_io_data ( 
+.clk(io_systemClk),
+.out_pad({spi_0_io_data_0_write,spi_0_io_data_1_write}),
+.out_oe({spi_0_io_data_0_writeEnable,spi_0_io_data_1_writeEnable}),
+.in_pad({system_spi_0_io_data_0_read,system_spi_0_io_data_1_read}),
+.io({system_spi_0_io_data_0,system_spi_0_io_data_1}));
 
 //////////////////////////////////////////////////////////////////////////////
 top_soc dut (
+.io_memoryClk(io_memoryClk),
+.memoryClk_rstn(memoryClk_rstn),
+.memoryClk_locked(memoryClk_locked),
 .io_ddrA_arw_valid(io_ddrA_arw_valid),
 .io_ddrA_arw_ready(io_ddrA_arw_ready),
 .io_ddrA_arw_payload_addr(io_ddrA_arw_payload_addr),
@@ -414,11 +447,16 @@ top_soc dut (
 .io_ddrA_r_payload_id(io_ddrA_r_payload_id),
 .io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
 .io_ddrA_r_payload_last(io_ddrA_r_payload_last),
-.io_memoryClk(io_memoryClk),
-.memoryClk_rstn(memoryClk_rstn),
-.memoryClk_locked(memoryClk_locked),
 .system_uart_0_io_txd(system_uart_0_io_txd),
 .system_uart_0_io_rxd(system_uart_0_io_rxd),
+.system_spi_0_io_sclk_write(spi_0_io_sclk_write),
+.system_spi_0_io_data_0_writeEnable(spi_0_io_data_0_writeEnable),
+.system_spi_0_io_data_0_read(system_spi_0_io_data_0_read),
+.system_spi_0_io_data_0_write(spi_0_io_data_0_write),
+.system_spi_0_io_data_1_writeEnable(spi_0_io_data_1_writeEnable),
+.system_spi_0_io_data_1_read(system_spi_0_io_data_1_read),
+.system_spi_0_io_data_1_write(spi_0_io_data_1_write),
+.system_spi_0_io_ss(spi_0_io_ss),
 
 //clock and reset
 .io_asyncResetn(io_asyncResetn),

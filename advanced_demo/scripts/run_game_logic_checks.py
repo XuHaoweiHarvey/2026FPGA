@@ -37,6 +37,7 @@ with tempfile.TemporaryDirectory(prefix="survival-game-check-") as temp_name:
         subprocess.run([str(control_test)], cwd=temp, check=True)
         subprocess.run([*compiler, "/nologo", "/TC", "/W4", "/WX", "/Zs",
                         "/DSURVIVAL_GAME_HOST_SYNTAX",
+                        "/DGAME_FLASH_ENABLE=0",
                         "/I" + str(ROOT / "sim/mock_game"),
                         "/I" + str(ROOT / "sim/mock_uart"),
                         str(ROOT / "software/interactive_demo/game_main.c")],
@@ -55,6 +56,7 @@ with tempfile.TemporaryDirectory(prefix="survival-game-check-") as temp_name:
                         "-o", str(control_test)], cwd=ROOT, check=True)
         subprocess.run([str(control_test)], cwd=ROOT, check=True)
         subprocess.run([*common, "-fsyntax-only", "-DSURVIVAL_GAME_HOST_SYNTAX",
+                        "-DGAME_FLASH_ENABLE=0",
                         "-I", str(ROOT / "sim/mock_game"),
                         "-I", str(ROOT / "sim/mock_uart"),
                         str(ROOT / "software/interactive_demo/game_main.c")],

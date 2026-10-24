@@ -44,7 +44,7 @@ typedef struct {
     uint32_t rng;
     uint32_t simulation_ms, accumulator_ms, dropped_ms, wave;
     uint8_t lives, paused, game_over, previous_buttons;
-    uint8_t invulnerable;
+    uint8_t invulnerable, difficulty; /* 0 easy, 1 normal, 2 hard */
     uint8_t enemy_limit, invincible_mode, pending_buttons;
     uint32_t auto_restart_ms, auto_restart_at_ms, enemy_fire_interval_ms;
     uint32_t invulnerable_until_ms;

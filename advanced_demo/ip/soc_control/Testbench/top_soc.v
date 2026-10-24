@@ -18,11 +18,17 @@
 `timescale 1ns / 1ps
 
 module top_soc (
-output		system_uart_0_io_txd,
-input		system_uart_0_io_rxd,
 input		io_memoryClk,
 output		memoryClk_rstn,
 input		memoryClk_locked,
+output [0:0] system_spi_0_io_ss,
+output		system_spi_0_io_data_0_writeEnable,
+input		system_spi_0_io_data_0_read,
+output		system_spi_0_io_data_0_write,
+output		system_spi_0_io_data_1_writeEnable,
+input		system_spi_0_io_data_1_read,
+output		system_spi_0_io_data_1_write,
+output		system_spi_0_io_sclk_write,
 output		io_ddrA_arw_valid,
 input		io_ddrA_arw_ready,
 output [31:0] io_ddrA_arw_payload_addr,
@@ -47,6 +53,8 @@ input [127:0] io_ddrA_r_payload_data,
 input [7:0] io_ddrA_r_payload_id,
 input [1:0] io_ddrA_r_payload_resp,
 input		io_ddrA_r_payload_last,
+output		system_uart_0_io_txd,
+input		system_uart_0_io_rxd,
 
 output      memoryCheckerPass,
 output      systemClk_rstn,
@@ -69,6 +77,22 @@ wire		io_apbSlave_0_PWRITE;
 wire [31:0] io_apbSlave_0_PWDATA;
 wire [31:0] io_apbSlave_0_PRDATA;
 wire		io_apbSlave_0_PSLVERROR;
+wire		io_ddrA_ar_valid;
+wire		io_ddrA_ar_ready;
+wire [31:0] io_ddrA_ar_payload_addr;
+wire [7:0] io_ddrA_ar_payload_id;
+wire [7:0] io_ddrA_ar_payload_len;
+wire [2:0] io_ddrA_ar_payload_size;
+wire [1:0] io_ddrA_ar_payload_burst;
+wire [1:0] io_ddrA_ar_payload_lock;
+wire		io_ddrA_aw_valid;
+wire		io_ddrA_aw_ready;
+wire [31:0] io_ddrA_aw_payload_addr;
+wire [7:0] io_ddrA_aw_payload_id;
+wire [7:0] io_ddrA_aw_payload_len;
+wire [2:0] io_ddrA_aw_payload_size;
+wire [1:0] io_ddrA_aw_payload_burst;
+wire [1:0] io_ddrA_aw_payload_lock;
 wire [7:0] m_aid_0;
 wire [31:0] m_aaddr_0;
 wire [7:0]  m_alen_0;
@@ -101,30 +125,14 @@ wire		m_arvalid_0;
 wire		m_pass_0;
 wire		m_start_0;
 wire		io_axiMasterReset_0;
-wire		io_ddrA_ar_valid;
-wire		io_ddrA_ar_ready;
-wire [31:0] io_ddrA_ar_payload_addr;
-wire [7:0] io_ddrA_ar_payload_id;
-wire [7:0] io_ddrA_ar_payload_len;
-wire [2:0] io_ddrA_ar_payload_size;
-wire [1:0] io_ddrA_ar_payload_burst;
-wire [1:0] io_ddrA_ar_payload_lock;
-wire		io_ddrA_aw_valid;
-wire		io_ddrA_aw_ready;
-wire [31:0] io_ddrA_aw_payload_addr;
-wire [7:0] io_ddrA_aw_payload_id;
-wire [7:0] io_ddrA_aw_payload_len;
-wire [2:0] io_ddrA_aw_payload_size;
-wire [1:0] io_ddrA_aw_payload_burst;
-wire [1:0] io_ddrA_aw_payload_lock;
 
 
 /////////////////////////////////////////////////////////////////////////////
 //Reset and PLL
 assign reset 	= ~( io_asyncResetn & systemClk_locked);
 assign systemClk_rstn 	= 1'b1;
-assign memoryCheckerPass=m_pass_0;
 assign memoryClk_rstn=1'b1;
+assign memoryCheckerPass=m_pass_0;
 assign m_aready_0=(m_atype_0 & m_awready_0) | (!m_atype_0 & m_arready_0);
 assign m_awvalid_0=m_avalid_0 & m_atype_0;
 assign m_arvalid_0=m_avalid_0 & ~m_atype_0;
@@ -132,6 +140,19 @@ assign io_ddrA_w_payload_id='h0;
 
 
 /////////////////////////////////////////////////////////////////////////////
+apb3_slave #(
+.ADDR_WIDTH(16)) apb_slave_0 (
+.clk(io_systemClk),
+.resetn(~io_systemReset),
+.PADDR(io_apbSlave_0_PADDR),
+.PSEL(io_apbSlave_0_PSEL),
+.PENABLE(io_apbSlave_0_PENABLE),
+.PREADY(io_apbSlave_0_PREADY),
+.PWRITE(io_apbSlave_0_PWRITE),
+.PWDATA(io_apbSlave_0_PWDATA),
+.PRDATA(io_apbSlave_0_PRDATA),
+.PSLVERROR(io_apbSlave_0_PSLVERROR));
+
 timer_start #(
 .MHZ(100),
 .SECOND(3)
@@ -174,19 +195,6 @@ memory_checker #(
 .bvalid(m_bvalid_0),
 .bready(m_bready_0),
 .pass(m_pass_0));
-
-apb3_slave #(
-.ADDR_WIDTH(16)) apb_slave_0 (
-.clk(io_systemClk),
-.resetn(~io_systemReset),
-.PADDR(io_apbSlave_0_PADDR),
-.PSEL(io_apbSlave_0_PSEL),
-.PENABLE(io_apbSlave_0_PENABLE),
-.PREADY(io_apbSlave_0_PREADY),
-.PWRITE(io_apbSlave_0_PWRITE),
-.PWDATA(io_apbSlave_0_PWDATA),
-.PRDATA(io_apbSlave_0_PRDATA),
-.PSLVERROR(io_apbSlave_0_PSLVERROR));
 
 fd_to_hd_wrapper fd_to_hd_wrapper_inst(
 .clk(io_memoryClk),
@@ -231,8 +239,16 @@ soc_control soc_inst
 .io_apbSlave_0_PWDATA(io_apbSlave_0_PWDATA),
 .io_apbSlave_0_PRDATA(io_apbSlave_0_PRDATA),
 .io_apbSlave_0_PSLVERROR(io_apbSlave_0_PSLVERROR),
-.system_uart_0_io_txd(system_uart_0_io_txd),
-.system_uart_0_io_rxd(system_uart_0_io_rxd),
+.jtagCtrl_tck(),
+.jtagCtrl_tdi(),
+.jtagCtrl_tdo(),
+.jtagCtrl_enable(),
+.jtagCtrl_capture(),
+.jtagCtrl_shift(),
+.jtagCtrl_update(),
+.jtagCtrl_reset(),
+.io_memoryClk(io_memoryClk),
+.io_memoryReset(io_memoryReset),
 .io_ddrMasters_0_clk(io_memoryClk),
 .io_ddrMasters_0_reset(io_axiMasterReset_0),
 .io_ddrMasters_0_aw_valid(m_awvalid_0),
@@ -313,16 +329,22 @@ soc_control soc_inst
 .io_ddrA_r_payload_id(io_ddrA_r_payload_id),
 .io_ddrA_r_payload_resp(io_ddrA_r_payload_resp),
 .io_ddrA_r_payload_last(io_ddrA_r_payload_last),
-.jtagCtrl_tck(),
-.jtagCtrl_tdi(),
-.jtagCtrl_tdo(),
-.jtagCtrl_enable(),
-.jtagCtrl_capture(),
-.jtagCtrl_shift(),
-.jtagCtrl_update(),
-.jtagCtrl_reset(),
-.io_memoryClk(io_memoryClk),
-.io_memoryReset(io_memoryReset),
+.system_uart_0_io_txd(system_uart_0_io_txd),
+.system_uart_0_io_rxd(system_uart_0_io_rxd),
+.system_spi_0_io_sclk_write(system_spi_0_io_sclk_write),
+.system_spi_0_io_data_0_writeEnable(system_spi_0_io_data_0_writeEnable),
+.system_spi_0_io_data_0_read(system_spi_0_io_data_0_read),
+.system_spi_0_io_data_0_write(system_spi_0_io_data_0_write),
+.system_spi_0_io_data_1_writeEnable(system_spi_0_io_data_1_writeEnable),
+.system_spi_0_io_data_1_read(system_spi_0_io_data_1_read),
+.system_spi_0_io_data_1_write(system_spi_0_io_data_1_write),
+.system_spi_0_io_data_2_writeEnable(),
+.system_spi_0_io_data_2_read(),
+.system_spi_0_io_data_2_write(),
+.system_spi_0_io_data_3_writeEnable(),
+.system_spi_0_io_data_3_read(),
+.system_spi_0_io_data_3_write(),
+.system_spi_0_io_ss(system_spi_0_io_ss),
 
 .io_systemClk(io_systemClk),
 .io_asyncReset(reset),

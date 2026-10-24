@@ -137,3 +137,21 @@ assert 'ACCEL_CAP_ALPHA' in header and '0xE0u' in header and '0xE4u' in header
 print(f"PASS project: {len(files)} unique, existing design entries; current RGB/control integration")
 print(f"PASS register contract: {len(cases)} current RTL/header/documented offsets agree")
 print(f"PASS V4 UART pad reservation: RX R4/GPIOL_02, TX R14/GPIOR_28; {uart_status}")
+conf = json.loads((ROOT / 'ip/soc_control/settings.json').read_text(encoding='utf8'))['conf']
+assert conf['SPI0'] == "1'b1" and conf['SPI1'] == conf['SPI2'] == "1'b0"
+assert conf['HexFile_PathEnable'] == "1'b1" and 'jtag_wait.hex' in conf['HexFile_Path']
+for port,pad,direction in [('flash_cs_n','GPIOL_P_01','output'),
+                            ('flash_sck','GPIOL_N_01','output'),
+                            ('flash_mosi','GPIOL_P_03','output'),
+                            ('flash_miso','GPIOL_N_03','input')]:
+    matches=[g for g in gpios if g.get('gpio_def')==pad]
+    assert len(matches)==1 and matches[0].get('name')==port
+    assert matches[0].get('mode')==direction and matches[0].get('io_standard')=='1.8 V LVCMOS'
+    assert re.search(r'\.'+port+r'\s*\(\s*'+port+r'\s*\)',formal)
+for pin,signal in [('system_spi_0_io_ss','flash_cs_n'),
+                    ('system_spi_0_io_sclk_write','flash_sck'),
+                    ('system_spi_0_io_data_0_write','flash_mosi'),
+                    ('system_spi_0_io_data_1_read','flash_miso')]:
+    assert re.search(r'\.'+pin+r'\s*\(\s*'+signal+r'\s*\)',soc_connection_text)
+assert re.search(r'#define SYSTEM_SPI_0_IO_CTRL 0xf8014000',bsp_header)
+print('PASS SPI0 generated ports/BSP/1.8-V pin bindings and JTAG wait init')

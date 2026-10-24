@@ -1,5 +1,15 @@
 # 高级图形与游戏演示
 
+> 2026-10-24 新增 Flash 游戏实现：SPI0、图片/特效图集、最高分和难度存档、维护与只读导出工具。每次仍由电脑 JTAG/IDE 下载运行。详见 [Flash 封装与操作交付](docs/FLASH_DELIVERY.md) 和 [验证记录](docs/FLASH_VALIDATION.md)。下文原游戏报告保留为 Flash 接入前的基线记录。
+
+2026-10-24 已合并常驻调试/弹幕与 Flash 两套改动。默认构建启用 Flash，需要带 SPI0
+的硬件和已准备的素材；继续使用原来的常驻调试版本时，构建参数加
+`--define GAME_FLASH_ENABLE=0`，使用现有 UART/Alpha/Color Key v6 bit。
+两种模式都保留背景初始化、弹幕、调试命令和测量接口；Flash 模式还使用 BLIT 绘制背景。
+本次合并验证的 ELF 在 `output/merge_validation_20261024/`，没有覆盖当前已上板的
+`software/interactive_demo/build/game/survival_game.elf` 或 bit，未操作板卡或写 Flash。
+
+
 `advanced_demo` 用于完成赛题高级挑战：硬件 Alpha 混合、不规则精灵图的
 Color Key 透明处理，以及由 RISC-V CPU 运行、FPGA 加速绘图的高负载互动游戏。
 `basic_demo` 仍是单独保留的 M2 基线工程。
@@ -58,13 +68,15 @@ Efinity 2026.1.132 于 2026-10-23 完成完整编译，生成以下文件：
 $env:PYTHONHOME = 'D:\Efinity\python311'
 $efxPython = 'D:\Efinity\python311\bin\python.exe'
 & $efxPython scripts\check_project.py
-& $efxPython scripts\build_apb_software.py --program game
-& $efxPython scripts\build_apb_software.py --program keyboard-test
+& $efxPython scripts\build_apb_software.py --program game --ide-root 'D:/Efinity/efinity-riscv-ide-2026.1' --define GAME_FLASH_ENABLE=0
+& $efxPython scripts\build_apb_software.py --program keyboard-test --ide-root 'D:/Efinity/efinity-riscv-ide-2026.1'
 & $efxPython tools\keyboard_uart.py --list
 & $efxPython tools\keyboard_uart.py COMx
 ```
 
-其他装有可用 Python 3 启动器的电脑，可以用 `py -3` 替代 `$efxPython`。将
+其他装有可用 Python 3 启动器的电脑，可以用 `py -3` 替代 `$efxPython`。
+`--ide-root` 需改为本机实际安装目录；需要 Flash 版时去掉 `GAME_FLASH_ENABLE=0`，
+并先按 Flash 交付说明准备兼容的硬件和素材。将
 `COMx` 换成接上板卡后实际显示的串口号；Windows 可能在不同电脑或 USB 插口上分配
 不同编号。启动键盘发送程序前，先关闭占用该 COM 口的串口终端。键盘测试和游戏
 运行顺序见串口说明。

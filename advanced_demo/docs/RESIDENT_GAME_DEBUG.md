@@ -4,6 +4,10 @@
 用户已反馈通过桌面窗口加载 ELF 后游戏可以显示，背景跳变修复后显示正常。
 UART 实际接收、调试命令、自测结果和持续帧率仍需保存板端验证记录。
 
+与远端 Flash 功能合并后，默认构建启用 Flash。若使用原来的 v6 bit 和生成素材，
+构建时加 `--define GAME_FLASH_ENABLE=0`，并用 `--ide-root` 指定本机 IDE 路径；
+Flash 版另需带 SPI0 的硬件及正确素材，不能直接用原来的已封存图集替换或绕过验证。
+
 ## 先用起来
 
 1. 板上需要已有 UART/Alpha/Color Key 的 advanced v6 位流。已加载正确位流时无需重新编译 FPGA。
@@ -88,7 +92,7 @@ UART 实际接收、调试命令、自测结果和持续帧率仍需保存板端
 
 ```powershell
 $env:PYTHONHOME = 'D:/Efinity/python311'
-& 'D:/Efinity/python311/bin/python.exe' -B scripts/build_apb_software.py --program game
+& 'D:/Efinity/python311/bin/python.exe' -B scripts/build_apb_software.py --program game --ide-root 'D:/Efinity/efinity-riscv-ide-2026.1' --define GAME_FLASH_ENABLE=0
 & .\scripts\run_interactive_checks.cmd
 ```
 

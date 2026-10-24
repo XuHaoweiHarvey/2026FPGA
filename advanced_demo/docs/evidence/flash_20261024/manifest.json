@@ -1,0 +1,501 @@
+{
+  "baseline_commit": "8765c08185a0975ceac1729a4cbc7651621eb282",
+  "board_tested": false,
+  "source_files": [
+    {
+      "file": ".gitignore",
+      "sha256": "2382919cc2e0ac8e739dde88881e7003136b162316cf733db954a63489acbd5c"
+    },
+    {
+      "file": "advanced_demo/README.md",
+      "sha256": "09e18ce80dc36204b0f2d6e2df655763e389c7745dd460bb55e2806e5459f1c9"
+    },
+    {
+      "file": "advanced_demo/docs/FLASH_DELIVERY.md",
+      "sha256": "c9ccda653e6f8869767243e1bd6b524f13e182296446c606c708b3c356aaf714"
+    },
+    {
+      "file": "advanced_demo/docs/FLASH_VALIDATION.md",
+      "sha256": "5c7f27e6dff1f83ca1b312b4a3d824414b0e11cc29baa095b1d5920fd57e8899"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/soc.h",
+      "sha256": "aca01d13be997658308dee2633e39821a54b96105528493e474f907a9ab1bad4"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/linker/bootloader.ld",
+      "sha256": "6ee1b119719613f7032202a376f3ecf115296588b793307466ea94877103f5ac"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/linker/default.ld",
+      "sha256": "e488c5dea7950fd369f849a5cc7eff1435ed368e8286c6bbd955e285ac447e14"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/linker/default_i.ld",
+      "sha256": "96c0ac4c4bc2a7546b1b83e7755a84f863efa81375010b97bf2d5503153828a4"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/linker/freertos.ld",
+      "sha256": "e488c5dea7950fd369f849a5cc7eff1435ed368e8286c6bbd955e285ac447e14"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/linker/freertos_i.ld",
+      "sha256": "96c0ac4c4bc2a7546b1b83e7755a84f863efa81375010b97bf2d5503153828a4"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/debug.cfg",
+      "sha256": "9931a973453cbf3a5274e23194ffbb60f9ebe5e28e3177f34c1560d83fb1dffe"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/debug_profile_soft.cfg",
+      "sha256": "6e7a507edd93f188f03093bdf1c1dc3dadf75a5418011881b20e152fbb6e7aba"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/debug_softTap.cfg",
+      "sha256": "d2de942942c8757ce874fc2de0deed2643b038628ff97fe0eb123b815c2292a9"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/debug_ti.cfg",
+      "sha256": "d1523c599ecfc160de015a6f77d3e8a1ed9f11947ccf665e5253c821a7bfcaef"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/debug_tz.cfg",
+      "sha256": "d1523c599ecfc160de015a6f77d3e8a1ed9f11947ccf665e5253c821a7bfcaef"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/flash.cfg",
+      "sha256": "27ce391ea06c8152f1127aed4a67a69316a91f9007e5ba863f56508ead2e2ff1"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/flash_softTap.cfg",
+      "sha256": "143128943f6e4f8c3277796354aa0ae7ac47630be890b718c808f4270753d42d"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/flash_ti.cfg",
+      "sha256": "210e67929b6d015d2d2dd0d9d335a7a7fc756ff1681c41b7b6ebaeb99c6ed0a6"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/flash_tz.cfg",
+      "sha256": "210e67929b6d015d2d2dd0d9d335a7a7fc756ff1681c41b7b6ebaeb99c6ed0a6"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/openocd/sapphire_soc_xsvd.json",
+      "sha256": "fb3fb47e68a0f0f809c390034db108d4dd1b81ed8e90c194134ce8b172f3b661"
+    },
+    {
+      "file": "advanced_demo/embedded_sw/soc_control/cpu0.yaml",
+      "sha256": "c05d5637226b5ab5a5cf66806673db4c55fd8c4a30399a59de31442aedee5fbb"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin",
+      "sha256": "206ea49277a550be80acbe8abe872864d8dbb7e97916864814bd074b78ad75ff"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin",
+      "sha256": "26d6c7ae00fefc89dffc9ff03d1d4b7f724cedf883b5c27b8112bc9d9ca29e91"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin",
+      "sha256": "26d6c7ae00fefc89dffc9ff03d1d4b7f724cedf883b5c27b8112bc9d9ca29e91"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin",
+      "sha256": "26d6c7ae00fefc89dffc9ff03d1d4b7f724cedf883b5c27b8112bc9d9ca29e91"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/aldec/soc_control.v",
+      "sha256": "ff345a52b85b6ac361132842662519aee4520bbaf2f6c1df6f2f83d4a0d11133"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/modelsim/soc_control.v",
+      "sha256": "9fc1e7f41e445aa2d4443d2c05355294949f9e5e5cebd7faa6468b2eec695f8c"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/ncsim/soc_control.v",
+      "sha256": "39a156dbc8b6aed95e37b2662cb4eef6a4228c37e4847d8a6cd84e229a0aaca6"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/run.py",
+      "sha256": "bf5bbc00aa04a723a02e2b3784e33c6b34ec2f87d06bc38611875a10327930c1"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/soc_control.v",
+      "sha256": "f4a308df6d90dda124edabf9a6238c0af56bf99569c527d6108593715d2f97ba"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/synopsys/soc_control.v",
+      "sha256": "eca9859eee7c585099d7d2999b1b84eb3201a8fd4db051f3ee15936cb2ed3532"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/tb_soc.v",
+      "sha256": "b785c5bba45aa84a4db9e222598e12e4063d9ecf52afd7eb2160080a1548e1d8"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/Testbench/top_soc.v",
+      "sha256": "61dc1a48f62d02e43256463ce660c4df6834afefc43b99abeb74da797cbfb265"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/settings.json",
+      "sha256": "c70c88f791c3ae5cf66e11c9e98a1406b7fcdeee443e8998dd3beaf74d008788"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/soc_control.v",
+      "sha256": "f4a308df6d90dda124edabf9a6238c0af56bf99569c527d6108593715d2f97ba"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/soc_control_tmpl.v",
+      "sha256": "62925fe9573ef2e8543cca09500787176b3fedc0788ae2e48c64f877f2ab9ec9"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/soc_control_tmpl.vhd",
+      "sha256": "121c250f9163b08e730a0c3495a462175b7f236f8030a1c90f868a1f3b5b4ad8"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/EfxSapphireSoc.v",
+      "sha256": "9cad19fb2e9b601108ed86e61e51e639c84d6047cb0fe61425815dca4b7daddc"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin",
+      "sha256": "206ea49277a550be80acbe8abe872864d8dbb7e97916864814bd074b78ad75ff"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin",
+      "sha256": "26d6c7ae00fefc89dffc9ff03d1d4b7f724cedf883b5c27b8112bc9d9ca29e91"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin",
+      "sha256": "26d6c7ae00fefc89dffc9ff03d1d4b7f724cedf883b5c27b8112bc9d9ca29e91"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin",
+      "sha256": "26d6c7ae00fefc89dffc9ff03d1d4b7f724cedf883b5c27b8112bc9d9ca29e91"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/EfxSapphireSoc_io_cd.rpt",
+      "sha256": "3d56a972999f627e7cd9270a67d1d703ecbd77d672337560d8bacb68d7f568b5"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/source_aldec/EfxSapphireSoc.v",
+      "sha256": "f8c742a276f6c67cebf738ee201ff1a259cc6ef41e9e5286102d6643ba878dd2"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/source_efinity/EfxSapphireSoc.v",
+      "sha256": "9cad19fb2e9b601108ed86e61e51e639c84d6047cb0fe61425815dca4b7daddc"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/source_modelsim/EfxSapphireSoc.v",
+      "sha256": "95bb6415284a0e140d6a2d39fd06514b5ac5e4025bf961b7a355d328b1ca42f0"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/source_ncsim/EfxSapphireSoc.v",
+      "sha256": "94c21382fa72b8b0519db5b33b8c471093a0b2f96214eab8218fdd9d35eb513f"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/hardware/netlist/source_synopsys/EfxSapphireSoc.v",
+      "sha256": "fc0b8d97fbd625a385c3aed806e979096de874167cffbb21cf3e03ee9649b6b1"
+    },
+    {
+      "file": "advanced_demo/ip/soc_control/source/soc_config",
+      "sha256": "e45c4477ecd083ea486bceac2566fd362f6472b964d2481e0631d6e979e9310f"
+    },
+    {
+      "file": "advanced_demo/rtl/control/sapphire_control.v",
+      "sha256": "7e14b23041b66ea5f062d7509f9c1cbbf8c8572bfa194743c40a354f9d4a3f4d"
+    },
+    {
+      "file": "advanced_demo/rtl/ti60f225_oob_top.v",
+      "sha256": "a154aa1a426027a76d1b327d3bf5e609c70deb039eb7f20a3b77d9c6eee3927c"
+    },
+    {
+      "file": "advanced_demo/scripts/build_apb_software.py",
+      "sha256": "0227fe05bd0e5d5e8b282192b898b95d347a77e6d97e93b2a2f0304b0dbb0d8e"
+    },
+    {
+      "file": "advanced_demo/scripts/check_flash_delivery.py",
+      "sha256": "8ae71e53a19f4dc1ff838e52f4a76b3899b663d899553dd342bf944b6bc33e4a"
+    },
+    {
+      "file": "advanced_demo/scripts/check_project.py",
+      "sha256": "630fb8f7cf833c9eb0e5a841a29b442b83d91707f88511c0f5d55383c05db7c1"
+    },
+    {
+      "file": "advanced_demo/scripts/generate_flash_soc.py",
+      "sha256": "1e32df4496ed9ee68dd19f8d58e5dfadb1ac081c93f1662cc38999463480210f"
+    },
+    {
+      "file": "advanced_demo/scripts/prepare_flash_ide.py",
+      "sha256": "cee65255299180e1fb7dc4439974e4af94b1366212d31270a7584b23658057d7"
+    },
+    {
+      "file": "advanced_demo/scripts/run_flash_checks.py",
+      "sha256": "7896ecb0c2191b463963e7e46cd1d3f30e98bdfac753257ef7daf4329bf8339d"
+    },
+    {
+      "file": "advanced_demo/scripts/test_flash_assets.py",
+      "sha256": "087f574a71d1fa90fa1cdcabac42f62fde3eb605ff5ddd97506a9e1dadf78136"
+    },
+    {
+      "file": "advanced_demo/scripts/test_flash_gdb.py",
+      "sha256": "82a358e83b5f9026e4da620296ccd7d3c2dde46ea1feb2c8660957bfd2fca1f0"
+    },
+    {
+      "file": "advanced_demo/sim/flash_spi_model.py",
+      "sha256": "fd555cd5f3d6f7a90deb94185691d3ecc71e100f766e9d3d3310b5468bb085c4"
+    },
+    {
+      "file": "advanced_demo/sim/test_flash_spi.c",
+      "sha256": "66d4cf07b3da5a583d1293420fd1ccbe9688ee7c9004d6b32a245e78f81712b1"
+    },
+    {
+      "file": "advanced_demo/sim/test_flash_store.c",
+      "sha256": "e626a84df4034c957f73119785bfbfa935b0cbd3b1fa687d49b3ec1e467216f9"
+    },
+    {
+      "file": "advanced_demo/sim/test_survival_game.c",
+      "sha256": "05e00f1497384317de067c9529e6e55b22f7ba3f81396215a7906ddc3103260a"
+    },
+    {
+      "file": "advanced_demo/software/flash/.cproject",
+      "sha256": "c3fbc487fa6e4ca30e12dd1f10f66b314a8858d4eb338546822ba676ca9dc719"
+    },
+    {
+      "file": "advanced_demo/software/flash/.project",
+      "sha256": "bd306184d65a8c7a20dd5c913f16fe07ea4ce5c59327316093dbb89a87ca5db5"
+    },
+    {
+      "file": "advanced_demo/software/flash/Makefile",
+      "sha256": "6ccd020c11118e8b3f188a38fffaf71c97f8bc0c2c5ab6bb96a9ac37a3d07928"
+    },
+    {
+      "file": "advanced_demo/software/flash/README.md",
+      "sha256": "5133e459f0e4d2d509f147bf807816cfcf675e5105898915b5c7e0dcc2987c53"
+    },
+    {
+      "file": "advanced_demo/software/flash/flash_maint.c",
+      "sha256": "482c5bd65a06484ea948e2beac743af08aef1cca1b82fb2b877305844a28c4fa"
+    },
+    {
+      "file": "advanced_demo/software/flash/flash_probe.c",
+      "sha256": "3f59248efefa75a8d72c711f6ab3f130fe7a5d1eeb6a8fd12df13285b055757d"
+    },
+    {
+      "file": "advanced_demo/software/flash/flash_spi.c",
+      "sha256": "c30137501d08c649fa0ea4a5f84c2b62b02d87c1b4871641c2cd0b90b6bd1c57"
+    },
+    {
+      "file": "advanced_demo/software/flash/flash_store.c",
+      "sha256": "3bc70a62db34f7a35b584a406b50758703c7d0cca49eb0fc159d31fc2452d527"
+    },
+    {
+      "file": "advanced_demo/software/flash/flash_store.h",
+      "sha256": "e4748bc61ba60ec6c4619db4e1c2852a9ae3807a353b1ddfa38a370cf9921a9e"
+    },
+    {
+      "file": "advanced_demo/software/flash/game_flash.c",
+      "sha256": "e76294ec3f5d3101b65c99a197989303f5b80b3c92e60da2cdf3786424f701a6"
+    },
+    {
+      "file": "advanced_demo/software/flash/game_flash.h",
+      "sha256": "0296dbd2d22f06ab8d8df386aadba249103d3b74e03fdcf1130cd5246b6f9c52"
+    },
+    {
+      "file": "advanced_demo/software/flash/game_ti.launch",
+      "sha256": "a50a5d371ecdf7a2a3642821d43e1d23fed1f5dfa2338095f6288ad86251ca93"
+    },
+    {
+      "file": "advanced_demo/software/flash/jtag_wait.hex",
+      "sha256": "ef54ba090f3f2ce29e84924af2488a4e9751ecb9dd9dba53ce67ea72e66cd873"
+    },
+    {
+      "file": "advanced_demo/software/flash/maintenance_ti.launch",
+      "sha256": "990ab2889198793c794fbcbd760355eb957263735f11ddc7d33d88a8f6704adb"
+    },
+    {
+      "file": "advanced_demo/software/flash/ocram.ld",
+      "sha256": "96c0ac4c4bc2a7546b1b83e7755a84f863efa81375010b97bf2d5503153828a4"
+    },
+    {
+      "file": "advanced_demo/software/flash/probe_ti.launch",
+      "sha256": "7e59be58de24143c1b80c2d7ee3cb80e3484e492d7d5bf45d858b92db455d9c0"
+    },
+    {
+      "file": "advanced_demo/software/interactive_demo/game_logic.c",
+      "sha256": "a6eb5102b2e67b87bf94aa2106c5d2a497476f7222b3a037fd5262743360bb1d"
+    },
+    {
+      "file": "advanced_demo/software/interactive_demo/game_logic.h",
+      "sha256": "751547859742be16428453ff157134e7220c1ec480ed2e0832406cba0da78ab4"
+    },
+    {
+      "file": "advanced_demo/software/interactive_demo/game_main.c",
+      "sha256": "0dcd64c37462eac7db20f14e4efd5dbd1108928f5353d797af1ae797683198e3"
+    },
+    {
+      "file": "advanced_demo/ti60f225_oob.peri.xml",
+      "sha256": "7c8598f024ac0e1577b19543df8718856b6ea70b5bdae5729387bd684913a31e"
+    },
+    {
+      "file": "advanced_demo/ti60f225_oob.xml",
+      "sha256": "aa6d7ce2eaf225eea4dcaa9b0c82db20f4ee31c924fb7305abb50dca2a86baaa"
+    },
+    {
+      "file": "advanced_demo/tools/flash_assets.py",
+      "sha256": "3ec662c1c1a2d84ffa0e4fb4e50d804421baf4b2cc18b4cf015ff4c6a5670f74"
+    },
+    {
+      "file": "advanced_demo/tools/flash_transfer.py",
+      "sha256": "313412e1193a67a468f1d04c01bbf18b8dce727b4e603452f294f0cb00b11203"
+    },
+    {
+      "file": "docs/FLASH_ASSETS_GUIDE.md",
+      "sha256": "430dd5cbd63935e0f6ea6c34c8c772058e5e436df951643ed92c4ea343d7271f"
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "delivery-check.log",
+      "bytes": 222,
+      "sha256": "8b2a0b3133789d135187ad4ea3463bb70177bafda0abe5dea80e08c4499e5ef7"
+    },
+    {
+      "file": "flash-assets-tests.log",
+      "bytes": 2410,
+      "sha256": "4163d02268b8f0cdb381204e1d6622ea352d47253d3f25de0dd9a7726977761b"
+    },
+    {
+      "file": "flash-checks.log",
+      "bytes": 1555,
+      "sha256": "f927cea3f1aa8cf61eed809dd31d18b827b25123642cbab0b34341f84a30c013"
+    },
+    {
+      "file": "flash-fallback-build.log",
+      "bytes": 941,
+      "sha256": "75720a4732d8ef0290aed2d33f319b06a57a791604009692c04e1c84b39a4a54"
+    },
+    {
+      "file": "flash-fpga-build.log",
+      "bytes": 1469,
+      "sha256": "846020b5456c7069e6fa20d41a183606c6e170eabae81e9f76c6886b3379a92f"
+    },
+    {
+      "file": "flash-gdb-tests.log",
+      "bytes": 78,
+      "sha256": "cde395aaeb457d24602a8f851f2e2cac3b99c736e2d86e375a0071f2bf2480eb"
+    },
+    {
+      "file": "flash-generation.log",
+      "bytes": 121,
+      "sha256": "3e21ad4be6457e865d16ae4621da049466cd599e4caae296bff4bc8d8b54d1ac"
+    },
+    {
+      "file": "flash-interface.log",
+      "bytes": 194,
+      "sha256": "e34fd54912266661c270b0bca1fe9a0cd2ddd76b45e67bf47ae88eabf9b99806"
+    },
+    {
+      "file": "flash-m2-build.log",
+      "bytes": 612,
+      "sha256": "668555488e82c888e6265deb64a3fecee78748c291539e325dc969ab27b80237"
+    },
+    {
+      "file": "flash-maint-build.log",
+      "bytes": 569,
+      "sha256": "8b86bfc721fb3e81178dafc2e2d8331d6e109ec6389f3bc70390ab49e2eb5359"
+    },
+    {
+      "file": "flash-probe-build.log",
+      "bytes": 567,
+      "sha256": "f73813b43bc573a0c16e364dd524ed426b994f0ca09d53d90f4cc543955baab9"
+    },
+    {
+      "file": "flash_maint.elf",
+      "bytes": 84044,
+      "sha256": "eee77a56fc0a51d7029414634c65ee7430a530f7e69e381f5f7a1fa3d300465c"
+    },
+    {
+      "file": "flash_probe.elf",
+      "bytes": 79964,
+      "sha256": "d383eff8b2808e64b4500488c958e2da5c22a4dbbe5df191e6e4efe7c4d28c16"
+    },
+    {
+      "file": "game-build.log",
+      "bytes": 931,
+      "sha256": "b1043535e310fc7a5eeefa01ff10168a80b2b180810e9e6dcfd90e7697623605"
+    },
+    {
+      "file": "jtag-check.log",
+      "bytes": 73,
+      "sha256": "d30ca77c73e3526dc046c145e7eb6e9b8a92e411869fd82ea48c10945bd52962"
+    },
+    {
+      "file": "project-check.log",
+      "bytes": 353,
+      "sha256": "3d5692ae202cc9b50ddd7c5f59f1a15b2ae9e2b19300078bb6b948ed4a0860a4"
+    },
+    {
+      "file": "sample-dump.log",
+      "bytes": 78,
+      "sha256": "af217624a7b54c3944475b75f38dc313e8f31d77ee363be284f951abe16d2143"
+    },
+    {
+      "file": "sample-pack.log",
+      "bytes": 969,
+      "sha256": "30fb1de0af8ae62eaceb54b4e1a4bbd12e9d6d8b83f7de7b6988223e11a7e182"
+    },
+    {
+      "file": "sample-upload.log",
+      "bytes": 147,
+      "sha256": "3172d29302173f4be96149c500e42791b02ffa1888acc73d522f84683091d9cc"
+    },
+    {
+      "file": "sample.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "survival_game.elf",
+      "bytes": 166716,
+      "sha256": "1088fd2965ecbc7d20b9d54e1fe6422d1b12370c0cec641a32a70a3016f598a2"
+    },
+    {
+      "file": "ti60f225_oob.bit",
+      "bytes": 2985183,
+      "sha256": "39483d43e39c6b558cce070a1a2057fd7c84c19550b0402c4e76754c4d6da2cb"
+    },
+    {
+      "file": "ti60f225_oob.hex",
+      "bytes": 2985243,
+      "sha256": "cd6e7fb9611c313ffac3158080a4af340eed6d15fd8cf0567b4ab27e4d10dbf5"
+    },
+    {
+      "file": "ti60f225_oob.interface.csv",
+      "bytes": 22427,
+      "sha256": "ac7d96011854de28ab13eefd84971c22a094290fbe1eaafbf791a4ccd01febd2"
+    },
+    {
+      "file": "ti60f225_oob.lpf",
+      "bytes": 536316,
+      "sha256": "62627b0883f56f2af7a5c482df9b533d61b59283b6a49f54c882fc1dae9e572d"
+    },
+    {
+      "file": "ti60f225_oob.map.v",
+      "bytes": 60288585,
+      "sha256": "df46937a22276a823448b694147a35820e9dcb3a6e1ddf2a8c9d24babc18d4bf"
+    },
+    {
+      "file": "ti60f225_oob.place.rpt",
+      "bytes": 4574,
+      "sha256": "a825ac04f335e510e827507588ab916f98f4b1791d1913d5707ce2539b89ed7b"
+    },
+    {
+      "file": "ti60f225_oob.route.rpt",
+      "bytes": 1458,
+      "sha256": "75551b98648a273523e70457c6ebb971ec88b41735ed2c1243bc1c1171dfec44"
+    },
+    {
+      "file": "ti60f225_oob.timing.rpt",
+      "bytes": 1413748,
+      "sha256": "b86b8c9d3b996b8c4d2391a977ae2b1847ea7afa4b05d4a5885d1eaa41a9b039"
+    }
+  ]
+}

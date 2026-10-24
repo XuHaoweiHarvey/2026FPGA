@@ -49,6 +49,8 @@ static void spawn_enemy(survival_game_t *game, uint32_t now_ms) {
         uint32_t elapsed = now_ms - game->started_ms;
         uint32_t interval = elapsed < 18000u ? 620u - (elapsed / 3000u) * 55u : 290u;
         if (interval < 290u) interval = 290u;
+        if(game->difficulty==0u)interval=interval*3u/2u;
+        else if(game->difficulty==2u)interval=interval*3u/4u;
         game->next_spawn_ms = now_ms + interval;
     }
 }
@@ -73,6 +75,7 @@ static void reset_with_options(survival_game_t *game, uint32_t now_ms,
     game->enemy_limit = enemy_limit;
     game->invincible_mode = invincible_mode;
     game->lives = INITIAL_LIVES;
+    game->difficulty = 1u;
     game->rng = UINT32_C(0x7a31c5e9) ^ now_ms;
 }
 

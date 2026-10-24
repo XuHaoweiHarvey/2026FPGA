@@ -4,26 +4,17 @@ ENTRY( _start )
 
 MEMORY
 {
-  start (wxai!r) : ORIGIN = 0xF9000000, LENGTH = 512
-  ram   (wxai!r) : ORIGIN = 0xf900fc00, LENGTH = 1024
+  ram  (wxai!r) : ORIGIN = 0xF9000000, LENGTH = 64K
 }
 
 PHDRS
 {
-  start PT_LOAD;
   ram PT_LOAD;
 }
 
 SECTIONS
 {
-  __stack_size = DEFINED(__stack_size) ? __stack_size : 128;
-
-  .start           :
-  {
-    *start.o(.init);
-    *start.o(*);
-  } > start AT>start :start
-  
+  __stack_size = DEFINED(__stack_size) ? __stack_size : 256;
 
   .init           :
   {
@@ -34,7 +25,7 @@ SECTIONS
   {
     *(.text.unlikely .text.unlikely.*)
     *(.text.startup .text.startup.*)
-    *(.text );
+    *(.text .text.*)
     *(.gnu.linkonce.t.*)
     *(.note.gnu.build-id)
   } >ram AT>ram :ram
@@ -131,7 +122,7 @@ SECTIONS
     *(.srodata.cst4)
     *(.srodata.cst2)
     *(.srodata .srodata.*)
-     . += 10;
+    . += 10; /* fix for linker false error message */
   } >ram AT>ram :ram
 
   . = ALIGN(4);
@@ -154,8 +145,7 @@ SECTIONS
   PROVIDE( _end = . );
   PROVIDE( end = . );
 
-  . = ALIGN(16); /* RISC-V stack is 16 byte aligned*/
-  .stack /*ORIGIN(ram) + LENGTH(ram) - __stack_size*/ :
+  .stack (NOLOAD) : ALIGN(16)  
   {
     PROVIDE( _heap_end = . );
     . = __stack_size;
