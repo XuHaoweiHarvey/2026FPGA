@@ -96,7 +96,8 @@ symbols = subprocess.check_output([str(nm), '-n', '-S', str(elf)], text=True)
 required = ('_start','main','m1a_test_done','g_m1a_result','_sp') if args.program=='m1a' else \
            ('_start','main','m1b_test_done','g_m1b_result','_sp') if args.program=='m1b' else \
            ('_start','main','m2_error_stop','m2_cycle_boundary','g_m2_result','_sp') if args.program=='m2' else \
-           ('_start','main','game_demo_done','g_game_result','_sp') if args.program=='game' else \
+           ('_start','main','game_demo_done','g_game_result','g_debug_control',
+            'g_debug_status','g_debug_first_fault','_sp') if args.program=='game' else \
            ('_start','main','g_uart_keyboard_result','_sp') if args.program=='keyboard-test' else \
            ('_start', 'main', 'apb_test_done', 'g_apb_test_result', 'g_benchmark_result', '_sp')
 selected = [line for line in symbols.splitlines() if line.split()[-1] in

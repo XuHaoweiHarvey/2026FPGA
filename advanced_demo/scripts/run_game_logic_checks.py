@@ -28,6 +28,13 @@ with tempfile.TemporaryDirectory(prefix="survival-game-check-") as temp_name:
                         str(ROOT / "software/interactive_demo/game_logic.c"),
                         "/Fe:" + str(executable)], cwd=temp, check=True)
         subprocess.run([str(executable)], cwd=temp, check=True)
+        control_test = temp / "game_debug_test.exe"
+        subprocess.run([*compiler, "/nologo", "/TC", "/W4", "/WX",
+                        "/I" + str(ROOT / "sim/mock_uart"),
+                        str(ROOT / "sim/test_game_debug_control.c"),
+                        str(ROOT / "software/interactive_demo/game_logic.c"),
+                        "/Fe:" + str(control_test)], cwd=temp, check=True)
+        subprocess.run([str(control_test)], cwd=temp, check=True)
         subprocess.run([*compiler, "/nologo", "/TC", "/W4", "/WX", "/Zs",
                         "/DSURVIVAL_GAME_HOST_SYNTAX",
                         "/I" + str(ROOT / "sim/mock_game"),
@@ -41,10 +48,17 @@ with tempfile.TemporaryDirectory(prefix="survival-game-check-") as temp_name:
                         str(ROOT / "software/interactive_demo/game_logic.c"),
                         "-o", str(executable)], cwd=ROOT, check=True)
         subprocess.run([str(executable)], cwd=ROOT, check=True)
+        control_test = temp / ("game_debug_test.exe" if os.name == "nt" else "game_debug_test")
+        subprocess.run([*common, "-I", str(ROOT / "sim/mock_uart"),
+                        str(ROOT / "sim/test_game_debug_control.c"),
+                        str(ROOT / "software/interactive_demo/game_logic.c"),
+                        "-o", str(control_test)], cwd=ROOT, check=True)
+        subprocess.run([str(control_test)], cwd=ROOT, check=True)
         subprocess.run([*common, "-fsyntax-only", "-DSURVIVAL_GAME_HOST_SYNTAX",
                         "-I", str(ROOT / "sim/mock_game"),
                         "-I", str(ROOT / "sim/mock_uart"),
                         str(ROOT / "software/interactive_demo/game_main.c")],
                        cwd=ROOT, check=True)
-print("PASS survival game movement, firing, scoring, pause/restart, frozen timers/clock wrap and sprite accounting")
+print("PASS game movement, firing, enemy projectiles/collision, fixed-step rates, pause/clock wrap, auto restart, option bounds and sprite accounting")
 print("PASS UART-enabled board game source syntax")
+print("PASS firmware command ack/ownership, restart configuration, frozen pause timers, 60s presentation metrics and raw counters (mock hardware)")

@@ -4,9 +4,9 @@
 Color Key 透明处理，以及由 RISC-V CPU 运行、FPGA 加速绘图的高负载互动游戏。
 `basic_demo` 仍是单独保留的 M2 基线工程。
 
-最终演示是键盘控制的弹幕生存游戏：WASD 或方向键移动，空格或 Ctrl 开火，P
+当前阶段实现键盘控制的弹幕生存游戏：WASD 或方向键移动，空格或 Ctrl 开火，P
 暂停。玩家和敌人图片使用 Color Key 去除背景，光晕、子弹和受击效果使用 Alpha
-混合。敌人波次逐渐增加，最多接近 48 个同时活动的精灵。画面显示游戏帧率、当前
+混合。敌人波次逐渐增加，敌机上限为 48，另有玩家子弹、敌方弹幕和效果。画面显示游戏帧率、当前
 精灵数量和运行期间观察到的最大精灵数量，用于上板测量性能。
 
 游戏 ELF 发送 Color Key 和 Alpha 命令，不发送普通 `OP_BLIT` 命令。RTL 仍保留
@@ -27,12 +27,27 @@ Efinity 2026.1.132 于 2026-10-23 完成完整编译，生成以下文件：
 - 游戏程序：`software/interactive_demo/build/game/survival_game.elf`
 - UART 诊断程序：`software/interactive_demo/build/keyboard-test/uart_keyboard_test.elf`
 
-这些文件位于 Git 忽略的构建目录中，普通 Git 提交和推送不会包含它们。烧录时要
-配对使用同一次构建生成的 bit 和对应 ELF。UART 实际收发、游戏画面、游戏帧率和
-最大精灵数量还没有在实体板上验证。本机当前列出的 COM 口只有蓝牙虚拟串口；接上
-板卡后还需要确认 FT4232 对应的 UART 通道和 Windows 分配的 COM 号。详见
+这些文件位于 Git 忽略的构建目录中，普通 Git 提交和推送不会包含它们。烧录时需要
+使用启用 UART/Alpha/Color Key 的 advanced v6 bit 与兼容 ELF；本次软件改动只需重建、
+加载 ELF，已有兼容 bit 无需重编译。2026-10-24 用户已反馈通过调试窗口加载 ELF 后
+游戏正常显示，修复背景跳变后显示正常。板卡 UART 对应的 COM、按键实际接收、
+自测结果及持续帧率仍需保存板端验证记录，不能用电脑端发送成功代替。详见
 [构建报告](docs/GAME_BUILD_REPORT.md)、[键盘串口说明](docs/KEYBOARD_UART_INPUT.md)
 和[上板验证清单](docs/BOARD_VALIDATION_CHECKLIST.md)。
+
+上板前的配套文件整理、诊断与游戏专用调试配置和中文烧录步骤见
+[上板操作说明](docs/BOARD_READY_GUIDE.md)。封存包默认输出到 Git 忽略的
+`output/board_ready/`；生成命令和本机工具核对结果也记录在该说明及包内报告中。
+
+## 常驻调试与弹幕扩展
+
+当前源码新增了桌面调试窗口和常驻游戏命令：首次加载新 ELF 后，可直接重开、暂停、
+调参、验证 FILL/Color Key/Alpha，以及测量独立 60 秒区间；GAME OVER 默认 3 秒自动重开。
+玩法增加敌方瞄准弹/扇形弹和波次，保留已有底层与基础工程。
+双击 `start_game_debug.cmd`，具体步骤见[常驻调试说明](docs/RESIDENT_GAME_DEBUG.md)。
+旧封存包不会自动更新，本次请从源码目录使用新 ELF 和窗口。
+本版作为阶段性开发版本保存，尚未完成最终性能验收。上传范围、排除文件和可复制的
+提交说明见[上传说明](docs/UPLOAD_GUIDE.md)。
 
 ## 构建与运行
 

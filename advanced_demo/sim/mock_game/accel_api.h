@@ -19,8 +19,22 @@
 #define ACCEL_CAP_COLOR_KEY (1u << 7)
 #define FRAME_FRONT_VALID (1u << 4)
 #define FRAME_WRITER_OWNED (1u << 5)
+#define FRAME_SWAP_PENDING (1u << 2)
+#define ACCEL_STATUS 0x0cu
+#define ACCEL_BUFFER_STATUS 0x64u
+#define ACCEL_BUSY 1u
 
-static inline uint32_t accel_read(uint32_t offset) { (void)offset; return 0u; }
+static uint32_t mock_game_fullscreen_fills, mock_game_swaps;
+static uint32_t mock_game_display_op_count, mock_game_display_ops[4];
+static uint32_t mock_game_fill_result, mock_game_swap_result;
+
+static inline uint32_t accel_read(uint32_t offset) {
+#ifdef MOCK_GAME_REG_READ
+    return MOCK_GAME_REG_READ(offset);
+#else
+    (void)offset; return 0u;
+#endif
+}
 static inline void accel_write(uint32_t offset, uint32_t value) { (void)offset; (void)value; }
 static inline uint32_t accel_error(void) { return 0u; }
 static inline uint32_t accel_init(void) { return 0u; }
@@ -28,7 +42,11 @@ static inline uint32_t display_wait_frames(uint32_t frames) { (void)frames; retu
 static inline uint32_t accel_sprite_begin(void) { return 0u; }
 static inline uint32_t accel_sprite_seal(void) { return 0u; }
 static inline uint32_t accel_fill_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c) {
-    (void)x; (void)y; (void)w; (void)h; (void)c; return 0u;
+    if (x == 0u && y == 0u && w == 1920u && h == 1080u && c == 0x0007101cu)
+        ++mock_game_fullscreen_fills;
+    if (mock_game_display_op_count < 4u)
+        mock_game_display_ops[mock_game_display_op_count++] = 1u;
+    return mock_game_fill_result;
 }
 static inline uint32_t accel_wait_done(void) { return 0u; }
 static inline uint32_t accel_color_key_blit(uint32_t s, uint32_t st, uint32_t x, uint32_t y,
@@ -41,7 +59,12 @@ static inline uint32_t accel_alpha_blend(uint32_t s, uint32_t st, uint32_t x, ui
 }
 static inline uint32_t display_get_back_buffer(void) { return 0x800000u; }
 static inline uint32_t display_get_front_buffer(void) { return 0u; }
-static inline uint32_t display_swap_request(uint32_t *ticket) { *ticket = 1u; return 0u; }
+static inline uint32_t display_swap_request(uint32_t *ticket) {
+    *ticket = ++mock_game_swaps;
+    if (mock_game_display_op_count < 4u)
+        mock_game_display_ops[mock_game_display_op_count++] = 2u;
+    return mock_game_swap_result;
+}
 static inline uint32_t display_wait_swap_done(uint32_t ticket) { (void)ticket; return 0u; }
 
 #endif
