@@ -1,3 +1,4 @@
+"""封存现有 bit/ELF，准备独立调试项目和中文上板资料；不重新编译或下载。"""
 
 import argparse
 from datetime import datetime, timedelta, timezone
