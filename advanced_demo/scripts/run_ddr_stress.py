@@ -37,7 +37,7 @@ def sim(top,files,overrides=()):
 d_modules=['rtl/framebuffer/buffer_manager.v','rtl/framebuffer/video_frame_cdc.v','rtl/framebuffer/read_frame_guard.v','rtl/framebuffer/ddr_write_admission.v','rtl/framebuffer/display_underflow_counter.v']
 
 run([sys.executable,'scripts/prepare_rgb_sim.py',out])
-sources=['sim/tb_ddr_display_stress.v','rtl/test_pattern/rgb_tpg.v','rtl/framebuffer/rgb_framebuffer.v',
+sources=['sim/tb_ddr_display_stress.v','rtl/test_pattern/rgb_tpg.v','rtl/framebuffer/rgb_framebuffer.v','rtl/accelerator/graphics_command_queue.v',
  'rtl/framebuffer/init_write_monitor.v','rtl/accelerator/fill_rect_writer.v','rtl/control/accel_regs.v',
  'rtl/framebuffer/rgb_unpack128_to64.v','rtl/display/rgb_to_hdmi.v',out/'ddr_wr_buffer.v',out/'ddr_rd_buffer.v',
  out/'DC_FIFO.v','rtl/frame_buffer_V4/bank_switch.v','rtl/frame_buffer_V4/rst_n_piple.v',

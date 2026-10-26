@@ -18,19 +18,27 @@ module blit_source_guard #(
     output reg src_range_valid
 );
 localparam [63:0] FRAME_BYTES = 64'd1 * FRAME_STRIDE * FRAME_HEIGHT;
+localparam SOURCE_OFFSET_BITS = FRAME_BYTES > 1 ? $clog2(FRAME_BYTES) : 1;
+localparam [SOURCE_OFFSET_BITS-1:0] SOURCE_STRIDE_N = FRAME_STRIDE;
 wire [63:0] front_end = {32'b0, front_base} + FRAME_BYTES;
 wire [31:0] source_offset = src_addr - front_base;
+wire [SOURCE_OFFSET_BITS-1:0] source_offset_narrow = source_offset[SOURCE_OFFSET_BITS-1:0];
 // Divisors are elaboration-time constants, not a programmable divider.
-// The production stride is 7680 (not a power of two).
-wire [31:0] source_row = source_offset / FRAME_STRIDE;
-wire [31:0] source_x = (source_offset % FRAME_STRIDE) >> 2;
+// Narrow the dividend to the largest legal frame offset before constant
+// division. The full-width range test below still rejects wrapped/oversized
+// addresses, while the smaller divider keeps the command-accept path shallow.
+wire [SOURCE_OFFSET_BITS-1:0] source_row = source_offset_narrow / SOURCE_STRIDE_N;
+wire [SOURCE_OFFSET_BITS-1:0] source_x = (source_offset_narrow % SOURCE_STRIDE_N) >> 2;
 // Extend before adding, so huge width/height cannot wrap into a valid rectangle.
 wire [32:0] source_right = {1'b0, source_x} + {1'b0, width};
 wire [32:0] source_bottom = {1'b0, source_row} + {1'b0, height};
 wire sprite_address = src_addr >= 32'h01384000 && src_addr < 32'h014b0000;
+localparam SPRITE_OFFSET_BITS = $clog2(64'd640 * 480 * 4);
+localparam [SPRITE_OFFSET_BITS-1:0] SPRITE_STRIDE_N = 32'd2560;
 wire [31:0] sprite_offset=src_addr-32'h01384000;
-wire [31:0] sprite_row=sprite_offset/32'd2560;
-wire [31:0] sprite_x=(sprite_offset%32'd2560)>>2;
+wire [SPRITE_OFFSET_BITS-1:0] sprite_offset_narrow=sprite_offset[SPRITE_OFFSET_BITS-1:0];
+wire [SPRITE_OFFSET_BITS-1:0] sprite_row=sprite_offset_narrow/SPRITE_STRIDE_N;
+wire [SPRITE_OFFSET_BITS-1:0] sprite_x=(sprite_offset_narrow%SPRITE_STRIDE_N)>>2;
 wire [32:0] sprite_right={1'b0,sprite_x}+{1'b0,width};
 wire [32:0] sprite_bottom={1'b0,sprite_row}+{1'b0,height};
 wire front_ok = front_base != back_base && front_base[1:0] == 0 &&
@@ -45,7 +53,19 @@ wire asset_ok = asset_base_ok && asset_ready && op==32'd1 &&
 wire sprite_ok=ALPHA_ENABLE && sprite_address && (op==32'd2 || op==32'd3) &&
     sprite_ready && src_addr[3:0]==0 && src_stride==32'd2560 &&
     width!=0 && height!=0 && sprite_right<=33'd640 && sprite_bottom<=33'd480;
-wire range_ok = front_ok || asset_ok || sprite_ok;
+wire [31:0] background_offset=src_addr-32'h02000000;
+localparam BACKGROUND_OFFSET_BITS = $clog2(32'h027e9000 - 32'h02000000);
+localparam [BACKGROUND_OFFSET_BITS-1:0] BACKGROUND_STRIDE_N = 32'd7680;
+wire [BACKGROUND_OFFSET_BITS-1:0] background_offset_narrow=background_offset[BACKGROUND_OFFSET_BITS-1:0];
+wire [BACKGROUND_OFFSET_BITS-1:0] background_row=background_offset_narrow/BACKGROUND_STRIDE_N;
+wire [BACKGROUND_OFFSET_BITS-1:0] background_x=(background_offset_narrow%BACKGROUND_STRIDE_N)>>2;
+wire [32:0] background_right={1'b0,background_x}+{1'b0,width};
+wire [32:0] background_bottom={1'b0,background_row}+{1'b0,height};
+wire background_ok=ALPHA_ENABLE && asset_ready && op==32'd1 &&
+    src_addr>=32'h02000000 && src_addr<32'h027e9000 && src_addr[3:0]==0 &&
+    src_stride==32'd7680 && width!=0 && height!=0 &&
+    background_right<=33'd1920 && background_bottom<=33'd1080;
+wire range_ok = front_ok || asset_ok || sprite_ok || background_ok;
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) src_range_valid <= 0;

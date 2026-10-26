@@ -22,7 +22,7 @@ sim('tb_init_write_monitor',['sim/tb_init_write_monitor.v','rtl/framebuffer/init
     ['-Ptb_init_write_monitor.FRAME_BEATS=518400'] if args.full_init else [])
 run([sys.executable,'scripts/prepare_rgb_sim.py',out])
 c_sources=['sim/tb_checkpoint_c.v','rtl/test_pattern/rgb_tpg.v',
- 'rtl/framebuffer/rgb_framebuffer.v', 'rtl/framebuffer/buffer_manager.v','rtl/framebuffer/video_frame_cdc.v','rtl/framebuffer/read_frame_guard.v','rtl/framebuffer/ddr_write_admission.v','rtl/framebuffer/display_underflow_counter.v','rtl/framebuffer/init_write_monitor.v','rtl/accelerator/fill_rect_writer.v',
+ 'rtl/framebuffer/rgb_framebuffer.v','rtl/accelerator/graphics_command_queue.v', 'rtl/framebuffer/buffer_manager.v','rtl/framebuffer/video_frame_cdc.v','rtl/framebuffer/read_frame_guard.v','rtl/framebuffer/ddr_write_admission.v','rtl/framebuffer/display_underflow_counter.v','rtl/framebuffer/init_write_monitor.v','rtl/accelerator/fill_rect_writer.v',
  'rtl/control/accel_regs.v','rtl/framebuffer/rgb_unpack128_to64.v','rtl/display/rgb_to_hdmi.v',
  out/'ddr_wr_buffer.v',out/'ddr_rd_buffer.v',out/'DC_FIFO.v',
  'rtl/frame_buffer_V4/bank_switch.v','rtl/frame_buffer_V4/rst_n_piple.v','rtl/user_cvo_axi_v2/cvo_axi_v2.v']

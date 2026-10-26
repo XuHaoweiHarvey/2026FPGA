@@ -74,8 +74,12 @@ endfunction
 wire aw_range=valid_region_word(aw_addr,back_base,FRAME_BYTES);
 wire ar_range=valid_region_word(ar_addr,front_base,FRAME_BYTES) ||
               valid_region_word(ar_addr,back_base,FRAME_BYTES);
-wire asset_aw_range=valid_region_word(aw_addr,ASSET_BASE,ASSET_BYTES);
-wire asset_ar_range=valid_region_word(ar_addr,ASSET_BASE,ASSET_BYTES);
+// The fullscreen background shares the immutable asset loading/seal lifetime.
+// Its dedicated window never overlaps frame slots, small assets or sprites.
+wire asset_aw_range=valid_region_word(aw_addr,ASSET_BASE,ASSET_BYTES) ||
+    (SPRITE_ENABLE && valid_region_word(aw_addr,32'h02000000,32'h007e9000));
+wire asset_ar_range=valid_region_word(ar_addr,ASSET_BASE,ASSET_BYTES) ||
+    (SPRITE_ENABLE && valid_region_word(ar_addr,32'h02000000,32'h007e9000));
 wire sprite_aw_range=SPRITE_ENABLE && valid_region_word(aw_addr,SPRITE_BASE,SPRITE_BYTES);
 wire sprite_ar_range=SPRITE_ENABLE && valid_region_word(ar_addr,SPRITE_BASE,SPRITE_BYTES);
 wire [15:0] lane_mask=16'h000f << {aw_addr[3:2],2'b00};

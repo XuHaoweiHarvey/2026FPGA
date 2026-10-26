@@ -173,8 +173,11 @@ static uint32_t benchmark_run(const benchmark_io_t *io,volatile benchmark_result
     r->underflow_baseline=io->read(ACCEL_DISPLAY_UNDERFLOW_COUNT);
     r->missed_baseline=io->read(ACCEL_MISSED_BOUNDARY_COUNT);
     if(!samples || samples>64u || warmups>8u || !timer_hz ||
-       r->id!=ACCEL_ID_EXPECTED || r->version!=ACCEL_VERSION_EXPECTED ||
-       r->capabilities!=ACCEL_CAPABILITIES_EXPECTED || io->read(ACCEL_WIDTH)!=1920u ||
+       r->id!=ACCEL_ID_EXPECTED ||
+       (r->version!=ACCEL_VERSION_EXPECTED && r->version!=UINT32_C(0x00070000)) ||
+       ((r->capabilities&~ACCEL_CAP_FULLSCREEN_BACKGROUND)!=ACCEL_CAPABILITIES_EXPECTED &&
+        (r->capabilities&~ACCEL_CAP_FULLSCREEN_BACKGROUND)!=(ACCEL_CAPABILITIES_EXPECTED|ACCEL_CAP_COMMAND_QUEUE)) ||
+       io->read(ACCEL_WIDTH)!=1920u ||
        io->read(ACCEL_HEIGHT)!=1080u || io->read(ACCEL_STRIDE)!=7680u ||
        r->service_read_quota!=128u || r->service_watermarks!=UINT32_C(0x02000180) ||
        !(io->read(ACCEL_SERVICE_STATUS)&(1u<<5))) e=BENCH_ERR_CONFIG;

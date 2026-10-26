@@ -136,8 +136,8 @@ static void enemy_projectiles_hit_and_invincibility_works(void) {
     game.next_enemy_fire_ms = 16u;
     survival_game_step(&game, 0u, 16u);
     assert(game.enemy_bullets[0].active && game.enemy_bullets[0].vy > 0);
-    game.enemy_bullets[0].x = game.player_x + 13;
-    game.enemy_bullets[0].y = game.player_y + 13;
+    game.enemy_bullets[0].x = game.player_x + 13 * GAME_PIXEL_SCALE;
+    game.enemy_bullets[0].y = game.player_y + 13 * GAME_PIXEL_SCALE;
     game.enemy_bullets[0].vx = game.enemy_bullets[0].vy = 0;
     survival_game_step(&game, 0u, 32u);
     assert(game.lives == 2u && game.invulnerable);
@@ -179,6 +179,81 @@ static void parameter_bounds_and_pending_fire(void) {
     assert(!game.enemies[1].active);
 }
 
+static void campaign_reaches_both_boss_phases_and_restarts(uint32_t origin) {
+    survival_game_t game;
+    uint32_t elapsed, i, before;
+    survival_game_reset(&game, origin);
+    survival_game_set_options(&game, 0u, 350u, 48u, 1u);
+    game.difficulty = 2u;
+    game.campaign_stage = GAME_CAMPAIGN_TITLE;
+    survival_game_step(&game, 0u, origin + 1000u);
+    assert(game.frames == 0u && !game.enemies[0].active);
+    origin += 1000u;
+    survival_game_step(&game, UART_KEY_FIRE, origin);
+    assert(game.campaign_stage == 1u && game.difficulty == 2u);
+    for (elapsed = 16u; elapsed <= 66000u; elapsed += 16u) {
+        survival_game_step(&game, 0u, origin + elapsed);
+        if (elapsed < 22000u) assert(game.campaign_stage == 1u);
+        else if (elapsed < 44000u) assert(game.campaign_stage == 2u);
+        else if (elapsed < 66000u) assert(game.campaign_stage == 3u);
+    }
+    /* 66000 is not a multiple of 16: the first Boss tick is 66000 rounded up. */
+    survival_game_step(&game, 0u, origin + elapsed);
+    assert(game.campaign_stage == 4u && game.boss.active && game.boss.hp == 90u);
+    for (i = 0u; i < GAME_ENEMY_LIMIT; ++i) assert(!game.enemies[i].active);
+    before = game.boss_next_fire_ms;
+    survival_game_step(&game, UART_KEY_PAUSE, origin + elapsed + 10u);
+    survival_game_step(&game, 0u, origin + elapsed + 1010u);
+    survival_game_step(&game, UART_KEY_PAUSE, origin + elapsed + 2010u);
+    assert(!game.paused && game.boss_next_fire_ms == before + 2010u);
+    elapsed += 2010u;
+    game.boss.hp = 45u;
+    game.boss_next_fire_ms = origin + elapsed;
+    survival_game_step(&game, 0u, origin + elapsed + 16u);
+    elapsed += 16u;
+    assert(game.boss.attack_phase == 2u);
+    assert(game.enemy_bullets[0].active && game.enemy_bullets[15].active);
+    game.boss.hp = 2u;
+    for (i = 0u; i < 2u; ++i) {
+        game.bullets[0].active = 1u;
+        game.bullets[0].x = (int16_t)(game.boss.x + GAME_BOSS_SIZE / 2u);
+        game.bullets[0].y = (int16_t)(game.boss.y + 24u * GAME_PIXEL_SCALE);
+        survival_game_step(&game, 0u, origin + elapsed + 16u);
+        elapsed += 16u;
+    }
+    assert(game.game_over && game.campaign_result == 1u && !game.boss.active);
+    assert(game.boss.hp == 0u && game.score >= 1010u);
+    for (i = 0u; i < GAME_ENEMY_BULLET_LIMIT; ++i) assert(!game.enemy_bullets[i].active);
+    before = game.score;
+    survival_game_step(&game, 0u, origin + elapsed + 5000u);
+    assert(game.game_over && game.score == before); /* Results remain visible. */
+    survival_game_step(&game, UART_KEY_FIRE, origin + elapsed + 5016u);
+    assert(!game.game_over && game.campaign_stage == 1u && game.lives == 3u);
+    assert(game.enemy_fire_interval_ms == 350u && game.invincible_mode && game.difficulty == 2u);
+}
+
+static void campaign_failure_and_stress_remain_distinct(void) {
+    survival_game_t game;
+    uint32_t now, sprites, minimum = UINT32_MAX;
+    survival_game_reset(&game, 0u);
+    survival_game_set_options(&game, 0u, 350u, 12u, 0u);
+    survival_game_begin_campaign(&game, 0u);
+    game.lives = 0u;
+    survival_game_step(&game, 0u, 16u);
+    assert(game.game_over && game.campaign_result == 2u);
+    survival_game_step(&game, UART_KEY_FIRE, 32u);
+    assert(game.campaign_stage == 1u && !game.game_over && !game.invincible_mode);
+    survival_game_begin_stress(&game, 32u);
+    assert(survival_game_sprite_count(&game, 32u) == 114u);
+    for (now = 48u; now <= 100032u; now += 16u) {
+        survival_game_step(&game, 0u, now);
+        sprites = survival_game_sprite_count(&game, now);
+        if (sprites < minimum) minimum = sprites;
+        assert(game.campaign_stage == 0u && !game.game_over && game.invincible_mode);
+    }
+    assert(game.stress_mode && game.enemy_limit == 48u && minimum >= 114u);
+}
+
 int main(void) {
     survival_game_t easy,normal,hard;
     survival_game_reset(&easy,0);survival_game_reset(&normal,0);survival_game_reset(&hard,0);
@@ -200,5 +275,8 @@ int main(void) {
     enemy_projectiles_hit_and_invincibility_works();
     motion_is_independent_of_render_rate();
     parameter_bounds_and_pending_fire();
+    campaign_reaches_both_boss_phases_and_restarts(0u);
+    campaign_reaches_both_boss_phases_and_restarts(UINT32_MAX - 10000u);
+    campaign_failure_and_stress_remain_distinct();
     return 0;
 }

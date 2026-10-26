@@ -13,7 +13,8 @@ module rgb_framebuffer #(
     parameter WRITE_SERVICE_ENABLE=1, WRITE_READ_QUOTA=128,
     parameter WRITE_FIFO_LOW=RD_FIFO_DEPTH*3/8, WRITE_FIFO_HIGH=RD_FIFO_DEPTH/2,
     parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000,
-    parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0, ALPHA_ENABLE=0
+    parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0, ALPHA_ENABLE=0,
+    parameter COMMAND_QUEUE_ENABLE=0, COMMAND_QUEUE_DEPTH=8
 )(
     input wire axi_clk, input wire rst_n,
     input wire i_clk, input wire i_frame_start, input wire i_de,
@@ -48,6 +49,7 @@ module rgb_framebuffer #(
     input wire [31:0] cmd_op,cmd_src_addr,cmd_src_stride,
     output wire init_done, output wire [31:0] init_error,
     output wire engine_busy,engine_done,output wire [31:0] engine_error,command_count,
+    output wire command_queue_ready,
     output wire [31:0] init_data_beats,init_aw_bursts,init_wlast_bursts,init_b_responses,init_aw_beats,
     input wire swap_request,clear_swap_done,
     output wire draw_ready,output wire [31:0] buffer_status,
@@ -74,6 +76,31 @@ module rgb_framebuffer #(
     output wire cpu_rlast,output wire cpu_rvalid,input wire cpu_rready
 );
 localparam [24:0] FRAME_BEATS = FRAME_WIDTH * FRAME_HEIGHT / 4;
+wire [$clog2(COMMAND_QUEUE_DEPTH+1)-1:0] command_queue_count;
+wire [31:0] command_accept_count;
+wire [255:0] command_queue_head;
+wire queue_storage_ready,command_queue_valid;
+wire queue_push,queue_pop,queue_flush,queue_dispatch,queue_pop_event;
+wire [31:0] dispatch_op,dispatch_x,dispatch_y,dispatch_width,dispatch_height;
+wire [31:0] dispatch_color,dispatch_src_addr,dispatch_src_stride;
+wire engine_active_internal,engine_done_internal;
+wire [31:0] engine_error_internal,engine_command_count_internal;
+assign engine_busy=engine_active_internal || (COMMAND_QUEUE_ENABLE && command_queue_count!=0);
+assign engine_done=engine_done_internal;
+assign engine_error=engine_error_internal;
+assign command_count=COMMAND_QUEUE_ENABLE ? command_accept_count : engine_command_count_internal;
+assign queue_dispatch=COMMAND_QUEUE_ENABLE ? command_queue_valid : cmd_start;
+assign {dispatch_op,dispatch_x,dispatch_y,dispatch_width,dispatch_height,
+        dispatch_color,dispatch_src_addr,dispatch_src_stride} = COMMAND_QUEUE_ENABLE ? command_queue_head :
+        {cmd_op,cmd_x,cmd_y,cmd_width,cmd_height,cmd_color,cmd_src_addr,cmd_src_stride};
+assign queue_push=COMMAND_QUEUE_ENABLE && cmd_start && command_queue_ready;
+assign queue_pop=COMMAND_QUEUE_ENABLE && queue_pop_event;
+assign queue_flush=COMMAND_QUEUE_ENABLE && engine_error_internal!=0;
+graphics_command_queue #(.DEPTH(COMMAND_QUEUE_DEPTH),.WIDTH(256)) command_queue (
+    .clk(axi_clk),.rst_n(axi_rst_n),.enable(COMMAND_QUEUE_ENABLE != 0),
+    .push(queue_push),.push_data({cmd_op,cmd_x,cmd_y,cmd_width,cmd_height,cmd_color,cmd_src_addr,cmd_src_stride}),
+    .ready(queue_storage_ready),.pop(queue_pop),.valid(command_queue_valid),.head_data(command_queue_head),
+    .flush(queue_flush),.count(command_queue_count),.accepted_count(command_accept_count));
 wire wr_rst_n, axi_rst_n, rd_rst_n;
 rst_n_piple #(.DLY(3)) u_wr_reset (.clk(i_clk), .rst_n_i(rst_n), .rst_n_o(wr_rst_n));
 rst_n_piple #(.DLY(3)) u_axi_reset (.clk(axi_clk), .rst_n_i(rst_n), .rst_n_o(axi_rst_n));
@@ -277,23 +304,29 @@ generate if(C_MODE) begin: c_control
         .init_done(init_done),.init_error(init_error),.data_beats(init_data_beats),
         .aw_bursts(init_aw_bursts),.wlast_bursts(init_wlast_bursts),
         .b_responses(init_b_responses),.aw_reserved_beats(init_aw_beats));
+    assign command_queue_ready = COMMAND_QUEUE_ENABLE ?
+        (queue_storage_ready && d_front_valid && !d_pending && !swap_request &&
+         read_healthy && !cpu_owner && !(CPU_DDR_ENABLE &&
+         (cpu_ddr_error!=0 || cpu_session_fault || cpu_ddr_acquire)) && engine_error_internal==0) : 1'b1;
+    assign queue_pop_event=d_command_accept;
     if(BLIT_ENABLE) begin: graphics
         wire source_valid;
         blit_source_guard #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
             .FRAME_STRIDE(FRAME_WIDTH*4),.ALPHA_ENABLE(ALPHA_ENABLE)) source_guard (
             .clk(axi_clk),.rst_n(axi_rst_n),.command_accept(d_command_accept),
             .front_base(d_front_base),.back_base(d_back_base),
-            .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),
-            .op(cmd_op),.asset_ready(asset_ready),.sprite_ready(sprite_ready),
-            .width(cmd_width),.height(cmd_height),.src_range_valid(source_valid));
+            .src_addr(dispatch_src_addr),.src_stride(dispatch_src_stride),
+            .op(dispatch_op),.asset_ready(asset_ready),.sprite_ready(sprite_ready),
+            .width(dispatch_width),.height(dispatch_height),.src_range_valid(source_valid));
         graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
             .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),
             .ALPHA_ENABLE(ALPHA_ENABLE)) engine (
             .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
-            .op(cmd_op),.x(cmd_x),.y(cmd_y),.width(cmd_width),.height(cmd_height),.color(cmd_color),
-            .src_addr(cmd_src_addr),.src_stride(cmd_src_stride),.back_base(d_back_base),
+            .op(dispatch_op),.x(dispatch_x),.y(dispatch_y),.width(dispatch_width),.height(dispatch_height),.color(dispatch_color),
+            .src_addr(dispatch_src_addr),.src_stride(dispatch_src_stride),.back_base(d_back_base),
             .src_range_valid(source_valid),.accept(),
-            .busy(engine_busy),.done(engine_done),.error_code(engine_error),.command_count(command_count),
+            .busy(engine_active_internal),.done(engine_done_internal),
+            .error_code(engine_error_internal),.command_count(engine_command_count_internal),
             .araddr(b_araddr),.arlen(b_arlen),.arvalid(b_arvalid),.arready(b_arready),
             .rdata(b_rdata),.rid(b_rid),.rresp(b_rresp),.rlast(b_rlast),.rvalid(b_rvalid),.rready(b_rready),
             .awaddr(a_awaddr),.awlen(a_awlen),.awvalid(a_awvalid),.awready(a_awready),
@@ -301,12 +334,15 @@ generate if(C_MODE) begin: c_control
             .bid(bid),.bresp(bresp),.bvalid(a_bvalid),.bready(a_bready));
     end else begin: fill_only
     assign b_araddr=0;assign b_arlen=0;assign b_arvalid=0;assign b_rready=0;
+    assign command_queue_ready=1'b1;
+    assign queue_pop_event=d_command_accept;
     fill_rect_writer #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
         .FRAME_STRIDE(FRAME_WIDTH*4),.SETTLE_FRAMES(D_MODE ? 0 : SETTLE_FRAMES)) engine (
         .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(D_MODE ? d_command_accept : cmd_start),
-        .rect_x(cmd_x),.rect_y(cmd_y),.rect_width(cmd_width),.rect_height(cmd_height),.rect_color(cmd_color),
+        .rect_x(dispatch_x),.rect_y(dispatch_y),.rect_width(dispatch_width),.rect_height(dispatch_height),.rect_color(dispatch_color),
         .display_frame_tick(rd_period_sync[2:1]==2'b01),
-        .busy(engine_busy),.done(engine_done),.error_code(engine_error),.command_count(command_count),
+        .busy(engine_active_internal),.done(engine_done_internal),
+        .error_code(engine_error_internal),.command_count(engine_command_count_internal),
         .awaddr(a_awaddr),.awlen(a_awlen),.awvalid(a_awvalid),.awready(a_awready),
         .wdata(a_wdata),.wstrb(a_wstrb),.wlast(a_wlast),.wvalid(a_wvalid),.wready(a_wready),
         .bid(bid),.bresp(bresp),.bvalid(a_bvalid),.bready(a_bready));
@@ -315,7 +351,9 @@ end else begin: legacy_mode
     assign init_done=0;assign init_error=0;
     assign init_data_beats=0;assign init_aw_bursts=0;assign init_wlast_bursts=0;
     assign init_b_responses=0;assign init_aw_beats=0;
-    assign engine_busy=0;assign engine_done=0;assign engine_error=0;assign command_count=0;
+    assign engine_active_internal=0;assign engine_done_internal=0;
+    assign engine_error_internal=0;assign engine_command_count_internal=0;
+    assign command_queue_ready=1'b0;assign queue_pop_event=0;
     assign a_awaddr=0;assign a_awlen=0;assign a_awvalid=0;
     assign a_wdata=0;assign a_wstrb=0;assign a_wlast=0;assign a_wvalid=0;assign a_bready=0;
     assign b_araddr=0;assign b_arlen=0;assign b_arvalid=0;assign b_rready=0;
@@ -403,10 +441,10 @@ generate if(D_MODE) begin: d_buffers
         .reserved_beats(reader_reserved_beats),.error_code(display_error));
     buffer_manager #(.BUFFER0_BASE(BUFFER0_BASE),.BUFFER1_BASE(BUFFER1_BASE)) manager (
         .clk(axi_clk),.rst_n(axi_rst_n),.init_done(init_done),
-        .cmd_request(cmd_start && read_healthy && !cpu_owner &&
+        .cmd_request(queue_dispatch && read_healthy && !cpu_owner &&
                      !(CPU_DDR_ENABLE && cpu_ddr_acquire)),
-        .writer_busy(engine_busy),.writer_done(engine_done),.writer_error(engine_error),
-        .swap_request(swap_request && !cpu_owner &&
+        .writer_busy(engine_active_internal),.writer_done(engine_done_internal),.writer_error(engine_error_internal),
+        .swap_request(swap_request && (!COMMAND_QUEUE_ENABLE || command_queue_count==0) && !cpu_owner &&
                       !(CPU_DDR_ENABLE && (cpu_ddr_error!=0 || cpu_session_fault)) &&
                       !(CPU_DDR_ENABLE && cpu_ddr_acquire)),.clear_done(clear_swap_done),
         .boundary_tick(d_boundary),.blank_active(d_blank),.reader_safe(d_safe && read_healthy),.reader_fifo_empty(d_fifo_empty),
@@ -422,6 +460,7 @@ end else begin: no_swaps
     assign display_underflow_count=0;assign reader_frame_completions=0;assign writer_max_cycles=0;
     assign service_read_quota=0;assign service_watermarks=0;
     assign draw_ready=init_done && !engine_busy;
+    assign command_queue_ready=1'b0;assign queue_pop_event=0;
     assign buffer_status=0;assign reader_frame_base=0;assign reader_outstanding=0;
     assign reader_data_beats=0;assign reader_reserved_beats=0;assign reader_error=0;
     assign boundary_count=0;assign swap_count=0;assign missed_boundary_count=0;

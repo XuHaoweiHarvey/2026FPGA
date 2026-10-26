@@ -160,6 +160,24 @@ initial begin
     asset_check(32'h01000000,7680,640,480,1,1,0);
     asset_check(32'h01000000,2560,636,480,1,1,0);
     asset_check(32'h01000000,2560,640,480,2,1,0);
+    // Fullscreen background is a separate sealed window, Alpha builds only.
+    asset_check(32'h02000000,7680,1920,1080,1,0,0);
+    asset_check(32'h02000000,7680,1920,1080,1,1,ALPHA_ENABLE!=0);
+    asset_check(32'h02000000+64*7680+128*4,7680,256,128,1,1,ALPHA_ENABLE!=0);
+    asset_check(32'h02000000+1024*7680+1856*4,7680,64,56,1,1,ALPHA_ENABLE!=0);
+    asset_check(32'h02000000+1072*7680+1904*4,7680,16,8,1,1,ALPHA_ENABLE!=0);
+    asset_check(32'h027e8ff0,7680,4,1,1,1,ALPHA_ENABLE!=0);
+    asset_check(32'h027e8ff0,7680,8,1,1,1,0);
+    asset_check(32'h027e7200,7680,4,2,1,1,0);
+    asset_check(32'h027e9000,7680,4,1,1,1,0);
+    asset_check(32'h02000004,7680,4,1,1,1,0);
+    asset_check(32'h02000000,2560,640,480,1,1,0);
+    asset_check(32'h02000000,7680,64,64,2,1,0);
+    asset_check(32'h02000000,7680,64,64,3,1,0);
+    asset_check(32'h02000000,7680,0,64,1,1,0);
+    asset_check(32'h02000000,7680,64,0,1,1,0);
+    asset_check(32'h02000000,7680,32'hffffffff,1,1,1,0);
+    asset_check(32'h02000000,7680,4,32'hffffffff,1,1,0);
     asset_ready=0;op=1;
     if(ALPHA_ENABLE) begin
         sprite_check(32'h01384000,2560,128,128,3,0,0);

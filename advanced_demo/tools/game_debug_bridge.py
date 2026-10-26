@@ -13,6 +13,25 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IDE = Path("D:/Efinity/efinity-riscv-ide-2026.1")
 DEFAULT_ELF = ROOT / "software/interactive_demo/build/game/survival_game.elf"
 CONTROL_MAGIC, STATUS_MAGIC = 0x47444331, 0x47445331
+RUNTIME_FIELDS = ("magic publication campaign_stage campaign_result boss_hp "
+                  "render_us frame_us max_render_us max_frame_us over_budget_frames "
+                  "measurement_max_render_us measurement_max_frame_us measurement_over_budget_frames "
+                  "background_pixels background_rectangles sprite_pixels glyph_blits stress_mode "
+                  "measurement_display_frames measurement_repeated_frames "
+                  "measurement_writer_throttle_cycles_lo measurement_writer_throttle_cycles_hi "
+                  "measurement_writer_bursts measurement_reader_ar_stall_cycles_lo "
+                  "measurement_reader_ar_stall_cycles_hi measurement_reader_r_stall_cycles_lo "
+                  "measurement_reader_r_stall_cycles_hi measurement_commands "
+                  "command_submit_us command_wait_us measurement_command_submit_us "
+                  "measurement_command_wait_us measurement_path_diagnostics").split()
+BUILD_CONFIG_FIELDS = ("magic version fullscreen view_x view_y view_width view_height "
+                       "pixel_scale flash_enabled team_sprites path_diagnostics submit_timing "
+                       "require_queue enemy_limit enemy_bullet_limit output_width output_height").split()
+LEGACY_RUNTIME_FIELDS = ("magic publication campaign_stage campaign_result boss_hp "
+                         "render_us frame_us max_render_us max_frame_us over_budget_frames "
+                         "measurement_max_render_us measurement_max_frame_us measurement_over_budget_frames "
+                         "background_pixels background_rectangles sprite_pixels glyph_blits stress_mode "
+                         "measurement_display_frames measurement_repeated_frames").split()
 STATUS_FIELDS = (
     "magic version acknowledged_sequence phase error frame score lives "
     "active_sprites max_active_sprites fps_x100 command_delta swap_delta "
@@ -55,6 +74,7 @@ class ElfImage:
         if struct.unpack_from("<H", self.data, 18)[0] != 243:
             raise ValueError("ELF 不是 RISC-V 程序")
         self.entry = struct.unpack_from("<I", self.data, 24)[0]
+        self.load_segments = []
         offset = struct.unpack_from("<I", self.data, 32)[0]
         width, count = struct.unpack_from("<HH", self.data, 46)
         sections = [struct.unpack_from("<10I", self.data, offset + i * width)
@@ -80,7 +100,9 @@ class ElfImage:
         phoff = struct.unpack_from("<I", self.data, 28)[0]
         phsize, phcount = struct.unpack_from("<HH", self.data, 42)
         for i in range(phcount):
-            kind, _, va, pa, _, memsize, _, _ = struct.unpack_from("<8I", self.data, phoff+i*phsize)
+            kind, file_offset, va, pa, filesize, memsize, _, _ = struct.unpack_from("<8I", self.data, phoff+i*phsize)
+            if kind == 1:
+                self.load_segments.append((va, file_offset, filesize))
             if kind == 1 and (not RAM_START <= va < va+memsize <= RAM_END or
                               not RAM_START <= pa < pa+memsize <= RAM_END):
                 raise ValueError("ELF 加载段超出 RAM 或占用 OpenOCD 工作区")
@@ -90,6 +112,15 @@ class ElfImage:
         if not RAM_START <= address < RAM_END or actual_size < size:
             raise ValueError(f"ELF 缺少或不匹配符号 {name}")
         return address
+
+    def symbol_u32(self, name, word_offset=0):
+        if word_offset < 0:
+            raise ValueError("ELF 符号偏移不能为负数")
+        address = self.symbol(name, (word_offset + 1) * 4) + word_offset * 4
+        for start, offset, size in self.load_segments:
+            if start <= address and address + 4 <= start + size:
+                return struct.unpack_from("<I", self.data, offset + address - start)[0]
+        raise ValueError(f"ELF 符号没有文件初值 {name}")
 
 
 def inspection_config(root=ROOT):
@@ -193,6 +224,17 @@ class DebugBridge:
             raise RuntimeError("JTAG 读回长度不匹配")
         return words
 
+    def runtime_layout(self):
+        symbol = self.image.symbols.get("g_game_runtime")
+        if not symbol:
+            return None
+        address, size = symbol
+        if size >= 4 * len(RUNTIME_FIELDS):
+            return address, RUNTIME_FIELDS, False
+        if size >= 4 * len(LEGACY_RUNTIME_FIELDS):
+            return address, LEGACY_RUNTIME_FIELDS, True
+        return None
+
     def verify_code(self):
         for address, data in self.image.code:
             for start in range(0, len(data), 1024):
@@ -220,6 +262,27 @@ class DebugBridge:
                 first = self.read_words(fault_addr, len(STATUS_FIELDS))
                 if first[0] == STATUS_MAGIC:
                     status["first_fault"] = dict(zip(STATUS_FIELDS, first))
+                layout = self.runtime_layout()
+                if layout:
+                    runtime_address, runtime_fields, legacy_runtime = layout
+                    runtime = self.read_words(runtime_address, len(runtime_fields))
+                    if runtime[0] == 0x47525431:
+                        status["runtime"] = dict(zip(runtime_fields, runtime))
+                        if legacy_runtime:
+                            status["runtime_abi_legacy"] = True
+                        if runtime[1] & 1:
+                            status["partial_runtime"] = True
+                config_symbol = self.image.symbols.get("g_game_build_config")
+                if config_symbol and config_symbol[1] >= 4 * len(BUILD_CONFIG_FIELDS):
+                    config_address = self.image.symbol("g_game_build_config",
+                                                       4 * len(BUILD_CONFIG_FIELDS))
+                    status["build_config"] = dict(zip(BUILD_CONFIG_FIELDS,
+                                                      self.read_words(config_address,
+                                                                      len(BUILD_CONFIG_FIELDS))))
+                marker = self.image.symbols.get("g_game_measurement_complete")
+                if marker and marker[1] >= 4:
+                    status["measurement_complete"] = bool(
+                        self.read_words(self.image.symbol("g_game_measurement_complete", 4), 1)[0])
             else:
                 values = self.read_words(self.image.symbol("g_game_result", 96), 24)
                 status = dict(zip(LEGACY_FIELDS, values))
@@ -254,6 +317,17 @@ class DebugBridge:
                 raise RuntimeError("固件处于故障状态；请导出日志检查首个错误")
             if command == 7 and (status["phase"] != 4 or not status["invincible_mode"]):
                 raise RuntimeError("测量前先应用无敌模式，再进入游戏；可等弹幕达到目标数量后测量")
+            runtime_layout = self.runtime_layout()
+            if command == 8 and runtime_layout is None:
+                raise RuntimeError("这个 ELF 不支持固定压力场景，请选择新版关卡 ELF")
+            if command == 7 and runtime_layout is None:
+                raise RuntimeError("这个 ELF 不支持满负载测量，请选择新版关卡 ELF")
+            if command == 7 and runtime_layout is not None:
+                runtime_address, runtime_fields, _ = runtime_layout
+                runtime = self.read_words(runtime_address, len(runtime_fields))
+                if (runtime[0] != 0x47525431 or
+                        not runtime[runtime_fields.index("stress_mode")] or status["enemy_limit"] != 48):
+                    raise RuntimeError("请先点击“满负载场景”，等画面稳定后再测量 60 秒")
             sequence = (words[1] + 1) & 0xFFFFFFFF
             if options is not None:
                 delay, interval, cap, invincible, alpha = options
@@ -277,8 +351,16 @@ class DebugBridge:
             retry_after_running = False
             with self.halted() as was_running:
                 hardware = self.read_words(APB, 2)
-                if hardware != [0x4143434C, 0x00060000]:
-                    raise RuntimeError("硬件 ID/版本不匹配，需要 advanced v6 位流")
+                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000):
+                    raise RuntimeError("硬件 ID/版本不匹配，需要 advanced v6/v7 位流")
+                if "g_game_required_caps" in self.image.symbols:
+                    required = self.image.symbol_u32("g_game_required_caps")
+                    available = self.read_words(APB+0x40, 1)[0]
+                    if available & required != required:
+                        label = ("全屏背景 bit 和命令队列 bit" if required == 0x600
+                                 else "命令队列 bit")
+                        raise RuntimeError("所选游戏需要" + label + "。请先重新配置本版 "
+                                           "outflow/ti60f225_oob.bit，再加载 ELF；旧 v6 bit 不支持这些能力。")
                 last = self._read_load_state()
                 self._check_load_errors(last)
                 if self._load_state_is_safe(last):

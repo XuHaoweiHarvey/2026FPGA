@@ -12,7 +12,8 @@ module accel_regs #(
     parameter [31:0] FRAME_STRIDE = 7680,
     parameter COLOR_KEY_ENABLE = 0,
     parameter CPU_DDR_ENABLE = 0,
-    parameter ALPHA_ENABLE = 0
+    parameter ALPHA_ENABLE = 0,
+    parameter COMMAND_QUEUE_ENABLE = 0
 )(
     input wire PCLK,
     input wire PRESETn,
@@ -31,7 +32,7 @@ module accel_regs #(
     input wire [31:0] init_data_beats,init_aw_bursts,init_wlast_bursts,init_b_responses,init_aw_beats,
     output reg [31:0] cmd_x,cmd_y,cmd_width,cmd_height,cmd_color,
     output reg [31:0] cmd_op,cmd_src_addr,cmd_src_stride,
-    input wire draw_ready,input wire [31:0] buffer_status,
+    input wire draw_ready,input wire command_queue_ready,input wire [31:0] buffer_status,
     input wire [31:0] reader_frame_base,reader_outstanding,reader_data_beats,reader_reserved_beats,reader_error,
     input wire [31:0] boundary_count,swap_count,missed_boundary_count,
     input wire [31:0] service_status,writer_throttle_cycles,writer_bursts,
@@ -69,9 +70,12 @@ always @(*) begin
     writable = 0;
     case (PADDR)
         32'h00: PRDATA = ID;
-        32'h04: PRDATA = ALPHA_ENABLE ? 32'h00060000 : COLOR_KEY_ENABLE ? 32'h00050000 : BLIT_ENABLE ? 32'h00040000 : DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
+        32'h04: PRDATA = COMMAND_QUEUE_ENABLE ? 32'h00070000 : ALPHA_ENABLE ? 32'h00060000 : COLOR_KEY_ENABLE ? 32'h00050000 : BLIT_ENABLE ? 32'h00040000 : DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
         32'h08: begin PRDATA = {control,1'b0}; writable = 1; end
         32'h0C: PRDATA = ENGINE_ENABLE ?
+            COMMAND_QUEUE_ENABLE ?
+                {26'b0,command_queue_ready,init_done,init_done,
+                 (init_error!=0 || engine_error!=0 || error_code!=0 || (DOUBLE_BUFFER && reader_error!=0)),engine_done,engine_busy} :
             {27'b0,init_done,init_done,(init_error!=0 || engine_error!=0 || error_code!=0 || (DOUBLE_BUFFER && reader_error!=0)),engine_done,engine_busy} :
             {30'b0,start_seen,1'b0};
         32'h10: begin PRDATA = rect_x; writable = 1; end
@@ -87,7 +91,8 @@ always @(*) begin
         32'h34: PRDATA = FRAME_STRIDE;
         32'h38: PRDATA = FRAME_WIDTH;
         32'h3C: PRDATA = FRAME_HEIGHT;
-        32'h40: PRDATA = ALPHA_ENABLE ? 32'h000001FB : COLOR_KEY_ENABLE ? 32'h000000FB : BLIT_ENABLE ? 32'h0000007B : DOUBLE_BUFFER ? 32'h0000003B : ENGINE_ENABLE ? 32'h0000001B : 32'h00000007;
+        32'h40: PRDATA = (ALPHA_ENABLE ? 32'h000003FB : COLOR_KEY_ENABLE ? 32'h000000FB : BLIT_ENABLE ? 32'h0000007B : DOUBLE_BUFFER ? 32'h0000003B : ENGINE_ENABLE ? 32'h0000001B : 32'h00000007) |
+                         (COMMAND_QUEUE_ENABLE ? 32'h00000400 : 32'b0);
         32'h44: begin PRDATA=init_data_beats;if(!ENGINE_ENABLE) mapped=0;end
         32'h48: begin PRDATA=init_aw_bursts;if(!ENGINE_ENABLE) mapped=0;end
         32'h4C: begin PRDATA=init_wlast_bursts;if(!ENGINE_ENABLE) mapped=0;end
@@ -134,10 +139,12 @@ always @(*) begin
     else if (!mapped) transaction_error = 2;
     else if (PWRITE && !writable) transaction_error = 3;
     else if(ENGINE_ENABLE && PWRITE && PADDR==8 && PWDATA[0] && !init_done) transaction_error=4;
-    else if(ENGINE_ENABLE && PWRITE && PADDR==8 && PWDATA[0] && (engine_busy || start_pulse)) transaction_error=5;
-    else if(DOUBLE_BUFFER && PWRITE && PADDR==8 && PWDATA[0] && !draw_ready) transaction_error=6;
+    else if(ENGINE_ENABLE && PWRITE && PADDR==8 && PWDATA[0] &&
+            ((COMMAND_QUEUE_ENABLE ? !command_queue_ready : engine_busy) || start_pulse)) transaction_error=5;
+    else if(DOUBLE_BUFFER && !COMMAND_QUEUE_ENABLE && PWRITE && PADDR==8 && PWDATA[0] && !draw_ready) transaction_error=6;
     else if(DOUBLE_BUFFER && PWRITE && PADDR=='h60 && PWDATA[0] && !buffer_status[4]) transaction_error=4;
     else if(DOUBLE_BUFFER && PWRITE && PADDR=='h60 && PWDATA[0] && (buffer_status[2] || swap_request)) transaction_error=6;
+    else if(DOUBLE_BUFFER && COMMAND_QUEUE_ENABLE && PWRITE && PADDR=='h60 && PWDATA[0] && engine_busy) transaction_error=6;
     else if(BLIT_ENABLE && PWRITE && PADDR=='h60 && PWDATA[0] && reader_error!=0) transaction_error=6;
     else if(CPU_DDR_ENABLE && PWRITE && PADDR==8 && PWDATA[0] &&
             (cpu_ddr_status[0] || cpu_ddr_acquire)) transaction_error=6;

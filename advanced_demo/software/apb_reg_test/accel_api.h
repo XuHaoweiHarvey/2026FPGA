@@ -4,10 +4,26 @@
 
 /* Polling-only API. CPU accesses only APB; src_addr is a DDR address for DMA.
  * Returns 0 on success, hardware ERROR_CODE or an E0xx/E1xx software error otherwise.
- * One CPU owns the command stream. Rebuild the entire Back before presenting it. */
+ * One CPU owns the command stream. v7 has an eight-entry descriptor queue;
+ * v6 retains the synchronous command contract. */
 #ifndef ACCEL_POLL_LIMIT
 #define ACCEL_POLL_LIMIT UINT32_C(20000000)
 #endif
+
+/* Firmware has one command producer after accel_init(). Cache immutable
+ * capabilities, the acknowledged command counter, and persistent descriptor
+ * registers so the hot path does not reread/rewrite unchanged APB state. */
+static uint32_t accel_cached_capabilities;
+static uint32_t accel_cached_command_count;
+static uint32_t accel_cached_command_op,accel_cached_source_addr,accel_cached_source_stride;
+static uint32_t accel_cached_rect_x,accel_cached_rect_y;
+static uint32_t accel_cached_rect_width,accel_cached_rect_height,accel_cached_rect_color;
+static uint32_t accel_cached_capabilities_valid;
+static uint32_t accel_cached_command_count_valid;
+static uint32_t accel_cached_descriptor_valid;
+static uint32_t accel_command_batch_active;
+static uint32_t accel_batch_start_count,accel_batch_command_count;
+
 static inline void accel_write(uint32_t offset,uint32_t value) {
     __asm__ volatile ("fence iorw,iorw" ::: "memory");
     *(volatile uint32_t *)(ACCEL_BASE+offset)=value;
@@ -62,9 +78,13 @@ static inline void diagnostics_read(volatile accel_diagnostics_t *d) {
 /* Re-running CPU Debug must first drain an earlier command/pending swap.
  * No reset, START, error clear, or swap is issued by initialization. */
 static inline uint32_t accel_init(void) {
-    uint32_t i,s,bs,e;
+    uint32_t i,s,bs,e,version,caps;
+    accel_cached_capabilities_valid=0u;
+    accel_cached_command_count_valid=0u;
+    accel_cached_descriptor_valid=0u;
+    version=accel_read(ACCEL_VERSION);
     if(accel_read(ACCEL_ID)!=ACCEL_ID_EXPECTED ||
-       accel_read(ACCEL_VERSION)!=ACCEL_VERSION_EXPECTED) return UINT32_C(0xE000);
+       (version!=ACCEL_VERSION_EXPECTED && version!=UINT32_C(0x00070000))) return UINT32_C(0xE000);
     for(i=0;i<ACCEL_POLL_LIMIT;++i) {
         e=accel_read(ACCEL_ERROR_CODE);if(e) return e;
         s=accel_read(ACCEL_STATUS);bs=accel_read(ACCEL_BUFFER_STATUS);
@@ -72,11 +92,18 @@ static inline uint32_t accel_init(void) {
            !(bs&(FRAME_SWAP_PENDING|FRAME_WRITER_OWNED))) break;
     }
     if(i==ACCEL_POLL_LIMIT) return UINT32_C(0xE001);
+    caps=accel_read(ACCEL_CAPABILITIES);
     if(accel_read(ACCEL_WIDTH)!=1920 || accel_read(ACCEL_HEIGHT)!=1080 ||
-       accel_read(ACCEL_STRIDE)!=7680 || accel_read(ACCEL_CAPABILITIES)!=ACCEL_CAPABILITIES_EXPECTED ||
+       accel_read(ACCEL_STRIDE)!=7680 ||
+       ((caps&~ACCEL_CAP_FULLSCREEN_BACKGROUND)!=ACCEL_CAPABILITIES_EXPECTED &&
+        (caps&~ACCEL_CAP_FULLSCREEN_BACKGROUND)!=(ACCEL_CAPABILITIES_EXPECTED|ACCEL_CAP_COMMAND_QUEUE)) ||
        accel_read(ACCEL_SERVICE_READ_QUOTA)!=128 ||
        accel_read(ACCEL_SERVICE_WATERMARKS)!=UINT32_C(0x02000180) ||
        !(accel_read(ACCEL_SERVICE_STATUS)&(1u<<5))) return UINT32_C(0xE003);
+    accel_cached_capabilities=caps;
+    accel_cached_command_count=accel_read(ACCEL_COMMAND_COUNT);
+    accel_cached_capabilities_valid=1u;
+    accel_cached_command_count_valid=1u;
     return 0;
 }
 static inline uint32_t accel_error(void) {
@@ -99,23 +126,119 @@ static inline uint32_t accel_wait_done(void) {
     }
     return UINT32_C(0xE101);
 }
+
+/* The game owns one command stream and does not swap buffers until a frame is
+ * drained. Validate ownership once, then use queue-ready backpressure alone
+ * for each descriptor. Frame end drains DMA and checks the accepted count. */
+static inline uint32_t accel_command_batch_begin(void) {
+    uint32_t i,e,bs,status;
+    uint32_t caps=accel_cached_capabilities_valid ? accel_cached_capabilities :
+                  accel_read(ACCEL_CAPABILITIES);
+    accel_command_batch_active=0u;
+    accel_batch_command_count=0u;
+    if(!(caps&ACCEL_CAP_COMMAND_QUEUE)) return 0u;
+    for(i=0u;i<ACCEL_POLL_LIMIT;++i) {
+        e=accel_error();if(e) return e;
+        bs=accel_read(ACCEL_BUFFER_STATUS);
+        if(!(bs&FRAME_FRONT_VALID) || (bs&FRAME_SWAP_PENDING)) return UINT32_C(0xE102);
+        status=accel_read(ACCEL_STATUS);
+        if(status&ACCEL_COMMAND_QUEUE_READY) {
+            accel_batch_start_count=accel_read(ACCEL_COMMAND_COUNT);
+            accel_command_batch_active=1u;
+            return 0u;
+        }
+    }
+    return UINT32_C(0xE102);
+}
+
+static inline uint32_t accel_command_batch_end(void) {
+    uint32_t e,expected,accepted;
+    if(!accel_command_batch_active) return accel_wait_done();
+    accel_command_batch_active=0u;
+    e=accel_wait_done();
+    if(e) return e;
+    expected=accel_batch_start_count+accel_batch_command_count;
+    accepted=accel_read(ACCEL_COMMAND_COUNT);
+    if(accepted!=expected) return UINT32_C(0xE103);
+    accel_cached_command_count=accepted;
+    accel_cached_command_count_valid=1u;
+    return 0u;
+}
+
 static inline uint32_t accel_submit(uint32_t op,uint32_t src_addr,uint32_t src_stride,
                                   uint32_t x,uint32_t y,uint32_t width,uint32_t height,uint32_t color) {
-    uint32_t before,i,e,bs=accel_read(ACCEL_BUFFER_STATUS);
-    if(!(bs&FRAME_FRONT_VALID) || (bs&(FRAME_SWAP_PENDING|FRAME_WRITER_OWNED)) ||
-       (accel_read(ACCEL_STATUS)&ACCEL_BUSY)) return UINT32_C(0xE102);
-    e=accel_error();if(e) return e;
-    before=accel_read(ACCEL_COMMAND_COUNT);
-    accel_write(ACCEL_COMMAND_OP,op);
-    accel_write(ACCEL_SRC_ADDR,src_addr);accel_write(ACCEL_SRC_STRIDE,src_stride);
-    accel_write(ACCEL_RECT_X,x);accel_write(ACCEL_RECT_Y,y);
-    accel_write(ACCEL_RECT_WIDTH,width);accel_write(ACCEL_RECT_HEIGHT,height);
-    accel_write(ACCEL_RECT_COLOR,color);
-    accel_write(ACCEL_CONTROL,1);
+    uint32_t before=0u,i,e,bs,status;
+    uint32_t caps=accel_cached_capabilities_valid ? accel_cached_capabilities :
+                  accel_read(ACCEL_CAPABILITIES);
+    if(caps&ACCEL_CAP_COMMAND_QUEUE) {
+        for(i=0;i<ACCEL_POLL_LIMIT;++i) {
+            status=accel_read(ACCEL_STATUS);
+            if(status&ACCEL_COMMAND_QUEUE_READY) break;
+            e=accel_error();if(e) return e;
+            if(!accel_command_batch_active) {
+                bs=accel_read(ACCEL_BUFFER_STATUS);
+                if(!(bs&FRAME_FRONT_VALID) || (bs&FRAME_SWAP_PENDING)) return UINT32_C(0xE102);
+            }
+        }
+        if(i==ACCEL_POLL_LIMIT) return UINT32_C(0xE102);
+    } else {
+        bs=accel_read(ACCEL_BUFFER_STATUS);
+        if(!(bs&FRAME_FRONT_VALID) || (bs&(FRAME_SWAP_PENDING|FRAME_WRITER_OWNED)) ||
+           (accel_read(ACCEL_STATUS)&ACCEL_BUSY)) return UINT32_C(0xE102);
+        e=accel_error();if(e) return e;
+    }
+    if(!(accel_command_batch_active && (caps&ACCEL_CAP_COMMAND_QUEUE)))
+        before=accel_cached_command_count_valid ? accel_cached_command_count :
+               accel_read(ACCEL_COMMAND_COUNT);
+
+    /* Bracket a whole descriptor with one ordering fence pair. Volatile stores
+     * remain ordered, and the final CONTROL write still commits the snapshot. */
+    {
+        volatile uint32_t *regs=(volatile uint32_t *)ACCEL_BASE;
+        uint32_t valid=accel_cached_descriptor_valid;
+        __asm__ volatile ("fence iorw,iorw" ::: "memory");
+        if(!valid || accel_cached_command_op!=op) {
+            regs[ACCEL_COMMAND_OP/4u]=op;accel_cached_command_op=op;
+        }
+        if(!valid || accel_cached_source_addr!=src_addr) {
+            regs[ACCEL_SRC_ADDR/4u]=src_addr;accel_cached_source_addr=src_addr;
+        }
+        if(!valid || accel_cached_source_stride!=src_stride) {
+            regs[ACCEL_SRC_STRIDE/4u]=src_stride;accel_cached_source_stride=src_stride;
+        }
+        if(!valid || accel_cached_rect_x!=x) {
+            regs[ACCEL_RECT_X/4u]=x;accel_cached_rect_x=x;
+        }
+        if(!valid || accel_cached_rect_y!=y) {
+            regs[ACCEL_RECT_Y/4u]=y;accel_cached_rect_y=y;
+        }
+        if(!valid || accel_cached_rect_width!=width) {
+            regs[ACCEL_RECT_WIDTH/4u]=width;accel_cached_rect_width=width;
+        }
+        if(!valid || accel_cached_rect_height!=height) {
+            regs[ACCEL_RECT_HEIGHT/4u]=height;accel_cached_rect_height=height;
+        }
+        if(!valid || accel_cached_rect_color!=color) {
+            regs[ACCEL_RECT_COLOR/4u]=color;accel_cached_rect_color=color;
+        }
+        regs[ACCEL_CONTROL/4u]=1u;
+        __asm__ volatile ("fence iorw,iorw" ::: "memory");
+        accel_cached_descriptor_valid=1u;
+    }
+    if(accel_command_batch_active && (caps&ACCEL_CAP_COMMAND_QUEUE)) {
+        ++accel_batch_command_count;
+        return 0u;
+    }
     /* A new count acknowledges this START, so an old sticky DONE cannot win. */
     for(i=0;i<ACCEL_POLL_LIMIT;++i) {
+        if(accel_read(ACCEL_COMMAND_COUNT)==before+1u) {
+            accel_cached_command_count=before+1u;
+            accel_cached_command_count_valid=1u;
+            return (caps&ACCEL_CAP_COMMAND_QUEUE) ? 0u : accel_wait_done();
+        }
+        /* The success path needs only the counter read. Check error when the
+         * expected admission has not happened yet, and on the next submit. */
         e=accel_error();if(e) return e;
-        if(accel_read(ACCEL_COMMAND_COUNT)==before+1u) return 0;
     }
     return UINT32_C(0xE103);
 }
@@ -123,8 +246,8 @@ static inline uint32_t accel_fill_rect(uint32_t x,uint32_t y,uint32_t width,uint
     return accel_submit(ACCEL_OP_FILL,0,0,x,y,width,height,color);
 }
 /* Source is an absolute address in current Front; stride=7680. Destination x
- * and width are multiples of four. A successful submit only acknowledges START;
- * call accel_wait_done(), then explicitly request/wait for a swap. */
+ * and width are multiples of four. On v7 submit acknowledges queue admission;
+ * drain with accel_wait_done() before a swap. v6 remains synchronous. */
 static inline uint32_t accel_blit(uint32_t src_addr,uint32_t src_stride,uint32_t x,uint32_t y,
                                 uint32_t width,uint32_t height) {
     return accel_submit(ACCEL_OP_BLIT,src_addr,src_stride,x,y,width,height,0);

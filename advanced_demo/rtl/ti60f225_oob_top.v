@@ -420,7 +420,7 @@ wire [127:0] tpg_data;
 (* syn_keep = 1 *) wire [1:0] rd_buffer_index;
 wire [31:0] wr_buffer_base, rd_buffer_base;
 wire tpg_source_done,fb_init_done,fill_busy,fill_done;
-wire draw_ready,swap_request,clear_swap_done;
+wire draw_ready,command_queue_ready,swap_request,clear_swap_done;
 wire [31:0] buffer_status,reader_frame_base,reader_outstanding,reader_data_beats,reader_reserved_beats,reader_error;
 wire [31:0] boundary_count,swap_count,missed_boundary_count;
 wire [31:0] fb_init_error,fill_error,fill_command_count;
@@ -481,12 +481,13 @@ rgb_framebuffer #(
     .FRAME_WIDTH(HACT), .FRAME_HEIGHT(VACT),
     .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH), .AXI_ID_WIDTH(AXI_ID_WIDTH),
     .WR_FIFO_DEPTH(1024), .RD_FIFO_DEPTH(1024), .BURST_LEN(127), .C_MODE(1), .D_MODE(1), .BLIT_ENABLE(1),
-    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),.ALPHA_ENABLE(ALPHA_ENABLE)
+    .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),.ALPHA_ENABLE(ALPHA_ENABLE),
+    .COMMAND_QUEUE_ENABLE(1),.COMMAND_QUEUE_DEPTH(8)
 ) checker0(
     .diag_wr_fifo_full(wr_fifo_full),
     .diag_wr_bank(wr_buffer_index), .diag_rd_bank(rd_buffer_index),
     .diag_wr_base(wr_buffer_base), .diag_rd_base(rd_buffer_base),
-    .draw_ready(draw_ready),.buffer_status(buffer_status),
+    .draw_ready(draw_ready),.command_queue_ready(command_queue_ready),.buffer_status(buffer_status),
     .reader_frame_base(reader_frame_base),.reader_outstanding(reader_outstanding),
     .reader_data_beats(reader_data_beats),.reader_reserved_beats(reader_reserved_beats),.reader_error(reader_error),
     .boundary_count(boundary_count),.swap_count(swap_count),.missed_boundary_count(missed_boundary_count),
@@ -948,7 +949,7 @@ assign tmds_tx_data2_TX_DATA = ~tmds_data2;
 // Sapphire is the only TDO driver. EDB and the former TDI/TDO placeholder are absent.
 (* syn_keep = 1 *) wire accel_start_test_pulse;
 sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),
-                    .ALPHA_ENABLE(ALPHA_ENABLE)) u_control (
+                    .ALPHA_ENABLE(ALPHA_ENABLE),.COMMAND_QUEUE_ENABLE(1)) u_control (
     .core_clk(core_clk), .platform_rst_n(i_arstn && w_arstn),
     .uart_rx(uart_rx), .uart_tx(uart_tx),
     .flash_cs_n(flash_cs_n), .flash_sck(flash_sck),
@@ -966,7 +967,7 @@ sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),
     .init_b_responses(init_b_responses),.init_aw_beats(init_aw_beats),
     .cmd_x(fill_x),.cmd_y(fill_y),.cmd_width(fill_width),.cmd_height(fill_height),.cmd_color(fill_color),
     .cmd_op(graphics_op),.cmd_src_addr(graphics_src_addr),.cmd_src_stride(graphics_src_stride),
-    .draw_ready(draw_ready),.buffer_status(buffer_status),
+    .draw_ready(draw_ready),.command_queue_ready(command_queue_ready),.buffer_status(buffer_status),
     .reader_frame_base(reader_frame_base),.reader_outstanding(reader_outstanding),
     .reader_data_beats(reader_data_beats),.reader_reserved_beats(reader_reserved_beats),.reader_error(reader_error),
     .boundary_count(boundary_count),.swap_count(swap_count),.missed_boundary_count(missed_boundary_count),

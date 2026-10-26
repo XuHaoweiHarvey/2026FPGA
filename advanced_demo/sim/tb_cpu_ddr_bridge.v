@@ -103,6 +103,31 @@ initial begin
     write_case(32'h01001000,16'h000f,3,0,8'ha8);
     read_case(32'h01001000,0,32'h01000000,8'ha9);
     asset_ready=0;
+    read_case(32'h02001000,3,0,8'hd0);
+    write_case(32'h02001000,16'h000f,3,0,8'hd1);
+    asset_loading=1;
+    if(SPRITE_ENABLE) begin
+        write_case(32'h02001000,16'h000f,0,32'h02000000,8'hd2);
+        write_case(32'h027e9ffc,16'hf000,0,32'h027e8ff0,8'hd3);
+        read_case(32'h027e9ffc,0,32'h027e8ff0,8'hd4);
+        read_case(32'h02001000,0,32'h02000000,8'hd5);
+    end else begin
+        write_case(32'h02001000,16'h000f,3,0,8'hd2);
+        read_case(32'h02001000,3,0,8'hd5);
+    end
+    write_case(32'h02000ffc,16'hf000,3,0,8'hd6);
+    write_case(32'h027ea000,16'h000f,3,0,8'hd7);
+    read_case(32'h027ea000,3,0,8'hd8);
+    asset_loading=0;asset_ready=1;
+    write_case(32'h02001000,16'h000f,3,0,8'hd9);
+    if(SPRITE_ENABLE) begin
+        read_case(32'h02001000,0,32'h02000000,8'hda);
+        session_active=0;
+        read_case(32'h02001000,3,0,8'hdb);
+        write_case(32'h02001000,16'h000f,3,0,8'hdc);
+        session_active=1;
+    end
+    asset_ready=0;
     if(SPRITE_ENABLE) begin
         sprite_loading=1;
         write_case(32'h01385000,16'h000f,0,32'h01384000,8'hac);

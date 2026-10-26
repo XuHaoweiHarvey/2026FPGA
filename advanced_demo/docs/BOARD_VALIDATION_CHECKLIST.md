@@ -2,13 +2,14 @@
 
 ## 上板前的构建状态
 
-UART 键盘游戏目前已完成编译，可以开始实体板验证：
+UART 键盘游戏 v7 队列版已完成编译，可以开始实体板验证；实板稳定帧率仍待测：
 
-- Efinity 2026.1.132 于 2026-10-23 完成完整编译，生成
-  `outflow/ti60f225_oob.bit`。
-- 游戏 ELF：`software/interactive_demo/build/game/survival_game.elf`。
+- Efinity 2026.1.132 于 2026-10-25 完成 v7 完整编译与布线，生成
+  `outflow/ti60f225_oob.bit`；100 MHz `core_clk` setup slack 为 +2.340 ns。
+- 游戏 ELF：`software/interactive_demo/build/game/survival_game.elf`（O2，全屏战役版）。
 - UART 诊断 ELF：`software/interactive_demo/build/keyboard-test/uart_keyboard_test.elf`。
 - `scripts/check_project.py` 检查生成的 UART0 和 V4 引脚连接通过。
+- XLR 使用 54,856/60,800（90.22%）；最终满负载帧率仍需在板卡上测量。
 
 bit 和 ELF 位于 Git 忽略的构建目录，Git 上传不会带上它们。需要把这三个文件单独
 交给上板的人，或在上板电脑上重新构建。使用时请确保 bit 和所加载的 ELF 来自同一

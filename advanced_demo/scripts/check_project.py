@@ -53,9 +53,11 @@ assert '.C_MODE(1)' in formal and '.ONE_FRAME(1)' in formal
 for name in ('rtl/accelerator/fill_rect_writer.v','rtl/framebuffer/init_write_monitor.v'):
     assert name in files
 for name in ('rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
+             'rtl/accelerator/graphics_command_queue.v',
              'rtl/framebuffer/blit_source_guard.v','rtl/framebuffer/ddr_read_arbiter.v'):
     assert name in files, f'Missing shared-read graphics source: {name}'
 assert '.BLIT_ENABLE(1)' in formal and 'ddr_read_arbiter #' in rgb_fb
+assert '.COMMAND_QUEUE_ENABLE(1)' in formal and '.COMMAND_QUEUE_DEPTH(8)' in formal
 for name in ('rtl/accelerator/alpha_pixel_pipeline.v','rtl/accelerator/alpha_blit_engine.v'):
     assert name in files, f'Missing Alpha design file: {name}'
 control = (ROOT / 'rtl/control/sapphire_control.v').read_text(encoding='utf8')
@@ -131,8 +133,9 @@ offsets = {int(value, 16) for _, value in re.findall(
 documented = {int(value, 16) for value in re.findall(
     r"^\| ([0-9A-Fa-f]{2}) \|", doc, re.M)}
 assert cases == offsets == documented, "RTL/header/REGISTER_MAP offsets disagree"
-assert '0x00060000' in header and "32'h00060000" in rtl
-assert '0x000001FB' in header and "32'h000001FB" in rtl
+assert '0x00060000' in header and "32'h00070000" in rtl
+assert '0x000001FB' in header and "32'h000003FB" in rtl
+assert "32'h00000400" in rtl and 'ACCEL_CAP_COMMAND_QUEUE' in header
 assert 'ACCEL_CAP_ALPHA' in header and '0xE0u' in header and '0xE4u' in header
 print(f"PASS project: {len(files)} unique, existing design entries; current RGB/control integration")
 print(f"PASS register contract: {len(cases)} current RTL/header/documented offsets agree")

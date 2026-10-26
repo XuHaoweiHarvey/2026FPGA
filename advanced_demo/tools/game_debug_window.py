@@ -1,5 +1,6 @@
 """Small Windows debug window for the resident Ti60 game firmware."""
 
+import argparse
 from datetime import datetime
 import json
 from pathlib import Path
@@ -14,7 +15,7 @@ import keyboard_uart
 
 
 class DebugWindow:
-    def __init__(self, root):
+    def __init__(self, root, elf=DEFAULT_ELF):
         self.root, self.bridge = root, None
         self.events = queue.Queue()
         self.busy = self.measuring = self.closing = False
@@ -28,7 +29,7 @@ class DebugWindow:
         root.minsize(840, 660)
         box = ttk.Frame(root, padding=12)
         box.pack(fill="both", expand=True)
-        self.elf = tk.StringVar(value=str(DEFAULT_ELF))
+        self.elf = tk.StringVar(value=str(elf))
         self.ide = tk.StringVar(value=str(DEFAULT_IDE))
         ttk.Label(box, text="游戏 ELF").grid(row=0, column=0, sticky="w")
         ttk.Entry(box, textvariable=self.elf, width=80).grid(row=0, column=1, columnspan=5, sticky="ew")
@@ -46,10 +47,11 @@ class DebugWindow:
         for label, command in (("重开", 1), ("暂停", 2), ("继续", 3),
                                ("一键自测", 5), ("进入游戏", 6)):
             ttk.Button(controls, text=label, command=lambda c=command: self.send(c)).pack(side="left", padx=4)
+        ttk.Button(controls, text="满负载场景", command=lambda: self.send(8)).pack(side="left", padx=4)
         ttk.Button(controls, text="连续测量 60 秒", command=self.measure).pack(side="left", padx=10)
         options = ttk.LabelFrame(box, text="运行参数（修改后点击应用）", padding=8)
         options.grid(row=4, column=0, columnspan=7, sticky="ew", pady=8)
-        self.delay, self.interval, self.cap, self.alpha = [tk.StringVar(value=v) for v in ("3000", "900", "48", "225")]
+        self.delay, self.interval, self.cap, self.alpha = [tk.StringVar(value=v) for v in ("0", "900", "48", "225")]
         self.invincible = tk.BooleanVar(value=False)
         for i, (label, variable) in enumerate((("自动重开 ms（0 关闭）", self.delay),
                                               ("敌弹间隔 ms", self.interval),
@@ -197,6 +199,11 @@ class DebugWindow:
 
     def send(self, command, options=None):
         def done(sequence):
+            if command == 8:
+                self.invincible.set(True)
+                self.cap.set("48")
+                self.delay.set("0")
+                self.log("压力场景：持续补充 48 架敌机、64 发敌弹，自动射击；建议稳定 3 秒后再测量。重开/进入游戏可返回关卡。")
             self.log(f"已提交命令 {command}，序号 {sequence}；等待板上确认")
             self.root.after(700, lambda: self.read_ack(sequence))
         self.run(lambda: self.require_bridge().command(command, options), done)
@@ -238,12 +245,48 @@ class DebugWindow:
                 return self.log("测量未启动，请检查状态；需在游戏运行时启动")
             if status.get("measurement_state") != 2:
                 return self.log("测量未完整结束；检查故障/暂停/当前状态")
+            if "measurement_complete" in status and not status["measurement_complete"]:
+                return self.log("固件未发布冻结的 60 秒结果；请再次读取状态")
             elapsed = status["measurement_elapsed_ms"]
             fps = status["measurement_frames"] * 1000 / max(elapsed, 1)
             self.log(f'板上测量：{elapsed} ms，平均 {fps:.2f} FPS，'
                      f'最低秒窗 {status["measurement_min_fps_x100"]/100:.2f} FPS，'
                      f'精灵范围 {status["measurement_min_sprites"]}–{status["measurement_max_sprites"]}，'
                      f'underflow {status["measurement_underflows"]}，missed {status["measurement_missed"]}')
+            runtime = status.get("runtime", {})
+            if runtime:
+                diagnostics = runtime.get("measurement_path_diagnostics", 0)
+                self.log(f'测量区间：最慢绘制 {runtime["measurement_max_render_us"]/1000:.3f} ms，'
+                         f'最大换帧间隔 {runtime["measurement_max_frame_us"]/1000:.3f} ms，'
+                         f'绘制超 16.667 ms {runtime["measurement_over_budget_frames"]} 帧，'
+                         f'显示重复旧帧 {runtime["measurement_repeated_frames"]} 次。'
+                         '需结合最低 FPS、精灵数量和硬件错误判断，显示接口 60 Hz 不等于游戏已达 60 FPS。')
+                if diagnostics & 1:
+                    throttle = (runtime["measurement_writer_throttle_cycles_hi"] << 32) | \
+                        runtime["measurement_writer_throttle_cycles_lo"]
+                    ar_stall = (runtime["measurement_reader_ar_stall_cycles_hi"] << 32) | \
+                        runtime["measurement_reader_ar_stall_cycles_lo"]
+                    r_stall = (runtime["measurement_reader_r_stall_cycles_hi"] << 32) | \
+                        runtime["measurement_reader_r_stall_cycles_lo"]
+                    self.log(f'硬件通路计数（同一 60 秒区间）：命令 {runtime["measurement_commands"]}，'
+                             f'写 burst {runtime["measurement_writer_bursts"]}，'
+                             f'写节流 {throttle} 周期，读地址停顿 {ar_stall} 周期，'
+                             f'读数据停顿 {r_stall} 周期。')
+                else:
+                    self.log('当前固件未提供硬件通路计数。')
+                if diagnostics & 2:
+                    self.log(f'命令耗时累计：提交/队列背压 {runtime["measurement_command_submit_us"]/1000:.1f} ms，'
+                             f'等待绘图完成 {runtime["measurement_command_wait_us"]/1000:.1f} ms；'
+                             '提交/背压占大头说明命令入队跟不上或队列太浅；帧末等待占大头再结合写节流/读停顿判断 DDR 服务瓶颈。')
+                elif diagnostics & 1:
+                    self.log(f'逐命令提交计时已关闭以减少测量干扰；帧末等待绘图完成累计 '
+                             f'{runtime["measurement_command_wait_us"]/1000:.1f} ms，'
+                             '结合写节流/读停顿和最低 FPS 判断 DDR 服务瓶颈。')
+                else:
+                    self.log('提交路径计时已关闭以减少测量干扰；以 FPS、绘制耗时和硬件通路计数评估性能。')
+                if not (diagnostics & 2) and (runtime.get("measurement_command_submit_us", 0) or
+                                              runtime.get("command_submit_us", 0)):
+                    self.log('注意：提交计时标志未启用，但字段非零；该字段不用于归因 CPU 入队瓶颈。')
         self.run(lambda: self.require_bridge().snapshot(), done)
         self.notice.set("普通 JTAG 读取会影响运行。测量结果来自固件保存的独立 60 秒区间；日志保留原始计数。")
 
@@ -254,14 +297,30 @@ class DebugWindow:
                          f'FPS {status.get("fps_x100", 0)/100:.2f} | '
                          f'精灵 {status.get("active_sprites")}/峰值 {status.get("max_active_sprites")} | '
                          f'错误 0x{status.get("error", 0):04x}')
+        runtime = status.get("runtime", {})
+        if runtime:
+            stage = runtime["campaign_stage"]
+            scene = ("通关" if runtime["campaign_result"] == 1 else
+                     ("失败" if runtime["campaign_result"] == 2 else
+                      ("压力场景" if runtime["stress_mode"] else ("开始画面" if stage == 255 else
+                       ("Boss" if stage == 4 else f"关卡 {stage}/3")))))
+            self.summary.set(self.summary.get() + f' | {scene} | 绘制 {runtime["render_us"]/1000:.2f} ms')
         self.uart_rx_label.set(
             f'最近板端快照：累计接收 {status.get("uart_accepted", 0)} 帧，按键 0x{status.get("buttons",0):02x}；'
             '连续读取确认计数增长，累计值不代表当前串口连通')
         self.log("状态 " + json.dumps(status, ensure_ascii=False), status)
+        if status.get("error") == 0xea02:
+            self.log("背景/素材初始化或校验失败。更新背景后需先断开 JTAG，重新配置本版全屏背景 bit，"
+                     "再加载新 ELF；仅重开游戏无法替换已封存背景。若仍失败，请导出日志。")
+        if status.get("error") == 0xea03:
+            self.log("图集初始化/校验失败。首次从旧素材切到新素材时，需先断开 JTAG，重新配置现有兼容 bit，"
+                     "再连接并加载新 ELF；重开游戏不会解除旧图集封存。若仍失败，请导出日志。")
         if status.get("legacy_read_only"):
             self.log("当前为旧 ELF，只读状态。要使用重开/自测/调参，请选择并加载新的常驻 ELF。")
         if status.get("partial_publication"):
             self.log("读取时固件正在发布状态，字段可能跨帧；请再次读取。")
+        if status.get("partial_runtime"):
+            self.log("读取时当前帧尚未完成，耗时与负载字段可能跨帧；完整测量以区间结果为准。")
         result = status.get("self_test_result", 0)
         if result:
             self.log(f"自测通过位 0x{result & 0xffff:x}，失败位 0x{result >> 16:x}（1 FILL / 2 Key / 4 Alpha / 8 Swap）")
@@ -378,8 +437,11 @@ class DebugWindow:
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--elf", type=Path, default=DEFAULT_ELF)
+    args = parser.parse_args()
     root = tk.Tk()
-    DebugWindow(root)
+    DebugWindow(root, args.elf)
     root.mainloop()
 
 

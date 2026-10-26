@@ -5,23 +5,42 @@
 2026-10-24 已合并常驻调试/弹幕与 Flash 两套改动。默认构建启用 Flash，需要带 SPI0
 的硬件和已准备的素材；继续使用原来的常驻调试版本时，构建参数加
 `--define GAME_FLASH_ENABLE=0`，使用现有 UART/Alpha/Color Key v6 bit。
-两种模式都保留背景初始化、弹幕、调试命令和测量接口；Flash 模式还使用 BLIT 绘制背景。
-本次合并验证的 ELF 在 `output/merge_validation_20261024/`，没有覆盖当前已上板的
-`software/interactive_demo/build/game/survival_game.elf` 或 bit，未操作板卡或写 Flash。
+两种模式都保留背景初始化、弹幕、调试命令和测量接口；当前全屏版使用 BLIT 恢复背景，
+并由 v7 硬件的 8 项 FIFO 缓冲绘图命令，减少每条命令等待引擎完成造成的 CPU 空转。
+合并验证的 ELF 保存在 `output/merge_validation_20261024/`。
+
+**全屏海岛战役版已接入**：活动范围扩展到 1920×1080，含标题页、三波敌机、
+双阶段 Boss 和胜负结果；硬件字形缓存、16×16 双缓冲背景恢复和满负荷测量入口，
+用来验证稳定 60 FPS 目标。
+调试窗口默认 ELF `software/interactive_demo/build/game/survival_game.elf` 已构建为
+不依赖 Flash 的全屏战役版。旧 v6 bit 不支持全屏背景窗口和绘图命令队列；若板上已配置配套 v7 bit
+且素材未变，只加载新 ELF 即可。更换素材时再重新配置同一 bit，以清除封存状态。
+新 bit 已完成编译与时序检查。
+v7 最终布线的 100 MHz `core_clk` setup slack 为 +2.340 ns；XLR 使用率为 90.22%。
+配套文件在 `output/campaign_game/`；上一版 bit/ELF 备份在
+`output/fullscreen_validation/before_fullscreen/`。
+操作、重建命令及验证结果见 [全屏版说明](docs/FULLSCREEN_GAME.md)。
+本次沿用已编译的全屏 bit；更换图集需重新配置以解除封存。
+60 FPS 尚待板上完整测量确认；本次没有操作板卡或写 Flash。
+
+居中 640×480 性能对照版已接入：HDMI 仍为 1920×1080@60 Hz，游戏视口固定在
+(640,300)，两个显示缓冲的外围背景只在启动时初始化，正常帧只清理/绘制视口。
+它使用相同 v7 bit、队友精灵、Alpha/Color Key 和 48 敌机/64 敌弹满载入口，独立输出
+到 software/interactive_demo/build/game-centered/，不会覆盖全屏基线。构建和 60 秒验收
+步骤见 docs/CENTERED_GAME.md；交付包在 output/campaign_game_centered/。
+该包的 board_tested 和 stable_60_fps_measured 保持为 false，等待实板测量。
 
 
 `advanced_demo` 用于完成赛题高级挑战：硬件 Alpha 混合、不规则精灵图的
 Color Key 透明处理，以及由 RISC-V CPU 运行、FPGA 加速绘图的高负载互动游戏。
 `basic_demo` 仍是单独保留的 M2 基线工程。
 
-当前阶段实现键盘控制的弹幕生存游戏：WASD 或方向键移动，空格或 Ctrl 开火，P
-暂停。玩家和敌人图片使用 Color Key 去除背景，光晕、子弹和受击效果使用 Alpha
-混合。敌人波次逐渐增加，敌机上限为 48，另有玩家子弹、敌方弹幕和效果。画面显示游戏帧率、当前
-精灵数量和运行期间观察到的最大精灵数量，用于上板测量性能。
+键盘 WASD 或方向键移动，空格或 Ctrl 开火，P 暂停。玩家和敌人使用 Color Key，
+子弹和爆炸使用 Alpha 混合。常规战役为三波敌机后挑战双阶段 Boss；另有固定满负载场景
+持续补足 48 架敌机、64 发敌弹，供连续 60 秒性能测量。
 
-游戏 ELF 发送 Color Key 和 Alpha 命令，不发送普通 `OP_BLIT` 命令。RTL 仍保留
-BLIT 支持，因为 Color Key 使用共享的源图传输通路，且加速器配置需要该支持；
-保留的 M2 回归也会测试普通复制。高级游戏中没有 CPU/FPGA 对照模式。
+全屏常驻版游戏 ELF 通过普通 `OP_BLIT` 恢复背景、Color Key 绘制飞机、Alpha 绘制
+子弹/光晕/爆炸。保留的 M2 回归继续测试普通复制。高级游戏中没有 CPU/FPGA 对照模式。
 
 ## 当前构建和上板状态
 
@@ -31,19 +50,22 @@ UART 发送端。串口配置为 115200 波特率、8 数据位、无校验、1 
 引脚约束为 RX：R4/GPIOL_02，TX：R14/GPIOR_28，均为 3.3 V LVCMOS。
 `scripts/check_project.py` 已通过，并确认生成的 SoC/BSP 端口连接正确。
 
-Efinity 2026.1.132 于 2026-10-23 完成完整编译，生成以下文件：
+Efinity 2026.1.132 已完成包含 8 项绘图命令队列的 v7 全屏版完整编译，当前配套文件为：
 
 - FPGA 配置文件：`outflow/ti60f225_oob.bit`
 - 游戏程序：`software/interactive_demo/build/game/survival_game.elf`
 - UART 诊断程序：`software/interactive_demo/build/keyboard-test/uart_keyboard_test.elf`
 
 这些文件位于 Git 忽略的构建目录中，普通 Git 提交和推送不会包含它们。烧录时需要
-使用启用 UART/Alpha/Color Key 的 advanced v6 bit 与兼容 ELF；本次软件改动只需重建、
-加载 ELF，已有兼容 bit 无需重编译。2026-10-24 用户已反馈通过调试窗口加载 ELF 后
-游戏正常显示，修复背景跳变后显示正常。板卡 UART 对应的 COM、按键实际接收、
+使用包含全屏背景与绘图命令队列能力的 advanced v7 bit 与新 ELF，不能混用旧 bit。
+2026-10-24 用户已反馈上一版小区域素材游戏已完成测试；本轮全屏背景仍需上板验证。
+板卡 UART 对应的 COM、按键实际接收、
 自测结果及持续帧率仍需保存板端验证记录，不能用电脑端发送成功代替。详见
 [构建报告](docs/GAME_BUILD_REPORT.md)、[键盘串口说明](docs/KEYBOARD_UART_INPUT.md)
 和[上板验证清单](docs/BOARD_VALIDATION_CHECKLIST.md)。
+
+新全屏版首次运行按[全屏版说明](docs/FULLSCREEN_GAME.md)先配置新 bit，
+解除旧素材封存，再加载新 ELF。
 
 上板前的配套文件整理、诊断与游戏专用调试配置和中文烧录步骤见
 [上板操作说明](docs/BOARD_READY_GUIDE.md)。封存包默认输出到 Git 忽略的
@@ -52,8 +74,7 @@ Efinity 2026.1.132 于 2026-10-23 完成完整编译，生成以下文件：
 ## 常驻调试与弹幕扩展
 
 当前源码新增了桌面调试窗口和常驻游戏命令：首次加载新 ELF 后，可直接重开、暂停、
-调参、验证 FILL/Color Key/Alpha，以及测量独立 60 秒区间；GAME OVER 默认 3 秒自动重开。
-玩法增加敌方瞄准弹/扇形弹和波次，保留已有底层与基础工程。
+调参、验证 FILL/Color Key/Alpha、切换固定满负载场景，并测量独立 60 秒区间。
 双击 `start_game_debug.cmd`，具体步骤见[常驻调试说明](docs/RESIDENT_GAME_DEBUG.md)。
 旧封存包不会自动更新，本次请从源码目录使用新 ELF 和窗口。
 本版作为阶段性开发版本保存，尚未完成最终性能验收。上传范围、排除文件和可复制的

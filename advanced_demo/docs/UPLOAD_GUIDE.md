@@ -1,144 +1,138 @@
-# 本次 GitHub 上传说明
+# 2026-10-26 阶段版本上传说明
 
-> 后续合并说明：本页原来的 20 文件清单对应本地提交 `4b12941`，已完成提交。
-> 随后拉取了远端 Flash 功能提交 `1496f8b`，产生 3 个游戏源码冲突。
-> 合并应保留两边功能及远端已跟踪的源码、IP/BSP、Flash 文档和验证记录；
-> 不要再按旧清单把这些合并内容取消暂存，也不要重新执行 pull。
-> `docs/evidence/flash_20261024/` 的日志是远端有意保存的验证材料，属于本次合并内容，
-> 与本机临时日志不同。4 个 `basic_demo` 未提交配置改动仍保留在本机，不纳入合并提交。
-> 完成合并后刷新 GitHub Desktop，按 Push origin 上传合并后的本地提交即可。
+本页替代此前的 20 文件上传清单。Flash 合并已在 `8221b43` 完成；本轮是该提交之后的
+v7 绘图命令队列、队伍素材、全屏/居中配置和 30 FPS 性能交接，不再沿用旧提交标题与清单。
+仓库：`C:\Users\Xuhaowei\Desktop\2026FPGA\2026FPGA`，当前分支 `main`。
+本次整理只更新说明，没有执行暂存、提交或推送。
 
-本说明对应 2026-10-24 的常驻调试与弹幕扩展，建议作为阶段性开发版本提交。
-实际仓库根目录是 `C:\Users\Xuhaowei\Desktop\2026FPGA\2026FPGA`，当前分支为 `main`。
-以下步骤保留为首次上传时的操作记录；后续合并应按上面的说明处理。
+## 可直接复制到 GitHub Desktop
 
-## 可直接复制的提交说明
-
-标题：
+Summary：
 
 ```text
-advanced_demo：增加常驻调试与弹幕扩展，修复背景跳变
+advanced_demo：加入v7绘图队列与居中素材版，记录满载30FPS基线
 ```
 
-正文（可用于 GitHub Desktop 的 Description、PR 或版本说明）：
+Description：
 
 ```text
-在现有高级工程上增加常驻游戏调试功能，首次加载 ELF 后可重开、暂停、调参，
-并提供 FILL / Color Key / Alpha 自测及独立 60 秒性能测量入口。
+加入 v7 的 8 项硬件绘图命令队列及配套软件接口，帧末统一排空，保留显示优先和双缓冲保护。
+接入队伍飞机、子弹、六帧爆炸和海岛背景，保留三波敌机、Boss 与固定压力场景。
+新增独立中央 640×480 构建；HDMI 仍输出 1920×1080@60 Hz，原全屏 ELF 独立保留。
+修复居中模式丢失海岛背景的问题，补充专用启动、构建和打包脚本及素材核对。
+增加构建配置快照、冻结的60秒测量结果及通路诊断，更新回归与使用文档。
 
-增加敌方瞄准弹、扇形弹、波次和自动重开；启动时统一初始化两个完整显示缓冲，
-修复局部游戏区域外背景随双缓冲交换反复跳变的问题。
+用户提供的60秒实板报告：48敌机/64敌弹压力场景，平均和最低秒窗均为30.00 FPS，
+精灵111–120，最慢绘制27.134 ms，重复旧帧1800次，区间新增underflow/missed为0/0。
+截图与人工摘录已归档；原始导出JSON和板上文件哈希匹配仍待补齐。
+主机游戏/UART/调试检查及交叉编译通过；满载60 FPS尚未达标，本次为可复现的阶段基线。
 
-改进桌面串口选择：自动枚举有效 COM、发送期间锁定端口，分别显示电脑发送状态
-与板端接收快照，避免误以为切换下拉选项就切换了实际发送端口。
-
-本版没有修改硬件 RTL。主机游戏逻辑、UART 协议、固件 mock 回归已通过；
-桌面调试检查 18 项及 OpenOCD 配置离线检查通过。
-用户已反馈游戏正常显示、背景跳变已解决。键盘实际接收、板上自测结果和
-持续 60 FPS 尚未完成验证，本提交为阶段性版本。
+后续优先评估居中版HUD缓存、损伤区域恢复及短写事务准入，保持素材与48/64压力基线。
 ```
 
-## 本次可以上传什么
+## 本次应上传的文件
 
-| 类型 | 本次纳入的内容 |
+按当前工作区，相关范围是 `advanced_demo/` 下未被忽略的改动及新增文件，以及
+`docs/evidence/game_perf_20261026/`。检查时共82个文件；后续数量可因实际修改变化，
+应以路径与内容判断，不为凑数勾选。
+
+| 类别 | 本轮需纳入 |
 |---|---|
-| 游戏源码 | `game_main.c`、`game_logic.c/.h`、`game_debug_abi.h` |
-| 桌面调试工具 | `game_debug_bridge.py`、`game_debug_window.py`、`start_game_debug.cmd` |
-| 构建与回归 | 构建脚本、游戏逻辑/调试检查脚本、C mock 与测试用例、回归入口 |
-| 上板准备工具 | `prepare_board_package.py`、`refresh_board_debug.py`；它们是工具源码，不是编译产物 |
-| 使用文档 | README、常驻调试说明、上板操作说明、本上传说明 |
+| RTL与工程 | `advanced_demo/rtl/` 中的相关改动、新增 `graphics_command_queue.v`；`advanced_demo/ti60f225_oob.xml` |
+| 游戏与API源码 | `software/interactive_demo/` 的 C/H、`software/apb_reg_test/` 的相关 API/寄存器/benchmark 头文件 |
+| 素材 | `assets/team_background/`、`assets/team_sprites/` 的 PNG/GIF、JSON、README |
+| 运行所需头文件 | `game_background_asset.h`、`game_sprite_assets.h`、`game_background_dirty.h`、`game_display_config.h`、`game_hud_atlas.h`、`game_runtime.h` |
+| 工具与检查 | `scripts/`、`tools/`、`sim/` 中本轮改动和新增文件；两个调试启动脚本 |
+| 文档 | README、CENTERED_GAME、FULLSCREEN_GAME、TEAM_SPRITES、GAME_BUILD_REPORT、性能交接、寄存器/调试/验收/上传说明 |
+| 实测证据 | `docs/evidence/game_perf_20261026/README.md`、`results.json`、`centered_full_load_30fps.png` |
 
-这些文件需要一起提交。只传 ELF 或只传 `game_main.c`，不能完整复现这一版。
-已有并受版本管理的 RTL、约束、IP 配置和 BSP 继续保留；不要因它们由工具生成就从仓库删除。
-本次没有对这些高级硬件文件作修改，无需人为加入新的改动。
+重要：
 
-## 本次不纳入什么
+- `advanced_demo/ti60f225_oob.xml` 新增了命令队列 RTL 引用，属于必需工程变更，要上传。
+- 素材头文件虽然由工具生成，但游戏编译直接依赖它们，必须和素材源图、生成脚本一起上传。
+- 不要按扩展名一刀切排除 PNG、JSON、H 或 XML；图片和上述证据都是本轮有效内容。
+- 已跟踪的 IP/BSP/Flash 源码继续保留，不删除、不因为它们由工具生成而取消已有版本管理。
+- HUD缓存/居中损伤恢复及新写准入是后续方案，不能在本次提交说明里宣称已完成。
 
-| 文件或目录 | 处理方式与原因 |
+## 本次不上传
+
+以下四项在 GitHub Desktop 的 Changes 中保持不勾选；只排除本次提交，不删除或撤销本机修改：
+
+```text
+basic_demo/software/apb_reg_test/.cproject
+basic_demo/software/apb_reg_test/.project
+basic_demo/software/apb_reg_test/apb_reg_test_ti.launch
+basic_demo/ti60f225_oob.xml
+```
+
+其余不纳入源码提交的本机产物：
+
+| 路径或类型 | 处理 |
 |---|---|
-| `basic_demo/software/apb_reg_test/.cproject` | 暂不纳入；属于基础工程 IDE 配置的独立改动 |
-| `basic_demo/software/apb_reg_test/.project` | 暂不纳入；属于基础工程项目链接的独立改动 |
-| `basic_demo/software/apb_reg_test/apb_reg_test_ti.launch` | 暂不纳入；属于基础工程调试配置的独立改动 |
-| `basic_demo/ti60f225_oob.xml` | 暂不纳入；基础工程项目文件变化需另行核对 |
-| `advanced_demo/outflow/`、`work_syn/`、`work_pnr/`、`work_pt/`、`work_dbg/`、`ooc/` | 编译输出、缓存和工作目录，正常 Git 提交不包含 |
-| `advanced_demo/software/*/build/` | ELF、BIN、HEX、目标文件和反汇编等构建产物，不强制加入源码提交 |
-| `advanced_demo/output/` | 本机封存包、ZIP、测试临时文件，正常 Git 提交不包含 |
-| IDE workspace 的 `.metadata/`、Python `__pycache__/`、临时日志 | 留在本机；有价值的验证结果可整理成文档再上传 |
-| 工具安装目录、驱动安装包、个人凭据、原始聊天截图 | 不属于这次源码提交；公开图片或日志前检查其中的个人信息 |
+| `advanced_demo/outflow/` | bitstream与编译报告，不强制加入Git |
+| `advanced_demo/work_syn/`、`work_pnr/`、`work_pt/`、`work_dbg/`、`ooc/` | 综合/布局布线缓存，不上传 |
+| `advanced_demo/software/*/build/` | 包括 `game`、`game-centered` 的ELF/BIN/HEX/MAP/反汇编及目标文件，不上传到源码提交 |
+| `advanced_demo/output/` | 本机交付包、30 FPS基线备份、临时日志，不整个加入Git |
+| `.metadata/`、`__pycache__/`、临时仿真文件 | 本地缓存，不上传 |
+| 工具安装包、凭据、个人配置及无关截图 | 不属于本轮内容 |
 
-“暂不纳入基础工程改动”不等于删除或撤销它们；这些变化继续保留在本机，后续可以单独提交。
-`.project`、`.cproject`、`.launch` 和 `.xml` 也不是一概禁止上传，只是上面这四个改动不属于本次范围。
-不要用 `git add .` 或 `git add -f` 把它们和本地构建输出混入此次提交。
+现有 `.gitignore` 已忽略主要构建目录；这些文件通常不会显示在 Changes 中。
+不要 `git add -f`，不要修改忽略规则把整个 output/outflow 纳入；也不要用 `git add .`
+混入四个基础工程文件。已有跟踪的历史证据继续保留，本次整理后的性能截图是特意纳入的例外。
 
-## 按清单提交到 GitHub
+## GitHub Desktop 操作
 
-在 PowerShell 中先执行下面这段。它只选择这次相关的 20 个文件，包括本说明：
+1. 选择实际仓库 `2026FPGA/2026FPGA` 和 `main`。
+2. 勾选上述本轮 `advanced_demo/` 改动及 `docs/evidence/game_perf_20261026/`。
+3. 确认四个 `basic_demo` 文件不勾选，新增素材/头文件/RTL/脚本/性能报告都已勾选。
+4. 填入 Summary 与 Description，点击 Commit to main，再 Push origin。
+5. 若远端有新提交，先查看差异并正常合并；不要强制推送或覆盖队友工作。
+
+## 可选：PowerShell精确暂存
+
+先预览，暂存区应没有其他独立工作；若有，先判断其归属。
 
 ```powershell
 Set-Location 'C:\Users\Xuhaowei\Desktop\2026FPGA\2026FPGA'
-
 git status --short
 git diff --cached --name-only
+git add --dry-run -- advanced_demo docs/evidence/game_perf_20261026
+```
 
-$uploadFiles = @(
-    'advanced_demo/README.md'
-    'advanced_demo/docs/BOARD_READY_GUIDE.md'
-    'advanced_demo/docs/RESIDENT_GAME_DEBUG.md'
-    'advanced_demo/docs/UPLOAD_GUIDE.md'
-    'advanced_demo/scripts/build_apb_software.py'
-    'advanced_demo/scripts/prepare_board_package.py'
-    'advanced_demo/scripts/refresh_board_debug.py'
-    'advanced_demo/scripts/run_game_debug_checks.py'
-    'advanced_demo/scripts/run_game_logic_checks.py'
-    'advanced_demo/scripts/run_interactive_checks.cmd'
-    'advanced_demo/sim/mock_game/accel_api.h'
-    'advanced_demo/sim/test_game_debug_control.c'
-    'advanced_demo/sim/test_survival_game.c'
-    'advanced_demo/software/interactive_demo/game_debug_abi.h'
-    'advanced_demo/software/interactive_demo/game_logic.c'
-    'advanced_demo/software/interactive_demo/game_logic.h'
-    'advanced_demo/software/interactive_demo/game_main.c'
-    'advanced_demo/start_game_debug.cmd'
-    'advanced_demo/tools/game_debug_bridge.py'
-    'advanced_demo/tools/game_debug_window.py'
-)
+确认后，仅选择指定范围。Git会遵守已有忽略规则：
 
-git add -- $uploadFiles
-git diff --cached --stat
+```powershell
+git add -- advanced_demo docs/evidence/game_perf_20261026
 git diff --cached --name-only
+git diff --cached --stat
 git diff --cached --check
 ```
 
-当前检查时暂存区为空。若执行时第一条 `git diff --cached --name-only` 已显示其他文件，
-先核对它们，避免一次提交带上之前暂存的内容。暂存后的清单应只有上面的文件。
-如果基础工程文件已被暂存，可按实际路径执行 `git restore --staged -- 文件路径`，
-只取消暂存，保留本机修改。
-
-核对清单与检查结果后，再执行提交和推送：
+若四个基础工程文件之前已被暂存，可只取消这些文件的暂存，保留工作区改动：
 
 ```powershell
-git commit -m 'advanced_demo：增加常驻调试与弹幕扩展，修复背景跳变'
+git restore --staged -- basic_demo/software/apb_reg_test/.cproject basic_demo/software/apb_reg_test/.project basic_demo/software/apb_reg_test/apb_reg_test_ti.launch basic_demo/ti60f225_oob.xml
+```
+
+最终核对清单后再提交推送；可用 GitHub Desktop 填入完整正文，或用命令提交标题：
+
+```powershell
+git commit -m 'advanced_demo：加入v7绘图队列与居中素材版，记录满载30FPS基线'
 git push origin main
 ```
 
-每条命令成功后再执行下一条。推送若提示远端有新提交，应先获取并检查差异，
-不要强制推送。使用 GitHub Desktop 时同样按上面的清单勾选，填写标题与正文，
-点击 Commit，再 Push origin；四个基础工程文件保持未勾选。
+## 给队友免编译上板的文件
 
-## 如果还要给队友可直接运行的文件
+源码推送不会包含 bit/ELF，队友要直接上板时需另外共享配套产物：
 
-Git 源码提交不会上传被忽略的 bit/ELF。需要免编译演示时，另行制作经过核对的
-ZIP，作为 GitHub Release 附件或队内共享文件，而不是把整个输出目录强制加入 Git。
+- `advanced_demo/output/campaign_game_centered/ti60f225_oob.bit`
+- 同目录 `survival_game.elf`、`SHA256SUMS.txt`、`manifest.json` 和 `使用说明.txt`
+- 已拉取本轮源码后，可使用同目录 `start_centered_game_debug.cmd`；它依赖源码目录中的
+  `start_game_debug.cmd` 与 `tools/`，不是仅复制六个文件即可跨电脑独立运行的工具包。
 
-包内至少需要兼容的 advanced UART/Alpha/Color Key v6 bit、最新游戏 ELF、
-当前调试窗口/桥接工具/键盘发送工具、相应配置和使用说明，并记录源码提交号、
-硬件版本、软件版本与 SHA-256。电脑工具安装路径也需要接收方核对。
+也可共享 `advanced_demo/output/performance_baseline_20261026_30fps/` 的配套备份，
+通过队内文件传输或Release附件提供，保持目录与版本说明。不要把两个版本的ELF/bit混用。
+素材已封存的板卡，从旧居中/全屏ELF切换时需重配同一个v7 bit后再加载目标ELF。
 
-旧 `output/board_ready/advanced_uart_20261023_e99e4e6/` 属于历史版本，
-不会随源码修改自动更新，不能当作本次常驻调试版发送。
-现有 `prepare_board_package.py` 主要生成 IDE 加载用的包，当前复制清单尚未包含
-`game_debug_window.py`、`game_debug_bridge.py` 和 `start_game_debug.cmd`；
-单独运行它不能得到完整的新版常驻调试工具包。
-
-本次可立即上传源码阶段版本；最终验收包应在实际 UART、板上自测和持续性能数据
-确认后，再保存对应的程序、说明与验证记录。
+本机候选产物哈希及截图身份限制见
+[性能交接报告](PERFORMANCE_HANDOFF_20261026.md)。本次上传不代表满载60 FPS验收完成。

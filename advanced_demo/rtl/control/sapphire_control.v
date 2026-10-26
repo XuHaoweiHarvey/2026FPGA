@@ -2,7 +2,8 @@
 module sapphire_control #(
     parameter COLOR_KEY_ENABLE = 0,
     parameter CPU_DDR_ENABLE = 0,
-    parameter ALPHA_ENABLE = 0
+    parameter ALPHA_ENABLE = 0,
+    parameter COMMAND_QUEUE_ENABLE = 0
 )(
     input wire core_clk,
     input wire platform_rst_n,
@@ -20,7 +21,7 @@ module sapphire_control #(
     input wire [31:0] init_data_beats,init_aw_bursts,init_wlast_bursts,init_b_responses,init_aw_beats,
     output wire [31:0] cmd_x,cmd_y,cmd_width,cmd_height,cmd_color,
     output wire [31:0] cmd_op,cmd_src_addr,cmd_src_stride,
-    input wire draw_ready,input wire [31:0] buffer_status,
+    input wire draw_ready,input wire command_queue_ready,input wire [31:0] buffer_status,
     input wire [31:0] reader_frame_base,reader_outstanding,reader_data_beats,reader_reserved_beats,reader_error,
     input wire [31:0] boundary_count,swap_count,missed_boundary_count,
     input wire [31:0] service_status,writer_throttle_cycles,writer_bursts,
@@ -163,7 +164,7 @@ end else begin: no_cpu_ddr
 end endgenerate
 accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1),
     .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(CPU_DDR_ENABLE),
-    .ALPHA_ENABLE(ALPHA_ENABLE)) u_accel_regs (
+    .ALPHA_ENABLE(ALPHA_ENABLE),.COMMAND_QUEUE_ENABLE(COMMAND_QUEUE_ENABLE)) u_accel_regs (
     .PCLK(core_clk), .PRESETn(soc_rst_n && !system_reset),
     .PADDR({16'b0,apb_addr}), .PSEL(apb_sel), .PENABLE(apb_enable), .PWRITE(apb_write),
     .PWDATA(apb_wdata), .PRDATA(apb_rdata), .PREADY(apb_ready), .PSLVERROR(apb_error),
@@ -174,7 +175,7 @@ accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1),
     .init_b_responses(init_b_responses),.init_aw_beats(init_aw_beats),
     .cmd_x(cmd_x),.cmd_y(cmd_y),.cmd_width(cmd_width),.cmd_height(cmd_height),.cmd_color(cmd_color),
     .cmd_op(cmd_op),.cmd_src_addr(cmd_src_addr),.cmd_src_stride(cmd_src_stride),
-    .draw_ready(draw_ready),.buffer_status(buffer_status),
+    .draw_ready(draw_ready),.command_queue_ready(command_queue_ready),.buffer_status(buffer_status),
     .reader_frame_base(reader_frame_base),.reader_outstanding(reader_outstanding),
     .reader_data_beats(reader_data_beats),.reader_reserved_beats(reader_reserved_beats),.reader_error(reader_error),
     .boundary_count(boundary_count),.swap_count(swap_count),.missed_boundary_count(missed_boundary_count),

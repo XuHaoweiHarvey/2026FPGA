@@ -13,7 +13,8 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from game_debug_bridge import (APB, CONTROL_MAGIC, DEFAULT_ELF, DEFAULT_IDE, DebugBridge,
-                               ElfImage, STATUS_FIELDS, STATUS_MAGIC, inspection_config, tcl_word)
+                               ElfImage, STATUS_FIELDS, STATUS_MAGIC, RUNTIME_FIELDS,
+                               LEGACY_RUNTIME_FIELDS, inspection_config, tcl_word)
 
 
 class FakeBridge(DebugBridge):
@@ -32,7 +33,10 @@ class FakeBridge(DebugBridge):
         for i, value in enumerate((CONTROL_MAGIC, 0, 0, 3000, 900, 48, 0, 225)):
             self.memory[control+i*4] = value
         self.set_status(magic=STATUS_MAGIC, version=1, phase=4, publication=2)
-        self.memory.update({APB: 0x4143434C, APB+4: 0x00060000, APB+0x64: 0x10})
+        if "g_game_runtime" in self.image.symbols:
+            self.memory[self.image.symbol("g_game_runtime", 4*len(RUNTIME_FIELDS))] = 0x47525431
+        self.memory.update({APB: 0x4143434C, APB+4: 0x00070000,
+                            APB+0x40: 0x7FB, APB+0x64: 0x10})
 
     def set_status(self, **values):
         address = self.image.symbol("g_debug_status", 4*len(STATUS_FIELDS))
@@ -98,6 +102,44 @@ class DebugTests(unittest.TestCase):
         self.assertEqual(bridge.cpu, "halted")
         self.assertNotIn("resume", bridge.calls)
 
+    def test_runtime_extension_matches_c_and_reports_partial_publication(self):
+        bridge = FakeBridge()
+        header = (ROOT / "software/interactive_demo/game_runtime.h").read_text()
+        body = re.search(r"typedef struct \{([^}]+)\} game_runtime_t;", header).group(1)
+        names = re.findall(r"uint32_t ([^;]+);", body)
+        self.assertEqual([item.strip() for group in names for item in group.split(",")], RUNTIME_FIELDS)
+        address = bridge.image.symbol("g_game_runtime", 4*len(RUNTIME_FIELDS))
+        self.assertEqual(bridge.image.symbols["g_game_runtime"][1], 4*len(RUNTIME_FIELDS))
+        bridge.memory[address+4] = 3
+        bridge.memory[address+4*RUNTIME_FIELDS.index("measurement_repeated_frames")] = 7
+        status = bridge.snapshot()
+        self.assertEqual(status["runtime"]["measurement_repeated_frames"], 7)
+        self.assertTrue(status["partial_runtime"])
+        bridge.image.symbols.pop("g_game_runtime")
+        self.assertNotIn("runtime", bridge.snapshot()) # Existing ABI1 firmware remains readable.
+
+    def test_previous_runtime_layout_remains_readable_and_measurable(self):
+        bridge = FakeBridge()
+        address, _ = bridge.image.symbols["g_game_runtime"]
+        bridge.image.symbols["g_game_runtime"] = (address, 4*len(LEGACY_RUNTIME_FIELDS))
+        bridge.memory[address + 4*LEGACY_RUNTIME_FIELDS.index("stress_mode")] = 1
+        bridge.set_status(invincible_mode=1, enemy_limit=48)
+        status = bridge.snapshot()
+        self.assertTrue(status["runtime_abi_legacy"])
+        self.assertEqual(status["runtime"]["stress_mode"], 1)
+        self.assertEqual(bridge.command(7), 1)
+
+    def test_campaign_cannot_be_measured_as_a_constant_stress_scene(self):
+        bridge = FakeBridge()
+        bridge.set_status(invincible_mode=1, enemy_limit=48)
+        with self.assertRaisesRegex(RuntimeError, "满负载场景"):
+            bridge.command(7)
+        self.assertEqual(bridge.writes, [])
+        address = bridge.image.symbol("g_game_runtime", 4*len(RUNTIME_FIELDS))
+        bridge.memory[address + 4*RUNTIME_FIELDS.index("stress_mode")] = 1
+        self.assertEqual(bridge.command(7), 1)
+        self.assertEqual(bridge.cpu, "running")
+
     def test_read_error_and_wrong_elf_restore_running_cpu(self):
         bridge = FakeBridge()
         bridge.broken_address = bridge.image.code[0][0]
@@ -160,6 +202,19 @@ class DebugTests(unittest.TestCase):
         self.assertNotIn("resume", bridge.calls[:image_call])
         self.assertIn(f"resume {bridge.image.entry:#x}", bridge.calls[image_call:])
         self.assertEqual(bridge.cpu, "running")
+
+    def test_fullscreen_elf_rejects_old_bit_before_ram_write(self):
+        bridge = FakeBridge()
+        self.assertEqual(bridge.image.symbol_u32("g_game_required_caps"), 0x600)
+        bridge.memory[APB+0x40] = 0x1FB
+        with self.assertRaisesRegex(RuntimeError, "全屏背景 bit"):
+            bridge.load()
+        self.assertFalse(any(call.startswith("load_image ") for call in bridge.calls))
+        self.assertEqual(bridge.writes, [])
+        self.assertEqual(bridge.cpu, "running")
+        bridge.image.symbols.pop("g_game_required_caps")
+        bridge.load()  # An old small-window ELF still works with the old bit.
+        self.assertTrue(any(call.startswith("load_image ") for call in bridge.calls))
 
     def test_load_runs_old_cpu_only_to_release_owned_ddr(self):
         bridge = FakeBridge()
@@ -252,7 +307,7 @@ class DebugTests(unittest.TestCase):
         try:
             window = DebugWindow(root)
             root.update_idletasks()
-            self.assertEqual(window.delay.get(), "3000")
+            self.assertEqual(window.delay.get(), "0")
             self.assertFalse(window.measuring)
             self.assertIsNone(window.bridge)
             self.assertEqual(str(window.ports.cget("state")), "readonly")

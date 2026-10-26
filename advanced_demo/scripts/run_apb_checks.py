@@ -24,4 +24,11 @@ for waits in (0, 1, 3):
                         f'-Ptb_graphics_regs.COLOR_KEY={color_key}','-o',str(graphics_binary),
                         'sim/tb_graphics_regs.v','rtl/control/accel_regs.v'],cwd=ROOT,check=True)
         subprocess.run([args.vvp,str(graphics_binary)],cwd=ROOT,check=True)
-print('PASS standalone APB3 B compatibility and v4/v5 graphics contracts; this run does not simulate the CPU or validate hardware.')
+        queued_binary = out / f'graphics-regs-queue-wait{waits}-key{color_key}.vvp'
+        subprocess.run([args.iverilog,'-g2005-sv','-s','tb_graphics_regs',
+                        f'-Ptb_graphics_regs.WAIT_CYCLES={waits}',
+                        f'-Ptb_graphics_regs.COLOR_KEY={color_key}',
+                        '-Ptb_graphics_regs.QUEUE_ENABLE=1','-o',str(queued_binary),
+                        'sim/tb_graphics_regs.v','rtl/control/accel_regs.v'],cwd=ROOT,check=True)
+        subprocess.run([args.vvp,str(queued_binary)],cwd=ROOT,check=True)
+print('PASS standalone APB3 B compatibility, v4/v5 contracts, and v7 queued command admission; this run does not simulate the CPU or validate hardware.')

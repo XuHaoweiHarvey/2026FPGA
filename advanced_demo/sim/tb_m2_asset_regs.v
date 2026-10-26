@@ -50,7 +50,7 @@ endtask
 initial begin
     repeat(3) @(negedge clk);rst_n=1;
     tx(0,'h04,0,ALPHA_ENABLE?'h60000:'h50000,0);
-    tx(0,'h40,0,ALPHA_ENABLE?'h1fb:'hfb,0);
+    tx(0,'h40,0,ALPHA_ENABLE?'h3fb:'hfb,0);
     tx(0,'hDC,0,'h80000000,0);
     tx(1,'hD8,2,0,1);tx(1,8,2,0,0); // seal before load
     tx(1,'hD8,1,0,0);tx(0,'hDC,0,'h80000001,0);
@@ -65,7 +65,7 @@ initial begin
     @(negedge clk);rst_n=0;@(negedge clk);rst_n=1;
     tx(0,'hDC,0,'h80000002,0); // control reset cannot unseal platform DDR
     if(ALPHA_ENABLE) begin
-        tx(0,'h04,0,'h60000,0);tx(0,'h40,0,'h1fb,0);
+        tx(0,'h04,0,'h60000,0);tx(0,'h40,0,'h3fb,0);
         tx(0,'hE4,0,'h80000000,0);
         tx(1,'hE0,1,0,0);tx(0,'hE4,0,'h80000001,0);
         tx(1,'hE0,1,0,1);tx(1,8,2,0,0);

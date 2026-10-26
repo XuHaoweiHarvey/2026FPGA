@@ -1,6 +1,6 @@
-# Register Map — advanced_demo v6
+# Register Map — advanced_demo v7
 
-本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。高级工程启用ENGINE、双缓冲、BLIT、Color Key、CPU DDR、M2素材与Alpha；硬件版本为v6。`basic_demo` 保持M2验收基线，高级工程仍需独立综合和上板验收。
+本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。高级工程启用ENGINE、双缓冲、BLIT、Color Key、CPU DDR、M2素材、Alpha 与 8 项绘图命令队列；硬件版本为v7。`basic_demo` 保持M2验收基线，高级工程仍需独立综合和上板验收。
 
 ## Address and Access
 
@@ -21,9 +21,9 @@
 | Offset | 名称 | 访问 | 复位值 / 域 | 位域、含义与清除语义 |
 |---|---|---|---|---|
 | 00 | ACCEL_ID | RO | 0x4143434C / 常量 | ASCII ACCL |
-| 04 | ACCEL_VERSION | RO | 0x00060000 / 常量 | v6 Alpha；保留v5 M2素材、Color Key、双缓冲与CPU DDR接口 |
+| 04 | ACCEL_VERSION | RO | 0x00070000 / 常量 | v7 绘图命令队列；保留v6 Alpha、M2素材、Color Key、双缓冲与CPU DDR接口 |
 | 08 | CONTROL | RW/W1 | 0 / C | bit0写1请求START、读0；bit1写1清APB错误；[31:1]保存写值并可读回，其他位无功能 |
-| 0C | STATUS | RO | 0 / P输入与C错误组合 | bit0 BUSY，1 DONE，2 ERROR，3 INIT_DONE，4 OWNER_ACCEL；[31:5]=0 |
+| 0C | STATUS | RO | 0 / P输入与C错误组合 | bit0 BUSY，1 DONE，2 ERROR，3 INIT_DONE，4 OWNER_ACCEL，5 COMMAND_QUEUE_READY；[31:6]=0 |
 | 10 | RECT_X | RW | 0 / C | x，pixel；新START快照，不影响在途命令 |
 | 14 | RECT_Y | RW | 0 / C | y，pixel |
 | 18 | RECT_WIDTH | RW | 0 / C | width，pixel，必须非0 |
@@ -36,14 +36,14 @@
 | 34 | FRAME_STRIDE | RO | 7680=0x1E00 / 常量 | bytes/line |
 | 38 | FRAME_WIDTH | RO | 1920=0x780 / 常量 | pixels/line |
 | 3C | FRAME_HEIGHT | RO | 1080=0x438 / 常量 | lines/frame |
-| 40 | CAPABILITIES | RO | 0x000001FB / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT、7 Color Key、8 Alpha；bit2=0 |
+| 40 | CAPABILITIES | RO | 0x000007FB / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT、7 Color Key、8 Alpha、9封存全屏背景、10命令队列；bit2=0 |
 | 44 | INIT_DATA_BEATS | RO | 0 / P | 初始化WVALID&&WREADY数，单位128bit beat；INIT_DONE后冻结 |
 | 48 | INIT_AW_BURSTS | RO | 0 / P | 初始化AW握手数，单位burst；完成后冻结 |
 | 4C | INIT_WLAST_BURSTS | RO | 0 / P | 初始化W握手且WLAST数，单位burst；完成后冻结 |
 | 50 | INIT_B_RESPONSES | RO | 0 / P | 初始化B握手数，单位burst；完成后冻结 |
 | 54 | INIT_AW_BEATS | RO | 0 / P | 初始化所有AWLEN+1之和，单位128bit beat；完成后冻结 |
 | 58 | WRITE_OWNER | RO | 0 / P | [0]=INIT_DONE：0 TPG/排空等待，1 Accelerator永久接管；高位0 |
-| 5C | COMMAND_COUNT | RO | 0 / P | engine实际接收命令数，非法几何也计一次；自然回绕，不由C复位清零 |
+| 5C | COMMAND_COUNT | RO | 0 / P | v7为队列成功接收的描述符数，v6为engine接收数；自然回绕，不由C复位清零 |
 | 60 | SWAP_CONTROL | W1，读0 | 0 / 输出pulse由C清零 | bit0 REQUEST、bit1 CLEAR_DONE；写3清旧DONE并请求，其他位忽略 |
 | 64 | BUFFER_STATUS | RO | 0x02加组合bit7 / P | bit0 FRONT_INDEX、1 BACK_INDEX、2 PENDING、3 DONE、4 FRONT_VALID、5 WRITER_OWNED、6 READER_ACTIVE、7 READER_SAFE；高位0 |
 | 68 | READER_FRAME_BASE | RO | 0 / P | 本帧锁存Front地址，帧内不变；只在安全launch更新 |
@@ -68,8 +68,8 @@
 | B4 | SERVICE_READ_QUOTA | RO | 128=0x80 / 常量 | 上一笔写B之后所需真实R handshake数 |
 | B8 | SERVICE_WATERMARKS | RO | 0x02000180 / 常量 | [31:16]HIGH512；[15:0]LOW384，单位128bit FIFO words |
 | BC | COMMAND_OP | RW | 0 / C | 0 FILL，1 BLIT，2色键复制，3 Alpha Blend；其他值接受计数后报0x26；START时快照 |
-| C0 | SRC_ADDR | RW | 0 / C | BLIT源绝对字节地址，16byte对齐；按命令限于Front、三张M2整图或已封存sprite图集的合法矩形 |
-| C4 | SRC_STRIDE | RW | 0 / C | 源行距bytes：Front为7680，M2整图或sprite为2560；START时快照 |
+| C0 | SRC_ADDR | RW | 0 / C | BLIT源绝对字节地址，16byte对齐；按命令限于Front、三张M2整图、封存全屏背景或sprite图集的合法矩形 |
+| C4 | SRC_STRIDE | RW | 0 / C | 源行距bytes：Front和全屏背景为7680，M2整图或sprite为2560；START时快照 |
 | CC | CPU_DDR_CONTROL | WO | 0 / C | Phase 3：bit0请求CPU会话，bit1请求释放，bit2清CPU DDR错误；会话与现有图形命令互斥 |
 | D0 | CPU_DDR_STATUS | RO | 0x10 / P | Phase 3：bit0会话有效，bit1桥非空，bit2会话错误，bit4支持CPU DDR；释放前须等待bit1=0 |
 | D4 | CPU_DDR_ERROR | RO | 0 / P | Phase 3桥首个错误码：1权限/协议，3 DDR响应ID，4 DDR响应错误，5 RLAST，6 CPU复位中止 |
@@ -80,15 +80,21 @@
 
 CPU 外部DDR窗口从 `0x00001000` 起。桥将地址减 `0x1000` 并对齐到128-bit字；锁定的Back有效像素区可写，Front/Back有效像素区可读。M2加载期另外仅允许三张图片素材`0x01000000..0x01383FFF`读写，封存后素材只读。v6 sprite加载期仅允许图集`0x01384000..0x014AFFFF`读写，封存后只读；图集不能由普通BLIT读取。其他DDR地址仍拒绝。CPU会话期间禁止图形命令和Swap；Display Reader持续工作，写准入节流仍生效。M1a程序与栈仍在64KB OCRAM。
 
+全屏扩展另允许物理背景窗口 `0x02000000..0x027e8fff`（1920×1080，stride=7680）。
+该窗口仅在启用 sprite 的构建中存在，复用 ASSET 加载/封存生命周期：有效 CPU DDR 会话
+且 LOADING 时可写，LOADING 或 READY 时可读，READY 后禁止修改。普通 BLIT 可在 READY
+后读取窗口内的对齐矩形，含局部恢复；不能跨行或越出右/下边界。Color Key/Alpha 不可读取
+该窗口。CPU 地址仍须加 `0x1000`；没有开放任意 DDR 范围。
+
 BUFFER_STATUS复位时Front0、Back1、active/owned/valid/pending/done=0；bit7按`!active && reader_idle && !ARVALID && !RVALID && outstanding==0 && reader_error==0`实时组合。Reader/DDR空闲且复位已稳定时可读0x82，不能把bit7当manager存储复位常量。
 
 SERVICE_STATUS复位healthy=0、read_credit=0、grant=0、transaction_active=0且ENABLE=1，因此0x22；bit1=1本身不是错误，reader safe的slack可准入。bit2只表示等待准入；bit3不是整条命令BUSY。一次准入锁存到B，不能通过软件写此寄存器解除保护。
 
 ## START / DONE / Swap Semantics
 
-START有效时，先检查INIT_DONE，再BUSY/已有start_pulse，再draw_ready；成功APB access快照矩形字段及op/src_addr/src_stride，下一core拍manager/engine接收并锁存Back；源检查器同拍锁存结果，engine下一拍读取。width/height>0，矩形边界不得越出1920×1080。FILL的x/width无需4对齐；BLIT、色键和Alpha的x/width必须按4像素/16byte beat对齐。Front源矩形须在当前Front有效图像内，不能使用8MiB槽尾padding，也不能横跨源行。M2允许普通BLIT从ASSET_READY后的三张精确素材基址`0x01000000/0x0112C000/0x01258000`读取整张640×480图像。v6的Color Key和Alpha另允许从已封存图集`0x01384000..0x014AFFFF`读取stride=2560、边界检查通过的矩形；普通BLIT不能读该图集。FILL不使用源字段，API每次显式写op=0。
+START有效时，先检查INIT_DONE。v6检查引擎BUSY和draw_ready；v7检查COMMAND_QUEUE_READY。成功APB access快照矩形字段及op/src_addr/src_stride，v6同步交给manager/engine，v7则按顺序放入8项FIFO，engine空闲时逐条取出。v7的BUSY覆盖FIFO和正在运行的命令，COMMAND_COUNT在FIFO成功接收时递增；交换缓冲区前必须等BUSY清零。width/height>0，矩形边界不得越出1920×1080。FILL的x/width无需4对齐；BLIT、色键和Alpha的x/width必须按4像素/16byte beat对齐。Front源矩形须在当前Front有效图像内，不能使用8MiB槽尾padding，也不能横跨源行。M2允许普通BLIT从ASSET_READY后的三张精确素材基址`0x01000000/0x0112C000/0x01258000`读取整张640×480图像。Color Key和Alpha另允许从已封存图集`0x01384000..0x014AFFFF`读取stride=2560、边界检查通过的矩形；普通BLIT不能读该图集。FILL不使用源字段，API每次显式写op=0。
 
-色键复制继承BLIT几何、完成和错误规则。源RGB等于RECT_COLOR低24位时，对应四个byte strobe为0，保留Back完整XRGB；其他源像素完整复制。Alpha Blend仅在op=3时将源最高字节解释为逐像素Alpha，按`Aeff=(pixel_alpha*global_alpha+127)/255`及`Cout=(src*Aeff+dst*(255-Aeff)+127)/255`四舍五入混合RGB，并保留目标最高字节。Alpha每段先读sprite前景，再读当前Back背景，混合后写回；命令参数在START时锁存。Color Key和Alpha均复用同一图集窗口，普通BLIT仍不能读取图集。换帧不会自动复制Front背景；CPU和FPGA演示均先准备Back背景。新软件要求v6/0x1FB能力，旧v3/v4/v5 ELF需重新Build。
+色键复制继承BLIT几何、完成和错误规则。源RGB等于RECT_COLOR低24位时，对应四个byte strobe为0，保留Back完整XRGB；其他源像素完整复制。Alpha Blend仅在op=3时将源最高字节解释为逐像素Alpha，按`Aeff=(pixel_alpha*global_alpha+127)/255`及`Cout=(src*Aeff+dst*(255-Aeff)+127)/255`四舍五入混合RGB，并保留目标最高字节。Alpha每段先读sprite前景，再读当前Back背景，混合后写回；命令参数在START时锁存。Color Key和Alpha均复用同一图集窗口，普通BLIT仍不能读取图集。换帧不会自动复制Front背景；CPU和FPGA演示均先准备Back背景。v6游戏可使用其原能力集；全屏 v7 游戏要求bit9全屏背景和bit10绘图队列（必需掩码`0x600`），当前完整能力为`0x7FB`。软件按硬件版本选择v6同步或v7入队协议。
 
 70/74/6C及94..A0、读quota只观察显示客户端的AR/R；BLIT读不计入显示帧或写准入额度。全局读仲裁最多一笔outstanding。共享协议FAULT映射READER_ERROR=0x2004，阻止新START、REQUEST和提交换帧；CPU reset不能清除，也不取消在途AR/R/AW/W/B。
 

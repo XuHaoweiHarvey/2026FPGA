@@ -2,7 +2,7 @@
 // One-shot TPG, real legacy engines and shared mock DDR, APB registers,
 // accelerator, CVO and serializer. No CPU or encrypted-controller simulation.
 module tb_checkpoint_d;
-parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0, COLOR_KEY=0, CPU_DDR=0, ALPHA_ENABLE=0;
+parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0, COLOR_KEY=0, CPU_DDR=0, ALPHA_ENABLE=0, QUEUE_ENABLE=0, QUEUE_STRESS_ONLY=0;
 localparam INIT_ONLY=0;
 localparam BEATS=WIDTH*HEIGHT/4;
 reg axi_clk=0, i_clk=0, o_clk=0, rst_n=0;
@@ -16,7 +16,7 @@ reg apb_reset=0;
 reg [31:0] paddr=0,pwdata=0;
 reg psel=0,penable=0,pwrite=0;
 wire [31:0] prdata;wire pready,pslverror;
-wire init_done,busy,done,start,draw_ready,swap_request,clear_swap_done;
+wire init_done,busy,done,start,draw_ready,command_queue_ready,swap_request,clear_swap_done;
 wire [31:0] service_status,writer_throttle_cycles,writer_bursts,reader_ar_stall_cycles,reader_ar_max_stall,reader_r_stall_cycles,reader_r_max_stall,display_underflow_count,reader_frame_completions,reader_fifo_level,writer_max_cycles,service_read_quota,service_watermarks;
 wire [31:0] buffer_status,reader_frame_base,reader_outstanding,reader_data_beats,reader_reserved_beats,reader_error;
 wire [31:0] boundary_count,swap_count,missed_boundary_count,front_base,back_base;
@@ -42,12 +42,12 @@ wire [127:0] cpu_rdata;
 reg [127:0] cpu_wdata=0;
 reg [15:0] cpu_wstrb=0;
 accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(GRAPHICS),.COLOR_KEY_ENABLE(COLOR_KEY),
- .CPU_DDR_ENABLE(CPU_DDR),.ALPHA_ENABLE(ALPHA_ENABLE),.WAIT_CYCLES(APB_WAITS),
+ .CPU_DDR_ENABLE(CPU_DDR),.ALPHA_ENABLE(ALPHA_ENABLE),.COMMAND_QUEUE_ENABLE(QUEUE_ENABLE),.WAIT_CYCLES(APB_WAITS),
  .FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.FRAME_STRIDE(WIDTH*4)) regs (
  .PCLK(axi_clk),.PRESETn(apb_reset),.PADDR(paddr),.PWDATA(pwdata),.PSEL(psel),.PENABLE(penable),.PWRITE(pwrite),
  .PRDATA(prdata),.PREADY(pready),.PSLVERROR(pslverror),.display_buffer_base(front_base),.tpg_write_buffer_base(back_base),
  .init_done(init_done),.init_error(init_error),.engine_busy(busy),.engine_done(done),.engine_error(engine_error),
- .draw_ready(draw_ready),.buffer_status(buffer_status),.swap_request(swap_request),.clear_swap_done(clear_swap_done),
+ .draw_ready(draw_ready),.command_queue_ready(command_queue_ready),.buffer_status(buffer_status),.swap_request(swap_request),.clear_swap_done(clear_swap_done),
  .service_status(service_status),
  .writer_throttle_cycles(writer_throttle_cycles),
  .writer_bursts(writer_bursts),
@@ -101,7 +101,8 @@ wire axis_ready;
 wire [1:0] wr_bank,rd_bank;
 rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),
  .RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS),
- .COLOR_KEY_ENABLE(COLOR_KEY),.CPU_DDR_ENABLE(CPU_DDR),.ALPHA_ENABLE(ALPHA_ENABLE)) dut (
+ .COLOR_KEY_ENABLE(COLOR_KEY),.CPU_DDR_ENABLE(CPU_DDR),.ALPHA_ENABLE(ALPHA_ENABLE),
+ .COMMAND_QUEUE_ENABLE(QUEUE_ENABLE)) dut (
     .axi_clk(axi_clk),.rst_n(rst_n),.i_clk(i_clk),.i_frame_start(frame_start),
     .i_de(source_de),.vin(vin),.o_clk(o_clk),.fifo_rd_period(period),
     .display_underflow(underflow),
@@ -118,7 +119,7 @@ rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_
     .cmd_op(cop),.cmd_src_addr(csrc),.cmd_src_stride(cstride),
     .init_done(init_done),.init_error(init_error),.engine_busy(busy),.engine_done(done),.engine_error(engine_error),.command_count(commands),
     .init_data_beats(beats),.init_aw_bursts(aws),.init_wlast_bursts(lasts),.init_b_responses(bs),.init_aw_beats(reserved),
-.draw_ready(draw_ready),.buffer_status(buffer_status),.swap_request(swap_request),.clear_swap_done(clear_swap_done),
+.draw_ready(draw_ready),.command_queue_ready(command_queue_ready),.buffer_status(buffer_status),.swap_request(swap_request),.clear_swap_done(clear_swap_done),
  .service_status(service_status),
  .writer_throttle_cycles(writer_throttle_cycles),
  .writer_bursts(writer_bursts),
@@ -264,7 +265,7 @@ always @(posedge axi_clk) begin
                 $fatal(1,"Bad AR burst");
             if(araddr>=32'h01384000 && araddr<32'h014b0000) begin
                 if(!ALPHA_ENABLE || !sprite_status[1]) $fatal(1,"Read from unsealed sprite");
-            end else if(dut.shared_read.arbiter.owner_blit &&
+            end else if(read_owner_blit &&
                         araddr>=back_base && araddr+(arlen+1)*16<=back_base+BEATS*16) begin
                 // Only the Alpha BLIT's registered arbiter owner may read Back.
             end else if(cpu_session_active && cpu_arvalid && cpu_arready) begin
@@ -370,15 +371,19 @@ begin
  @(negedge axi_clk);paddr=address;pwrite=write_access;pwdata=value;psel=1;penable=0;
  @(negedge axi_clk);penable=1;#1;
  while(!pready) begin @(negedge axi_clk);#1;end
- if(pslverror!==expected_error[0]) $fatal(1,"D APB error addr=%h actual=%b",address,pslverror);
+ if(pslverror!==expected_error[0]) $fatal(1,"D APB error addr=%h actual=%b expected=%b busy=%b queue_count=%0d queue_ready=%b engine_error=%h",address,pslverror,expected_error[0],busy,dut.command_queue_count,command_queue_ready,engine_error);
  @(negedge axi_clk);psel=0;penable=0;
 end endtask
 task start_rect;
 input integer xx,yy,ww,hh,cc;
+integer previous_count;
 begin
+ previous_count=commands;
  if(GRAPHICS) access('hBC,1,0,0);
  access('h10,1,xx,0);access('h14,1,yy,0);access('h18,1,ww,0);access('h1c,1,hh,0);access('h20,1,cc,0);
- access(8,1,1,0);wait(busy || done);@(negedge axi_clk);
+ access(8,1,1,0);
+ if(QUEUE_ENABLE) wait(commands==previous_count+1);
+ wait(busy || done);@(negedge axi_clk);
 end endtask
 task start_blit;
 input integer source,stride,xx,yy,ww,hh;
@@ -411,10 +416,26 @@ initial begin
  wait(final_b_pending);repeat(80) @(negedge axi_clk);
  if(init_done || beats!=BEATS || aws!=lasts || bs!=aws-1 || tpg_frames!=1) $fatal(1,"early handoff");
  release_final_b=1;wait(init_done);wait(draw_ready);
- access(8,1,2,0);access(4,0,0,0);if(prdata!=(ALPHA_ENABLE?'h60000:COLOR_KEY?'h50000:GRAPHICS?'h40000:'h30000))$fatal(1,"D VERSION");
+ access(8,1,2,0);access(4,0,0,0);if(prdata!=(QUEUE_ENABLE?'h70000:ALPHA_ENABLE?'h60000:COLOR_KEY?'h50000:GRAPHICS?'h40000:'h30000))$fatal(1,"D VERSION");
  access('h64,1,0,1);access('h24,0,0,0);if(prdata!=3)$fatal(1,"BUFFER_STATUS RO");
  access('hBC,0,0,GRAPHICS?0:1);access(8,1,2,0);
  wait(frames>=1);
+ if(QUEUE_STRESS_ONLY) begin
+  old_sw=commands;
+  for(round_no=0;round_no<9;round_no=round_no+1)
+   start_rect(64,16,64,32,'h00110000+round_no);
+  wait(commands==old_sw+9);
+  if(!busy || dut.command_queue_count!=8 || command_queue_ready)
+   $fatal(1,"Command queue did not assert full/backpressure after eight pending descriptors");
+  wait(command_queue_ready);
+  if(!busy) $fatal(1,"Queue ready did not recover while the engine was still draining");
+  wait_fill;
+  if(commands!=old_sw+9 || engine_error!=0 ||
+     memory[mem_index(back_base+(16*WIDTH+64)*4)][31:0]!==32'h00110008)
+   $fatal(1,"Queued descriptors were lost, reordered, or failed to drain");
+  $display("PASS v7 queue: nine ordered DMA fills, full/backpressure, readiness recovery while busy, final memory value and drain");
+  $finish;
+ end
  for(round_no=0;round_no<(GRAPHICS?1:4);round_no=round_no+1) begin
   back_slot=buffer_status[1];old_index=buffer_status[0];old_sw=swap_count;
   start_rect(0,0,WIDTH,HEIGHT,round_no%2==0?'h000000ff:0);wait_fill;
@@ -424,6 +445,7 @@ initial begin
   else start_rect(137,27,55,17,'h0000ff00);
   image_tag[back_slot]=round_no%2+1;
   if(round_no==0) begin
+   if(QUEUE_ENABLE) wait_fill;
    request_swap;access('h60,1,1,1);access('h24,0,0,0);if(prdata!=6)$fatal(1,"Duplicate swap request");
    access(8,1,1,1);access('h24,0,0,0);if(prdata!=5 && prdata!=6)$fatal(1,"START pending");
    // CPU island reset must preserve both the command and queued swap.
@@ -515,8 +537,10 @@ integer key_zero_beats=0,key_partial_beats=0;
 reg copy_in_progress=0;
 reg key_in_progress=0;
 wire shared_busy;
+wire read_owner_blit;
 generate if(GRAPHICS) begin: graphics_checks
  assign shared_busy=dut.shared_read.arbiter.busy;
+ assign read_owner_blit=dut.shared_read.arbiter.owner_blit;
  always @(posedge axi_clk) if(rst_n) begin
   if(dut.display_rvalid && dut.b_rvalid) $fatal(1,"Read owners broadcast");
   if(dut.u_ddr_rd_buffer.rvalid !== dut.display_rvalid)
@@ -534,11 +558,12 @@ generate if(GRAPHICS) begin: graphics_checks
  end
 end else begin: no_graphics_checks
  assign shared_busy=0;
+ assign read_owner_blit=0;
 end endgenerate
 task graphics_round;
 integer before_ar,before_aw,before_commands,underflow_before,missed_before,saved_front,k;
 begin
- access('h40,0,0,0);if(prdata!=(ALPHA_ENABLE?'h1fb:COLOR_KEY?'hfb:'h7b)) $fatal(1,"Graphics capabilities");
+ access('h40,0,0,0);if(prdata!=((ALPHA_ENABLE?'h3fb:COLOR_KEY?'hfb:'h7b)|(QUEUE_ENABLE?'h400:0))) $fatal(1,"Graphics capabilities");
  // Reject a source in Back without any memory traffic from the accelerator.
  expect_engine_error=1;
  before_aw=aw_count;before_commands=commands;
@@ -555,6 +580,21 @@ begin
  back_slot=buffer_status[1];old_sw=swap_count;
  start_rect(0,0,WIDTH,HEIGHT,0);wait_fill;
  expect_engine_error=0;
+ if(QUEUE_ENABLE) begin
+  before_commands=commands;
+  for(k=0;k<9;k=k+1) start_rect(64,16,64,32,'h00110000+k);
+  wait(commands==before_commands+9);
+  if(!busy || dut.command_queue_count!=8 || command_queue_ready)
+   $fatal(1,"Command queue did not assert full/backpressure after eight pending descriptors");
+  wait(command_queue_ready);
+  if(!busy) $fatal(1,"Queue ready did not recover while the engine was still draining");
+  wait_fill;
+  if(commands!=before_commands+9 || engine_error!=0 ||
+     memory[mem_index(back_base+(16*WIDTH+64)*4)][31:0]!==32'h00110008)
+   $fatal(1,"Queued descriptors were lost, reordered, or failed to drain");
+  $display("PASS v7 queue: nine ordered DMA fills, full/backpressure, readiness recovery while busy, final memory value and drain");
+  start_rect(64,16,64,32,0);wait_fill;
+ end
  start_rect(0,0,16,16,'hff0000);wait_fill;start_rect(16,0,16,16,'h00ff00);wait_fill;
  start_rect(0,16,16,16,'h0000ff);wait_fill;start_rect(16,16,16,16,'hffffff);wait_fill;
  image_tag[back_slot]=3;request_swap;wait_swap(old_sw);
