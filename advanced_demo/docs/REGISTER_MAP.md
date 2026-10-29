@@ -1,6 +1,27 @@
-# Register Map — advanced_demo v7
+# Register Map — advanced_demo v7 / 窗口构建 v8–v10
 
 本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。高级工程启用ENGINE、双缓冲、BLIT、Color Key、CPU DDR、M2素材、Alpha 与 8 项绘图命令队列；硬件版本为v7。`basic_demo` 保持M2验收基线，高级工程仍需独立综合和上板验收。
+
+默认工程仍为 v7。独立 `DISPLAY_WINDOW_ENABLE=1` 构建为 v8：VERSION=`0x00080000`，
+CAPABILITIES=`0x00000FFB`，新增 bit11 显示窗口；SERVICE_STATUS 新增 bit6 窗口准入策略。
+窗口游戏 ELF 要求能力 `0xE00`；原窗口 ELF 配套 v8，当前修正 HUD 的优化 ELF 支持 v8 / v9 / v10。详见 [WINDOW_DISPLAY.md](WINDOW_DISPLAY.md) 与 [ALPHA_HARDWARE_OPTIMIZATION.md](ALPHA_HARDWARE_OPTIMIZATION.md)。
+WIDTH/HEIGHT/STRIDE 仍为 1920/1080/7680；70/74 每帧终值为 76,800，不是全屏的 518,400。
+v8 的显示 AR 必须逐行覆盖中央区域，跳过行间外围像素，原协议错误与换帧保护继续生效。
+
+独立优化构建 v9 / v10 继续使用同一套寄存器偏移、队列和安全换帧协议：
+
+| 构建 | VERSION（04） | CAPABILITIES（40） | 新能力 |
+|---|---|---|---|
+| v8 | `0x00080000` | `0x00000FFB` | bit11 窗口显示 |
+| v9 | `0x00090000` | `0x00001FFB` | bit12 Alpha 连续供数 |
+| v10 | `0x000A0000` | `0x00003FFB` | bit12 连续供数、bit13 敌弹源图缓存 |
+
+`HARDWARE_VERSION` / `EXTRA_CAPABILITIES` 参数仅改变版本和能力只读值，默认工程仍为 v7。缓存只复用已封存的 16×16 敌弹源图片，仍逐次读取当前 Back 背景；有效标记随平台复位清除，CPU Debug reset 不清除素材封存或缓存。v9 / v10 未新增 APB 寄存器，也没有软件缓存清除操作。
+
+v8 写准入保留 LOW=384 / HIGH=512 迟滞及 B 完成前保持事务的规则。在 reader active 时，
+真实显示 R 达到 quota，或 FIFO 已达到 HIGH，均可准入下一笔有界写事务；低于 LOW 后须恢复到 HIGH。
+这是为避免顶部黑色区域令读 FIFO 预填满、停止新增读额度时阻塞绘图。reader safe 的空闲准入沿用原逻辑。
+因此 v8 的 B4=128 是读额度参数，不代表每笔写都必须新返回 128 拍；bit6 用于识别该策略。
 
 ## Address and Access
 
@@ -21,7 +42,7 @@
 | Offset | 名称 | 访问 | 复位值 / 域 | 位域、含义与清除语义 |
 |---|---|---|---|---|
 | 00 | ACCEL_ID | RO | 0x4143434C / 常量 | ASCII ACCL |
-| 04 | ACCEL_VERSION | RO | 0x00070000 / 常量 | v7 绘图命令队列；保留v6 Alpha、M2素材、Color Key、双缓冲与CPU DDR接口 |
+| 04 | ACCEL_VERSION | RO | 默认 0x00070000 / 常量 | 独立窗口构建 v8 / v9 / v10 的值见上表；保留绘图队列、Alpha、M2素材、Color Key、双缓冲与CPU DDR接口 |
 | 08 | CONTROL | RW/W1 | 0 / C | bit0写1请求START、读0；bit1写1清APB错误；[31:1]保存写值并可读回，其他位无功能 |
 | 0C | STATUS | RO | 0 / P输入与C错误组合 | bit0 BUSY，1 DONE，2 ERROR，3 INIT_DONE，4 OWNER_ACCEL，5 COMMAND_QUEUE_READY；[31:6]=0 |
 | 10 | RECT_X | RW | 0 / C | x，pixel；新START快照，不影响在途命令 |
@@ -36,7 +57,7 @@
 | 34 | FRAME_STRIDE | RO | 7680=0x1E00 / 常量 | bytes/line |
 | 38 | FRAME_WIDTH | RO | 1920=0x780 / 常量 | pixels/line |
 | 3C | FRAME_HEIGHT | RO | 1080=0x438 / 常量 | lines/frame |
-| 40 | CAPABILITIES | RO | 0x000007FB / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT、7 Color Key、8 Alpha、9封存全屏背景、10命令队列；bit2=0 |
+| 40 | CAPABILITIES | RO | 默认 0x000007FB / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT、7 Color Key、8 Alpha、9封存全屏背景、10命令队列、11窗口显示、12 Alpha连续供数、13敌弹源图缓存；bit2=0，按构建启用 |
 | 44 | INIT_DATA_BEATS | RO | 0 / P | 初始化WVALID&&WREADY数，单位128bit beat；INIT_DONE后冻结 |
 | 48 | INIT_AW_BURSTS | RO | 0 / P | 初始化AW握手数，单位burst；完成后冻结 |
 | 4C | INIT_WLAST_BURSTS | RO | 0 / P | 初始化W握手且WLAST数，单位burst；完成后冻结 |

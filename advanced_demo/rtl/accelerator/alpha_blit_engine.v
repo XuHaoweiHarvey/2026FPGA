@@ -7,7 +7,11 @@ module alpha_blit_engine #(
     parameter FRAME_HEIGHT = 1080,
     parameter FRAME_STRIDE = 7680,
     parameter MAX_BURST_BEATS = 32,
-    parameter WATCHDOG_BITS = 27
+    parameter WATCHDOG_BITS = 27,
+    parameter STREAM_ENABLE = 0,
+    // Fixed immutable atlas tile: 16x16 ARGB enemy bullet at x=144,y=0.
+    // Caller must enforce the platform sprite seal/source guard lifetime.
+    parameter SPRITE_CACHE_ENABLE = 0
 )(
     input wire clk, rst_n, enabled, start,
     input wire [31:0] src_addr, src_stride, back_base,
@@ -31,7 +35,7 @@ module alpha_blit_engine #(
     output wire [7:0] awlen,
     output wire awvalid,
     input wire awready,
-    output reg [127:0] wdata,
+    output wire [127:0] wdata,
     output wire [15:0] wstrb,
     output wire wlast, wvalid,
     input wire wready,
@@ -48,19 +52,23 @@ localparam [4:0] IDLE = 0, CHECK = 1, PREP = 2, RD_ADDR = 3,
     WR_RESP = 8, ADVANCE = 9, FAULT = 10,
     CHECK_SPAN = 11, CHECK_END = 12, CHECK_RANGE = 13,
     BG_ADDR = 14, BG_DATA = 15, MIX_LOAD = 16, MIX_START = 17, MIX_WAIT = 18,
-    DRAIN_R = 19;
+    DRAIN_R = 19, MIX_STREAM = 20;
 localparam [63:0] FRAME_BYTES = 64'd1 * FRAME_STRIDE * FRAME_HEIGHT;
 
 reg [4:0] state;
 reg [31:0] saved_back_base;
 reg [7:0] saved_alpha;
 reg [127:0] background_mem [0:MAX_BURST_BEATS-1];
-reg [127:0] mix_source,mix_background;
+reg [127:0] source_read_data,background_read_data;
 wire [127:0] mix_result;
 wire mix_valid;
+reg mix_input_valid;
+reg [8:0] mix_issue_index, mix_return_index;
+reg [127:0] cache_read_data;
+wire [127:0] pixel_foreground = SPRITE_CACHE_ENABLE && cache_use ? cache_read_data : source_read_data;
 alpha_pixel_pipeline pixels (
-    .clk(clk),.rst_n(rst_n),.in_valid(state==MIX_START),
-    .foreground(mix_source),.background(mix_background),.global_alpha(saved_alpha),
+    .clk(clk),.rst_n(rst_n),.in_valid(STREAM_ENABLE ? mix_input_valid : state==MIX_START),
+    .foreground(pixel_foreground),.background(background_read_data),.global_alpha(saved_alpha),
     .out_valid(mix_valid),.result(mix_result));
 reg [31:0] source, source_stride, x, y, copy_width, copy_height;
 reg [31:0] src_row, dst_row, src_cursor, dst_cursor;
@@ -72,6 +80,30 @@ reg segment_read_error;
 reg invalid_geometry_latched;
 reg [31:0] rows_before_last, destination_start_latched;
 reg [63:0] source_span, source_end;
+
+// 64 x 128 bits, no data reset: infer block RAM, reset only validity tags.
+// A row becomes valid only after an entire successful four-beat source read.
+// Clipped draws can hit valid rows, but cannot populate partial rows.
+reg [127:0] sprite_cache [0:63];
+reg [15:0] sprite_cache_valid;
+reg [3:0] cache_row;
+reg [1:0] cache_offset;
+reg cache_use, cache_fill;
+reg cache_address_match;
+reg [3:0] cache_address_row;
+integer cache_decode_row;
+always @* begin
+    cache_address_match = 0; cache_address_row = 0;
+    for (cache_decode_row=0; cache_decode_row<16; cache_decode_row=cache_decode_row+1)
+        if (src_cursor[31:6] == ((32'h01384240 + cache_decode_row*32'd2560) >> 6)) begin
+            cache_address_match = 1; cache_address_row = cache_decode_row;
+        end
+end
+wire cache_eligible = SPRITE_CACHE_ENABLE && cache_address_match &&
+    source_stride == 32'd2560 && segment_beats <= (32'd4 - {30'b0,src_cursor[5:4]});
+wire [8:0] mix_read_index = STREAM_ENABLE ? mix_issue_index : beat_index;
+wire [8:0] source_read_index = state == MIX_LOAD || state == MIX_STREAM ? mix_read_index : beat_index;
+wire [5:0] cache_read_index = {cache_row,2'b00} + {4'b0,cache_offset} + mix_read_index[5:0];
 
 // Keep full precision for rejection of invalid, overflowing addresses. Register
 // subtraction, multiplication, addition and range checking on separate cycles:
@@ -98,7 +130,9 @@ wire last_beat = beat_index == burst_beats - 1'b1;
 wire bad_read = rresp != 2'b00 || rid != 4'b0000;
 wire bad_write = bresp != 2'b00 || bid != 4'b0000;
 wire activity = (arvalid && arready) || (rvalid && rready) ||
-    (awvalid && awready) || (wvalid && wready) || (bvalid && bready);
+    (awvalid && awready) || (wvalid && wready) || (bvalid && bready) ||
+    state == MIX_LOAD || (state == MIX_STREAM &&
+        (mix_issue_index < burst_beats || mix_valid));
 wire timed_out = &watchdog;
 
 assign busy = state != IDLE;
@@ -110,35 +144,55 @@ assign awaddr = dst_cursor;
 assign awlen = burst_beats - 1'b1;
 assign awvalid = state == WR_ADDR;
 assign wstrb = 16'hffff;
+assign wdata = source_read_data;
 assign wvalid = state == WR_DATA;
 assign wlast = wvalid && last_beat;
 assign bready = state == WR_RESP;
 
+wire source_store = state == RD_DATA && rvalid && rready;
+wire mixed_store = mix_valid && (state == MIX_WAIT || (STREAM_ENABLE && state == MIX_STREAM));
+wire [8:0] store_index = STREAM_ENABLE && !source_store ? mix_return_index : beat_index;
+wire [127:0] store_data = source_store ? rdata : mix_result;
+
 // No reset on the storage array. Only entries received by a complete read
 // burst can be used. WR_LOAD below provides a synchronous memory read cycle.
 always @(posedge clk) begin
-    if (rst_n && state == RD_DATA && rvalid && rready)
-        beat_mem[beat_index] <= rdata;
+    if (rst_n && (source_store || mixed_store))
+        beat_mem[store_index] <= store_data;
     if (rst_n && state == BG_DATA && rvalid && rready)
         background_mem[beat_index] <= rdata;
-    if (rst_n && state == MIX_WAIT && mix_valid)
-        beat_mem[beat_index] <= mix_result;
+    if (rst_n && SPRITE_CACHE_ENABLE && cache_fill && state == RD_DATA && rvalid && rready)
+        sprite_cache[{cache_row,beat_index[1:0]}] <= rdata;
+    // Dedicated synchronous read register has no reset or bypass mux, so the
+    // synthesis tool can absorb it into BRAM instead of making 8192 flip-flops.
+    if (SPRITE_CACHE_ENABLE && (state == MIX_LOAD ||
+        (state == MIX_STREAM && mix_issue_index < burst_beats)))
+        cache_read_data <= sprite_cache[cache_read_index];
+    if (state == WR_LOAD || state == MIX_LOAD ||
+        (STREAM_ENABLE && state == MIX_STREAM && mix_issue_index < burst_beats))
+        source_read_data <= beat_mem[source_read_index];
+    if (state == MIX_LOAD ||
+        (STREAM_ENABLE && state == MIX_STREAM && mix_issue_index < burst_beats))
+        background_read_data <= background_mem[mix_read_index];
 end
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         state <= IDLE;
         done <= 0; error_code <= 0; command_count <= 0;
-        saved_back_base<=0;saved_alpha<=0;mix_source<=0;mix_background<=0;
+        saved_back_base<=0;saved_alpha<=0;
         source <= 0; source_stride <= 0; x <= 0; y <= 0;
         copy_width <= 0; copy_height <= 0;
         src_row <= 0; dst_row <= 0; src_cursor <= 0; dst_cursor <= 0;
         rows_left <= 0; beats_left <= 0;
-        burst_beats <= 0; beat_index <= 0; watchdog <= 0; wdata <= 0;
+        burst_beats <= 0; beat_index <= 0; watchdog <= 0;
         segment_read_error <= 0;
         invalid_geometry_latched <= 0; rows_before_last <= 0;
         destination_start_latched <= 0; source_span <= 0; source_end <= 0;
+        mix_input_valid<=0;mix_issue_index<=0;mix_return_index<=0;
+        sprite_cache_valid<=0;cache_row<=0;cache_offset<=0;cache_use<=0;cache_fill<=0;
     end else begin
+        mix_input_valid <= 0;
         if (state == IDLE || activity)
             watchdog <= 0;
         else if (!timed_out)
@@ -192,7 +246,12 @@ always @(posedge clk or negedge rst_n) begin
             end else begin
                 burst_beats <= segment_beats[8:0]; beat_index <= 0;
                 segment_read_error <= 0;
-                state <= RD_ADDR;
+                cache_row <= cache_address_row;
+                cache_offset <= src_cursor[5:4];
+                cache_use <= cache_eligible && sprite_cache_valid[cache_address_row];
+                cache_fill <= cache_eligible && !sprite_cache_valid[cache_address_row] &&
+                    src_cursor[5:4] == 0 && segment_beats == 4;
+                state <= cache_eligible && sprite_cache_valid[cache_address_row] ? BG_ADDR : RD_ADDR;
             end
         end
         RD_ADDR: if (arready) begin
@@ -214,6 +273,8 @@ always @(posedge clk or negedge rst_n) begin
                     if (bad_read || segment_read_error || error_code != 0 || timed_out) begin
                         done <= 1; state <= IDLE;
                     end else begin
+                        if (SPRITE_CACHE_ENABLE && cache_fill)
+                            sprite_cache_valid[cache_row] <= 1;
                         beat_index <= 0; state <= BG_ADDR;
                     end
                 end else
@@ -234,20 +295,36 @@ always @(posedge clk or negedge rst_n) begin
                 if(last_beat) begin
                     if(bad_read || segment_read_error || error_code!=0 || timed_out) begin
                         done<=1;state<=IDLE;
-                    end else begin beat_index<=0;state<=MIX_LOAD;end
+                    end else begin
+                        beat_index<=0;mix_issue_index<=0;mix_return_index<=0;state<=MIX_LOAD;
+                    end
                 end else beat_index<=beat_index+1'b1;
             end
         end
         MIX_LOAD: begin
             // Synchronous reads from the two segment memories.
-            mix_source<=beat_mem[beat_index];mix_background<=background_mem[beat_index];
-            state<=MIX_START;
+            if (STREAM_ENABLE) begin
+                mix_input_valid<=1;mix_issue_index<=1;state<=MIX_STREAM;
+            end else state<=MIX_START;
         end
         MIX_START: state<=MIX_WAIT;
         MIX_WAIT: if(mix_valid) begin
             if(error_code!=0 || timed_out) begin done<=1;state<=IDLE;end
             else if(last_beat) begin beat_index<=0;state<=WR_ADDR;end
             else begin beat_index<=beat_index+1'b1;state<=MIX_LOAD;end
+        end
+        MIX_STREAM: begin
+            // Registered RAM reads feed the existing four-pixel pipeline every
+            // clock. Results return in order into a separate write cursor.
+            if (mix_issue_index < burst_beats) begin
+                mix_input_valid<=1;mix_issue_index<=mix_issue_index+1'b1;
+            end
+            if (mix_valid) begin
+                if (mix_return_index == burst_beats-1'b1) begin
+                    if(error_code!=0 || timed_out) begin done<=1;state<=IDLE;end
+                    else begin beat_index<=0;state<=WR_ADDR;end
+                end else mix_return_index<=mix_return_index+1'b1;
+            end
         end
         DRAIN_R: if(rvalid && rlast) begin
             // Keep the malformed burst outstanding until its actual RLAST.
@@ -258,7 +335,7 @@ always @(posedge clk or negedge rst_n) begin
             beat_index <= 0; state <= WR_LOAD;
         end
         WR_LOAD: begin
-            wdata <= beat_mem[beat_index]; state <= WR_DATA;
+            state <= WR_DATA;
         end
         WR_DATA: if (wready) begin
             if (last_beat)

@@ -10,6 +10,7 @@
 #include "game_logic.h"
 #include "game_debug_abi.h"
 #include "game_runtime.h"
+#include "game_stress_tuning.h"
 #include "uart_keyboard_input.h"
 #ifndef GAME_FLASH_ENABLE
 #define GAME_FLASH_ENABLE 1
@@ -31,6 +32,19 @@
 #ifndef GAME_TEAM_BACKGROUND
 /* Keep art selection independent from the size of the playable viewport. */
 #define GAME_TEAM_BACKGROUND GAME_FULLSCREEN
+#endif
+#ifndef GAME_DISPLAY_WINDOW
+#define GAME_DISPLAY_WINDOW 0
+#endif
+#ifndef GAME_WINDOW_HUD_CACHE
+/* Opt in only in the separate window optimization ELF. */
+#define GAME_WINDOW_HUD_CACHE 0
+#endif
+#if GAME_WINDOW_HUD_CACHE && (!GAME_DISPLAY_WINDOW || !GAME_TEAM_SPRITES)
+#error "Window HUD cache requires the v8 window and hardware sprite/font configuration"
+#endif
+#if GAME_DISPLAY_WINDOW && (GAME_FULLSCREEN || !GAME_TEAM_BACKGROUND)
+#error "Window scan requires the centered supplied-background configuration"
 #endif
 #if GAME_FULLSCREEN && !GAME_TEAM_BACKGROUND
 #error "Fullscreen requires the supplied island background"
@@ -94,7 +108,8 @@ static game_background_dirty_t *g_current_dirty;
 /* Retained symbol lets the desktop loader check the ELF's exact requirements. */
 const volatile uint32_t g_game_required_caps =
     (GAME_TEAM_BACKGROUND ? ACCEL_CAP_FULLSCREEN_BACKGROUND : 0u) |
-    (GAME_REQUIRE_QUEUE ? ACCEL_CAP_COMMAND_QUEUE : 0u);
+    (GAME_REQUIRE_QUEUE ? ACCEL_CAP_COMMAND_QUEUE : 0u) |
+    (GAME_DISPLAY_WINDOW ? ACCEL_CAP_DISPLAY_WINDOW : 0u);
 #endif
 #define VIEW_W GAME_WORLD_WIDTH
 #define VIEW_H GAME_WORLD_HEIGHT
@@ -102,9 +117,29 @@ const volatile game_build_config_t g_game_build_config = {
     GAME_BUILD_CONFIG_MAGIC, 1u, GAME_FULLSCREEN, VIEW_X, VIEW_Y, VIEW_W, VIEW_H,
     GAME_PIXEL_SCALE, GAME_FLASH_ENABLE, GAME_TEAM_SPRITES,
     GAME_PATH_DIAGNOSTICS, GAME_SUBMIT_TIMING, GAME_REQUIRE_QUEUE,
-    GAME_ENEMY_LIMIT, GAME_ENEMY_BULLET_LIMIT, 1920u, 1080u
+    GAME_ENEMY_LIMIT,
+#if GAME_STRESS_TUNING
+    GAME_ENEMY_BULLET_CAPACITY,
+#else
+    GAME_ENEMY_BULLET_LIMIT,
+#endif
+    1920u, 1080u
 };
 volatile uint32_t g_game_measurement_complete;
+#if GAME_WINDOW_HUD_CACHE
+/* Optional retained build marker; existing status/config layouts stay intact. */
+const volatile uint32_t g_game_window_hud_cache = GAME_WINDOW_HUD_CACHE;
+/* Old window ELFs reject v9/v10 in accel_init; let the loader detect that. */
+const volatile uint32_t g_game_alpha_hardware_compatible = UINT32_C(0x3000);
+static uint32_t g_window_background_valid;
+#endif
+#if GAME_STRESS_TUNING
+const volatile game_stress_limits_t g_game_stress_limits = {
+    GAME_STRESS_MAGIC, 1u, GAME_ENEMY_LIMIT, GAME_ENEMY_BULLET_CAPACITY
+};
+volatile game_stress_request_t g_game_stress_request;
+volatile game_stress_status_t g_game_stress_status;
+#endif
 #define SPRITE_PHYS UINT32_C(0x01384000)
 #define SPRITE_STRIDE 2560u
 #define SPRITE_PIXELS (640u * 480u)
@@ -164,8 +199,19 @@ typedef struct {
     char lines[3][64];
     uint32_t refreshed_ms, boss_hp, overlay;
     uint8_t valid;
+#if GAME_WINDOW_HUD_CACHE
+    uint8_t paused;
+#endif
 } game_hud_cache_t;
 static game_hud_cache_t g_hud_cache[2];
+#if GAME_WINDOW_HUD_CACHE
+/* One sampling clock for both physical buffers; each retains its pixel cache. */
+static struct {
+    char line[64];
+    uint32_t refreshed_ms, mode;
+    uint8_t valid;
+} g_hud_metrics;
+#endif
 #endif
 
 static void poll_keyboard(void);
@@ -195,6 +241,12 @@ static void publish_status(void) {
     g_debug_status.auto_restart_ms = g_game.auto_restart_ms;
     g_debug_status.enemy_fire_interval_ms = g_game.enemy_fire_interval_ms;
     g_debug_status.enemy_limit = g_game.enemy_limit;
+#if GAME_STRESS_TUNING
+    g_game_stress_status.magic = GAME_STRESS_MAGIC;
+    g_game_stress_status.version = 1u;
+    g_game_stress_status.enemies = g_game.enemy_limit;
+    g_game_stress_status.enemy_bullets = survival_game_enemy_bullet_limit(&g_game);
+#endif
     g_debug_status.invincible_mode = g_game.invincible_mode;
     g_debug_status.dropped_ms = g_game.dropped_ms;
     g_debug_status.hardware_error = accel_error();
@@ -632,7 +684,10 @@ static GAME_SETUP void initialize_display_background(void) {
     /* TPG initializes only Front0. Clear each Back and present it so both
        double buffers start identical before assets and gameplay are ready. */
     for (i = 0; i < 2u; ++i) {
-        require(accel_fill_rect(0u, 0u, 1920u, 1080u, BACKGROUND));
+        require(accel_fill_rect(GAME_DISPLAY_WINDOW ? VIEW_X : 0u,
+                               GAME_DISPLAY_WINDOW ? VIEW_Y : 0u,
+                               GAME_DISPLAY_WINDOW ? VIEW_W : 1920u,
+                               GAME_DISPLAY_WINDOW ? VIEW_H : 1080u, BACKGROUND));
         require(accel_wait_done());
         check_health();
         require(display_swap_request(&ticket));
@@ -647,7 +702,12 @@ static GAME_SETUP void initialize_centered_island_background(void) {
     /* The sealed island is copied to each physical Back once. Only the
        viewport is restored during gameplay; the surrounding art stays still. */
     for (i = 0u; i < 2u; ++i) {
-        require(accel_blit(FULL_BACKGROUND_PHYS, 7680u, 0u, 0u, 1920u, 1080u));
+        require(accel_blit(FULL_BACKGROUND_PHYS +
+                              (GAME_DISPLAY_WINDOW ? VIEW_Y*7680u+VIEW_X*4u : 0u),
+                          7680u, GAME_DISPLAY_WINDOW ? VIEW_X : 0u,
+                          GAME_DISPLAY_WINDOW ? VIEW_Y : 0u,
+                          GAME_DISPLAY_WINDOW ? VIEW_W : 1920u,
+                          GAME_DISPLAY_WINDOW ? VIEW_H : 1080u));
         require(accel_wait_done());
         check_health();
         require(display_swap_request(&ticket));
@@ -656,10 +716,24 @@ static GAME_SETUP void initialize_centered_island_background(void) {
     }
 }
 
-static void restore_centered_island_background(void) {
-    issue_command(accel_blit(FULL_BACKGROUND_PHYS + VIEW_Y * 7680u + VIEW_X * 4u,
-                            7680u, VIEW_X, VIEW_Y, VIEW_W, VIEW_H));
-    g_game_runtime.background_pixels += VIEW_W * VIEW_H;
+static void restore_centered_island_background(uint32_t back) {
+    uint32_t top = 0u;
+#if GAME_WINDOW_HUD_CACHE
+    uint32_t slot = back == 0u ? 0u : 1u;
+    uint32_t bit = 1u << slot;
+    if (g_window_background_valid & bit) top = GAME_WORLD_TOP;
+    else {
+        /* Recover all pixels after restart/self-test, including the gap
+           between the HUD panel and gameplay; track each physical Back. */
+        g_window_background_valid |= bit;
+        g_hud_cache[slot].valid = 0u;
+    }
+#else
+    (void)back;
+#endif
+    issue_command(accel_blit(FULL_BACKGROUND_PHYS + (VIEW_Y + top) * 7680u + VIEW_X * 4u,
+                            7680u, VIEW_X, VIEW_Y + top, VIEW_W, VIEW_H - top));
+    g_game_runtime.background_pixels += VIEW_W * (VIEW_H - top);
     ++g_game_runtime.background_rectangles;
 }
 #endif
@@ -821,7 +895,7 @@ static void centered_text(uint32_t y, const char *line, uint32_t color) {
 static void render_hud(uint32_t back, uint32_t now_ms) {
     game_hud_cache_t *cache = &g_hud_cache[back == 0u ? 0u : 1u];
     char line[64], *p;
-#if !GAME_FULLSCREEN
+#if !GAME_FULLSCREEN && !GAME_WINDOW_HUD_CACHE
     cache->valid = 0u; /* The legacy view restores its whole background. */
 #endif
     if (!cache->valid) {
@@ -834,8 +908,16 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
     p = append_u32(p, g_game.score % 100000u, 5u); p = append(p, " HP:");
     p = append_u32(p, g_game.lives, 1u); *p = 0;
     cached_hud_line(cache, 0u, line, 0u);
+#if GAME_WINDOW_HUD_CACHE
+    {
+        uint32_t mode = g_game.campaign_stage == GAME_CAMPAIGN_TITLE ? 1u :
+            g_game.paused ? 2u : g_game.game_over ? 3u + g_game.campaign_result : 0u;
+        if (!g_hud_metrics.valid || g_hud_metrics.mode != mode ||
+            (uint32_t)(now_ms - g_hud_metrics.refreshed_ms) >= 250u) {
+#else
     if (!cache->valid || (uint32_t)(now_ms - cache->refreshed_ms) >= 250u ||
         g_game.paused || g_game.game_over || g_game.campaign_stage == GAME_CAMPAIGN_TITLE) {
+#endif
         p = line;
         if (g_game.campaign_stage == GAME_CAMPAIGN_TITLE) p = append(p, "FIRE TO START");
         else if (g_game.paused) p = append(p, "PAUSED P TO CONTINUE");
@@ -845,8 +927,18 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
             p = append(p, " SPR:"); p = append_u32(p, g_game_result.active_sprites, 1u);
             p = append(p, " MAX:"); p = append_u32(p, g_game_result.max_active_sprites, 1u);
         }
-        *p = 0; cached_hud_line(cache, 1u, line, 1u);
+        *p = 0;
+#if GAME_WINDOW_HUD_CACHE
+        { uint32_t i = 0u; do { g_hud_metrics.line[i] = line[i]; } while (line[i++]); }
+        g_hud_metrics.refreshed_ms = now_ms;
+        g_hud_metrics.mode = mode;
+        g_hud_metrics.valid = 1u;
+        }
+        cached_hud_line(cache, 1u, g_hud_metrics.line, 1u);
+#else
+        cached_hud_line(cache, 1u, line, 1u);
         cache->refreshed_ms = now_ms;
+#endif
     }
 #if GAME_FULLSCREEN
     p = line;
@@ -874,7 +966,8 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
         cache->boss_hp = hp;
     }
 #endif
-    if (cache->overlay != g_scene_mode) {
+    if (cache->overlay != g_scene_mode || (GAME_WINDOW_HUD_CACHE && g_scene_mode != 0u)) {
+        /* Window gameplay is restored every frame, including center overlays. */
         uint32_t y = VIEW_H / 2u - 48u;
         if (g_scene_mode == 1u) {
             centered_text(y, "SKY SURVIVOR", 0u);
@@ -889,6 +982,9 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
         cache->overlay = g_scene_mode;
     }
     cache->valid = 1u;
+#if GAME_WINDOW_HUD_CACHE
+    cache->paused = g_game.paused;
+#endif
 }
 #else
 static void render_hud(uint32_t back, uint32_t now_ms) {
@@ -961,6 +1057,16 @@ static void measure_frame(uint32_t now_ms) {
         g_debug_status.measurement_min_sprites = g_rendered_sprites;
     if (g_rendered_sprites > g_debug_status.measurement_max_sprites)
         g_debug_status.measurement_max_sprites = g_rendered_sprites;
+#if GAME_STRESS_TUNING
+    if (g_game_stress_status.rendered_enemies < g_game_stress_status.measurement_min_enemies)
+        g_game_stress_status.measurement_min_enemies = g_game_stress_status.rendered_enemies;
+    if (g_game_stress_status.rendered_enemies > g_game_stress_status.measurement_max_enemies)
+        g_game_stress_status.measurement_max_enemies = g_game_stress_status.rendered_enemies;
+    if (g_game_stress_status.rendered_enemy_bullets < g_game_stress_status.measurement_min_enemy_bullets)
+        g_game_stress_status.measurement_min_enemy_bullets = g_game_stress_status.rendered_enemy_bullets;
+    if (g_game_stress_status.rendered_enemy_bullets > g_game_stress_status.measurement_max_enemy_bullets)
+        g_game_stress_status.measurement_max_enemy_bullets = g_game_stress_status.rendered_enemy_bullets;
+#endif
     ++g_measure_window_frames;
     if ((uint32_t)(now_ms-g_measure_window_ms) >= 1000u) {
         fps = (uint32_t)((uint64_t)g_measure_window_frames * 100000u / (now_ms-g_measure_window_ms));
@@ -1035,10 +1141,13 @@ static void render_frame(uint32_t now_ms) {
     require(accel_command_batch_begin());
 
     g_rendered_sprites = 0u;
+#if GAME_STRESS_TUNING
+    g_game_stress_status.rendered_enemies = g_game_stress_status.rendered_enemy_bullets = 0u;
+#endif
 #if GAME_FULLSCREEN
     restore_game_background(back);
 #elif GAME_TEAM_BACKGROUND
-    restore_centered_island_background();
+    restore_centered_island_background(back);
 #elif GAME_FLASH_ENABLE
     issue_command(accel_blit(ASSET_BASE+((g_game.score/1000u)%3u)*ASSET_BYTES,
                             2560u,VIEW_X,VIEW_Y,VIEW_W,VIEW_H));
@@ -1069,15 +1178,24 @@ static void render_frame(uint32_t now_ms) {
     }
     for (i = 0; i < GAME_ENEMY_LIMIT; ++i) {
         const game_enemy_t *enemy = &g_game.enemies[i];
+#if GAME_STRESS_TUNING
+        uint32_t before = g_rendered_sprites;
+#endif
         if (enemy->active) draw_key_sprite(96u * GAME_PIXEL_SCALE, 0u, enemy->x, enemy->y, GAME_PLAYER_SIZE);
+#if GAME_STRESS_TUNING
+        g_game_stress_status.rendered_enemies += g_rendered_sprites - before;
+#endif
     }
     for (i = 0; i < GAME_BULLET_LIMIT; ++i) {
         const game_bullet_t *bullet = &g_game.bullets[i];
         if (bullet->active) draw_alpha_sprite(128u * GAME_PIXEL_SCALE, 0u,
             bullet->x, bullet->y, GAME_PROJECTILE_SIZE, g_projectile_alpha);
     }
-    for (i = 0; i < GAME_ENEMY_BULLET_LIMIT; ++i) {
+    for (i = 0; i < survival_game_enemy_bullet_limit(&g_game); ++i) {
         const game_enemy_bullet_t *bullet = &g_game.enemy_bullets[i];
+#if GAME_STRESS_TUNING
+        uint32_t before = g_rendered_sprites;
+#endif
         if (bullet->active) {
 #if GAME_TEAM_SPRITES
             draw_alpha_sprite(GAME_TEAM_ENEMY_BULLET_X * GAME_PIXEL_SCALE, 0u,
@@ -1086,6 +1204,9 @@ static void render_frame(uint32_t now_ms) {
             draw_alpha_sprite(24u, 24u, bullet->x, bullet->y, 16u, g_projectile_alpha);
 #endif
         }
+#if GAME_STRESS_TUNING
+        g_game_stress_status.rendered_enemy_bullets += g_rendered_sprites - before;
+#endif
     }
     if (!g_game.game_over) {
         draw_alpha_sprite(16u * GAME_PIXEL_SCALE, 16u * GAME_PIXEL_SCALE,
@@ -1174,6 +1295,10 @@ static void restart_game(uint32_t now_ms) {
     g_fps_window_ms = now_ms;
     g_fps_window_frames = 0u;
     g_last_present_ticks = 0u;
+#if GAME_WINDOW_HUD_CACHE
+    g_window_background_valid = 0u;
+    g_hud_metrics.valid = 0u;
+#endif
 #if GAME_TEAM_SPRITES
     g_hud_cache[0].valid = g_hud_cache[1].valid = 0u;
 #endif
@@ -1233,6 +1358,11 @@ static GAME_SETUP void run_self_test(void) {
     check_health();
     /* Low 16 bits: passed; high 16 bits: readback mismatches. */
     g_debug_status.self_test_result = ((15u & ~failed) | (failed << 16));
+#if GAME_WINDOW_HUD_CACHE
+    g_window_background_valid = 0u;
+    g_hud_metrics.valid = 0u;
+    g_hud_cache[0].valid = g_hud_cache[1].valid = 0u;
+#endif
     g_test_page = 1u;
     g_game_result.phase = GAME_DEBUG_PHASE_TEST_RESULT;
 }
@@ -1274,9 +1404,24 @@ static void service_debug_command(uint32_t now_ms) {
     } else if (command == GAME_DEBUG_CMD_STRESS) {
         restart_game(now_ms);
         survival_game_begin_stress(&g_game, now_ms);
+#if GAME_STRESS_TUNING
+    } else if (command == GAME_DEBUG_CMD_STRESS_LOAD) {
+        uint32_t enemies = g_game_stress_request.enemies;
+        uint32_t bullets = g_game_stress_request.enemy_bullets;
+        if (enemies < 1u || enemies > GAME_ENEMY_LIMIT ||
+            bullets < 1u || bullets > GAME_ENEMY_BULLET_CAPACITY) {
+            g_debug_status.command_result = UINT32_C(0xed05);
+        } else {
+            restart_game(now_ms);
+            (void)survival_game_begin_stress_load(&g_game, now_ms, enemies, bullets);
+            g_game_result.max_active_sprites = 0u;
+            g_debug_status.measurement_state = 0u;
+            g_game_measurement_complete = 0u;
+        }
+#endif
     } else if (command == GAME_DEBUG_CMD_MEASURE_60S && !g_test_page && !g_game.paused &&
                !g_game.game_over && g_game.invincible_mode && g_game.stress_mode &&
-               g_game.enemy_limit == GAME_ENEMY_LIMIT) {
+               (GAME_STRESS_TUNING || g_game.enemy_limit == GAME_ENEMY_LIMIT)) {
         g_game_measurement_complete = 0u;
         g_measure_start = milliseconds();
         g_measure_window_ms = g_measure_start;
@@ -1294,6 +1439,14 @@ static void service_debug_command(uint32_t now_ms) {
         g_debug_status.measurement_min_fps_x100 = UINT32_MAX;
         g_debug_status.measurement_min_sprites = UINT32_MAX;
         g_debug_status.measurement_max_sprites = 0u;
+#if GAME_STRESS_TUNING
+        g_game_stress_status.measurement_enemies = g_game.enemy_limit;
+        g_game_stress_status.measurement_enemy_bullets = survival_game_enemy_bullet_limit(&g_game);
+        g_game_stress_status.measurement_min_enemies = UINT32_MAX;
+        g_game_stress_status.measurement_max_enemies = 0u;
+        g_game_stress_status.measurement_min_enemy_bullets = UINT32_MAX;
+        g_game_stress_status.measurement_max_enemy_bullets = 0u;
+#endif
         g_game_runtime.measurement_max_render_us = 0u;
         g_game_runtime.measurement_max_frame_us = 0u;
         g_game_runtime.measurement_over_budget_frames = 0u;
@@ -1348,9 +1501,20 @@ int main(void) {
     g_debug_control.enemy_fire_interval_ms = 900u;
     g_debug_control.enemy_limit = GAME_ENEMY_LIMIT;
     g_debug_control.projectile_alpha = 225u;
+#if GAME_STRESS_TUNING
+    g_game_stress_request.enemies = GAME_ENEMY_LIMIT;
+    g_game_stress_request.enemy_bullets = GAME_ENEMY_BULLET_LIMIT;
+    if (g_game_stress_limits.magic != GAME_STRESS_MAGIC) fail(ERROR_RENDER);
+    g_game_stress_status.magic = GAME_STRESS_MAGIC;
+    g_game_stress_status.version = 1u;
+#endif
     publish_status();
     require(accel_init());
     if (g_game_build_config.magic != GAME_BUILD_CONFIG_MAGIC) fail(ERROR_RENDER);
+#if GAME_WINDOW_HUD_CACHE
+    if (g_game_window_hud_cache != 1u) fail(ERROR_RENDER);
+    if (g_game_alpha_hardware_compatible != UINT32_C(0x3000)) fail(ERROR_RENDER);
+#endif
 #if GAME_TEAM_BACKGROUND || GAME_REQUIRE_QUEUE
     if ((accel_read(ACCEL_CAPABILITIES) & g_game_required_caps) != g_game_required_caps)
         fail(ERROR_RENDER);

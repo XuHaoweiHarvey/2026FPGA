@@ -8,6 +8,15 @@
 #define GAME_ENEMY_LIMIT 48u
 #define GAME_BULLET_LIMIT 16u
 #define GAME_ENEMY_BULLET_LIMIT 64u
+#ifndef GAME_STRESS_TUNING
+#define GAME_STRESS_TUNING 0
+#endif
+#ifndef GAME_ENEMY_BULLET_CAPACITY
+#define GAME_ENEMY_BULLET_CAPACITY GAME_ENEMY_BULLET_LIMIT
+#endif
+#if GAME_ENEMY_BULLET_CAPACITY < GAME_ENEMY_BULLET_LIMIT
+#error "Enemy bullet pool must retain the original baseline"
+#endif
 #define GAME_EFFECT_LIMIT 8u
 #define GAME_TICK_MS 16u
 #define GAME_EFFECT_LIFETIME_MS 420u
@@ -60,16 +69,31 @@ typedef struct {
     uint32_t invulnerable_until_ms;
     uint32_t boss_next_fire_ms;
     uint8_t campaign_stage, campaign_result, stress_mode;
+#if GAME_STRESS_TUNING
+    uint32_t stress_enemy_bullet_limit;
+#endif
     game_boss_t boss;
     game_enemy_t enemies[GAME_ENEMY_LIMIT];
     game_bullet_t bullets[GAME_BULLET_LIMIT];
-    game_enemy_bullet_t enemy_bullets[GAME_ENEMY_BULLET_LIMIT];
+    game_enemy_bullet_t enemy_bullets[GAME_ENEMY_BULLET_CAPACITY];
     game_effect_t effects[GAME_EFFECT_LIMIT];
 } survival_game_t;
 
 void survival_game_reset(survival_game_t *game, uint32_t now_ms);
 void survival_game_begin_campaign(survival_game_t *game, uint32_t now_ms);
 void survival_game_begin_stress(survival_game_t *game, uint32_t now_ms);
+#if GAME_STRESS_TUNING
+int survival_game_begin_stress_load(survival_game_t *game, uint32_t now_ms,
+                                    uint32_t enemies, uint32_t enemy_bullets);
+#endif
+static inline uint32_t survival_game_enemy_bullet_limit(const survival_game_t *game) {
+#if GAME_STRESS_TUNING
+    return game->stress_mode ? game->stress_enemy_bullet_limit : GAME_ENEMY_BULLET_LIMIT;
+#else
+    (void)game;
+    return GAME_ENEMY_BULLET_LIMIT;
+#endif
+}
 void survival_game_set_options(survival_game_t *game, uint32_t auto_restart_ms,
                                uint32_t enemy_fire_interval_ms, uint8_t enemy_limit,
                                uint8_t invincible_mode);

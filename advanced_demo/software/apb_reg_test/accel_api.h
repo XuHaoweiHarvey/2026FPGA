@@ -83,8 +83,16 @@ static inline uint32_t accel_init(void) {
     accel_cached_command_count_valid=0u;
     accel_cached_descriptor_valid=0u;
     version=accel_read(ACCEL_VERSION);
+#if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
+    if((version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000)) ||
+       !(accel_read(ACCEL_CAPABILITIES)&ACCEL_CAP_DISPLAY_WINDOW)) return UINT32_C(0xE000);
+#endif
     if(accel_read(ACCEL_ID)!=ACCEL_ID_EXPECTED ||
+#if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
+       (version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000))) return UINT32_C(0xE000);
+#else
        (version!=ACCEL_VERSION_EXPECTED && version!=UINT32_C(0x00070000))) return UINT32_C(0xE000);
+#endif
     for(i=0;i<ACCEL_POLL_LIMIT;++i) {
         e=accel_read(ACCEL_ERROR_CODE);if(e) return e;
         s=accel_read(ACCEL_STATUS);bs=accel_read(ACCEL_BUFFER_STATUS);
@@ -95,11 +103,14 @@ static inline uint32_t accel_init(void) {
     caps=accel_read(ACCEL_CAPABILITIES);
     if(accel_read(ACCEL_WIDTH)!=1920 || accel_read(ACCEL_HEIGHT)!=1080 ||
        accel_read(ACCEL_STRIDE)!=7680 ||
-       ((caps&~ACCEL_CAP_FULLSCREEN_BACKGROUND)!=ACCEL_CAPABILITIES_EXPECTED &&
-        (caps&~ACCEL_CAP_FULLSCREEN_BACKGROUND)!=(ACCEL_CAPABILITIES_EXPECTED|ACCEL_CAP_COMMAND_QUEUE)) ||
+       ((caps&~(ACCEL_CAP_FULLSCREEN_BACKGROUND|ACCEL_CAP_DISPLAY_WINDOW|ACCEL_CAP_ALPHA_STREAM|ACCEL_CAP_ALPHA_SPRITE_CACHE))!=ACCEL_CAPABILITIES_EXPECTED &&
+        (caps&~(ACCEL_CAP_FULLSCREEN_BACKGROUND|ACCEL_CAP_DISPLAY_WINDOW|ACCEL_CAP_ALPHA_STREAM|ACCEL_CAP_ALPHA_SPRITE_CACHE))!=(ACCEL_CAPABILITIES_EXPECTED|ACCEL_CAP_COMMAND_QUEUE)) ||
        accel_read(ACCEL_SERVICE_READ_QUOTA)!=128 ||
        accel_read(ACCEL_SERVICE_WATERMARKS)!=UINT32_C(0x02000180) ||
        !(accel_read(ACCEL_SERVICE_STATUS)&(1u<<5))) return UINT32_C(0xE003);
+#if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
+    if(!(accel_read(ACCEL_SERVICE_STATUS)&(1u<<6))) return UINT32_C(0xE003);
+#endif
     accel_cached_capabilities=caps;
     accel_cached_command_count=accel_read(ACCEL_COMMAND_COUNT);
     accel_cached_capabilities_valid=1u;

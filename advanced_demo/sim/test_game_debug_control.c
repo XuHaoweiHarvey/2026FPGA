@@ -1,5 +1,13 @@
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#if defined(GAME_WINDOW_HUD_CACHE) && GAME_WINDOW_HUD_CACHE
+static void mock_hud_draw(uint32_t op, uint32_t src, uint32_t stride,
+                          uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
+#define MOCK_GAME_DRAW mock_hud_draw
+#endif
 
 static uint32_t mock_engine_status, mock_buffer_status, mock_swaps, mock_underflows, mock_missed, mock_boundaries;
 static uint32_t mock_writer_throttle, mock_writer_bursts, mock_reader_ar_stall, mock_reader_r_stall, mock_commands;
@@ -27,6 +35,38 @@ static uint32_t mock_mmio_read(uintptr_t address) { (void)address; return 0u; }
 #define main board_game_main
 #include "../software/interactive_demo/game_main.c"
 #undef main
+
+#if GAME_WINDOW_HUD_CACHE
+static uint32_t *mock_hud_pixels;
+/* Rasterize the actual drawing commands in the protected top band. This
+   catches stale glyphs, wrong source offsets and accidental background clears. */
+static void mock_hud_draw(uint32_t op, uint32_t src, uint32_t stride,
+                          uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color) {
+    uint32_t px, py, pixel, source_offset;
+    if (!mock_hud_pixels) return;
+    for (py = y; py < y + h && py < VIEW_Y + GAME_WORLD_TOP; ++py) {
+        if (py < VIEW_Y) continue;
+        for (px = x; px < x + w && px < VIEW_X + VIEW_W; ++px) {
+            if (px < VIEW_X) continue;
+            if (!op) pixel = color;
+            else {
+                source_offset = src + (py-y)*stride + (px-x)*4u;
+                if (op == 1u) {
+                    assert(source_offset >= FULL_BACKGROUND_PHYS);
+                    source_offset = (source_offset - FULL_BACKGROUND_PHYS) / 4u;
+                    pixel = game_background_pixel(source_offset % 1920u, source_offset / 1920u);
+                } else {
+                    assert(source_offset >= SPRITE_PHYS);
+                    source_offset = (source_offset - SPRITE_PHYS) / 4u;
+                    pixel = atlas_pixel(source_offset % 640u, source_offset / 640u);
+                    if ((pixel & 0xffffffu) == color) continue;
+                }
+            }
+            mock_hud_pixels[(py-VIEW_Y)*VIEW_W + px-VIEW_X] = pixel;
+        }
+    }
+}
+#endif
 
 static void compact_sprites_decode_to_expected_pixels(void) {
     static const uint32_t expected[] = {
@@ -88,18 +128,25 @@ static void centered_game_keeps_the_island_and_only_restores_the_viewport(void) 
     assert(mock_game_display_op_count == 4u);
     assert(mock_game_display_ops[0] == 3u && mock_game_display_ops[1] == 2u);
     assert(mock_game_display_ops[2] == 3u && mock_game_display_ops[3] == 2u);
-    assert(mock_game_blit_source == FULL_BACKGROUND_PHYS);
-    assert(mock_game_blit_x == 0u && mock_game_blit_y == 0u);
-    assert(mock_game_blit_width == 1920u && mock_game_blit_height == 1080u);
+    assert(mock_game_blit_source == FULL_BACKGROUND_PHYS +
+           (GAME_DISPLAY_WINDOW ? 300u*7680u+640u*4u : 0u));
+    assert(mock_game_blit_x == (GAME_DISPLAY_WINDOW ? 640u : 0u));
+    assert(mock_game_blit_y == (GAME_DISPLAY_WINDOW ? 300u : 0u));
+    assert(mock_game_blit_width == (GAME_DISPLAY_WINDOW ? 640u : 1920u));
+    assert(mock_game_blit_height == (GAME_DISPLAY_WINDOW ? 480u : 1080u));
     survival_game_reset(&g_game, 0u);
+#if GAME_WINDOW_HUD_CACHE
+    g_window_background_valid = 0u;
+#endif
     for (i = 0u; i < 3u; ++i) {
+        uint32_t top = GAME_WINDOW_HUD_CACHE && i != 0u ? GAME_WORLD_TOP : 0u;
         uint32_t before = mock_game_blits;
         render_frame(i * 17u);
         assert(mock_game_blits == before + 1u);
-        assert(mock_game_blit_source == FULL_BACKGROUND_PHYS + 300u * 7680u + 640u * 4u);
-        assert(mock_game_blit_x == 640u && mock_game_blit_y == 300u);
-        assert(mock_game_blit_width == 640u && mock_game_blit_height == 480u);
-        assert(g_game_runtime.background_pixels == 640u * 480u);
+        assert(mock_game_blit_source == FULL_BACKGROUND_PHYS + (300u+top) * 7680u + 640u * 4u);
+        assert(mock_game_blit_x == 640u && mock_game_blit_y == 300u+top);
+        assert(mock_game_blit_width == 640u && mock_game_blit_height == 480u-top);
+        assert(g_game_runtime.background_pixels == 640u * (480u-top));
         assert(g_game_runtime.background_rectangles == 1u);
     }
     g_game.enemy_limit = 0u;
@@ -250,7 +297,7 @@ static void both_display_buffers_start_with_the_same_fullscreen_background(void)
     mock_underflows = 0u;
     mock_missed = 0u;
     initialize_display_background();
-    assert(mock_game_fullscreen_fills == 2u);
+    assert(mock_game_fullscreen_fills == (GAME_DISPLAY_WINDOW ? 0u : 2u));
     assert(mock_game_swaps == 2u);
     assert(mock_game_display_op_count == 4u);
     assert(mock_game_display_ops[0] == 1u && mock_game_display_ops[1] == 2u);
@@ -301,13 +348,15 @@ static void hardware_hud_is_cached_and_gameplay_cannot_erase_it(void) {
     first = mock_game_keys;
     assert(first > 20u);
     render_hud(0u, 20u);
-#if GAME_FULLSCREEN
+#if GAME_FULLSCREEN || GAME_WINDOW_HUD_CACHE
     assert(mock_game_keys == first); /* No glyph writes for unchanged slot. */
     render_hud(0x00800000u, 20u);
     assert(mock_game_keys == 2u * first); /* Independent physical-slot cache. */
     g_game.lives = 2u;
     render_hud(0u, 40u);
     assert(mock_game_keys > 2u * first);
+#endif
+#if GAME_FULLSCREEN
     g_current_dirty = &g_background_dirty[0];
     for (i = 0u; i < GAME_DIRTY_ROWS * GAME_DIRTY_WORDS; ++i)
         g_current_dirty->rows[i / GAME_DIRTY_WORDS][i % GAME_DIRTY_WORDS] = 0u;
@@ -326,6 +375,157 @@ static void hardware_hud_is_cached_and_gameplay_cannot_erase_it(void) {
 #endif
     g_game.enemy_limit = 0u;
 }
+
+#if GAME_WINDOW_HUD_CACHE
+static void optimized_window_hud_matches_full_redraw(uint32_t origin) {
+    static uint32_t pixels[2][GAME_WORLD_TOP * VIEW_W];
+    static uint32_t reference[GAME_WORLD_TOP * VIEW_W];
+    static const uint32_t times[] = {0u, 17u, 34u, 251u, 268u, 285u, 302u, 319u};
+    uint32_t step, slot;
+    survival_game_reset(&g_game, origin);
+    g_scene_mode = 0u;
+    g_window_background_valid = 0u;
+    g_hud_cache[0].valid = g_hud_cache[1].valid = 0u;
+    g_hud_metrics.valid = 0u;
+    g_game_result.fps_x100 = 6000u;
+    g_game_result.active_sprites = 520u;
+    g_game_result.max_active_sprites = 530u;
+    memset(pixels, 0xa5, sizeof(pixels)); /* Previous self-test/corrupted panel. */
+    for (step = 0u; step < sizeof(times)/sizeof(times[0]); ++step) {
+        g_game.score = step & 1u ? 99999u : 0u; /* Long-to-short changes clear old pixels. */
+        g_game.lives = step & 1u ? 1u : 3u;
+        g_game.paused = step == 4u;
+        for (slot = 0u; slot < 2u; ++slot) {
+            uint32_t back = slot ? 0x00800000u : 0u;
+            uint32_t now = origin + times[step];
+            game_hud_cache_t saved;
+            mock_hud_pixels = pixels[slot];
+            restore_centered_island_background(back);
+            assert(mock_game_blit_y == VIEW_Y + (step ? GAME_WORLD_TOP : 0u));
+            render_hud(back, now);
+            saved = g_hud_cache[slot];
+            mock_hud_pixels = reference;
+            (void)accel_blit(FULL_BACKGROUND_PHYS + VIEW_Y*7680u + VIEW_X*4u,
+                             7680u, VIEW_X, VIEW_Y, VIEW_W, VIEW_H);
+            g_hud_cache[slot].valid = 0u;
+            render_hud(back, now); /* Independent full-redraw reference. */
+            assert(!memcmp(pixels[slot], reference, sizeof(reference)));
+            g_hud_cache[slot] = saved;
+        }
+    }
+    mock_hud_pixels = 0;
+    assert(g_window_background_valid == 3u);
+    restart_game(origin + 400u);
+    assert(!g_window_background_valid && !g_hud_cache[0].valid && !g_hud_cache[1].valid);
+    restore_centered_island_background(0u);
+    assert(mock_game_blit_y == VIEW_Y && mock_game_blit_height == VIEW_H);
+    restore_centered_island_background(0x00800000u);
+    assert(mock_game_blit_y == VIEW_Y && mock_game_blit_height == VIEW_H);
+    g_game.enemy_limit = 0u;
+}
+
+static void optimized_hud_refreshes_metrics_and_pause_prompt(uint32_t origin) {
+    uint32_t first;
+    char line[64];
+    survival_game_reset(&g_game, origin);
+    g_scene_mode = 0u;
+    g_hud_cache[0].valid = 0u;
+    g_hud_metrics.valid = 0u;
+    g_game_result.fps_x100 = 6000u;
+    render_hud(0u, origin);
+    first = mock_game_keys;
+    memcpy(line, g_hud_cache[0].lines[1], sizeof(line));
+    g_game_result.fps_x100 = 5912u;
+    render_hud(0u, origin + 249u);
+    assert(mock_game_keys == first && !strcmp(line, g_hud_cache[0].lines[1]));
+    render_hud(0u, origin + 250u);
+    assert(mock_game_keys > first && strstr(g_hud_cache[0].lines[1], "59.12"));
+    g_game.paused = 1u;
+    render_hud(0u, origin + 251u);
+    assert(strstr(g_hud_cache[0].lines[1], "PAUSED"));
+    g_game.paused = 0u;
+    render_hud(0u, origin + 252u);
+    assert(strstr(g_hud_cache[0].lines[1], "FPS:") &&
+           !strstr(g_hud_cache[0].lines[1], "PAUSED"));
+    g_game.enemy_limit = 0u;
+}
+
+static void optimized_hud_uses_shared_samples_across_alternating_buffers(uint32_t origin) {
+    char sampled[64];
+    uint32_t first;
+    survival_game_reset(&g_game, origin);
+    g_scene_mode = 0u;
+    g_hud_cache[0].valid = g_hud_cache[1].valid = 0u;
+    g_hud_metrics.valid = 0u;
+    g_game_result.active_sprites = 520u;
+    render_hud(0u, origin);
+    memcpy(sampled, g_hud_cache[0].lines[1], sizeof(sampled));
+    g_game_result.active_sprites = 522u;
+    render_hud(0x00800000u, origin + 17u);
+    assert(!strcmp(sampled, g_hud_cache[1].lines[1]));
+    g_game_result.active_sprites = 519u;
+    render_hud(0u, origin + 249u);
+    assert(!strcmp(sampled, g_hud_cache[0].lines[1]));
+    g_game_result.active_sprites = 524u;
+    render_hud(0x00800000u, origin + 266u);
+    assert(strstr(g_hud_cache[1].lines[1], "SPR:524"));
+    g_game_result.active_sprites = 521u;
+    render_hud(0u, origin + 283u);
+    assert(!strcmp(g_hud_cache[0].lines[1], g_hud_cache[1].lines[1]));
+    first = mock_game_keys;
+    render_hud(0x00800000u, origin + 300u);
+    assert(first == mock_game_keys);
+    g_game.paused = 1u;
+    render_hud(0u, origin + 301u);
+    render_hud(0x00800000u, origin + 318u);
+    assert(!strcmp(g_hud_cache[0].lines[1], g_hud_cache[1].lines[1]));
+    assert(strstr(g_hud_cache[1].lines[1], "PAUSED"));
+    g_game.paused = 0u;
+    render_hud(0x00800000u, origin + 335u);
+    render_hud(0u, origin + 352u);
+    assert(!strcmp(g_hud_cache[0].lines[1], g_hud_cache[1].lines[1]));
+    assert(strstr(g_hud_cache[0].lines[1], "SPR:521"));
+    g_game.enemy_limit = 0u;
+}
+
+static void optimized_window_center_overlays_survive_background_restore(void) {
+    uint32_t first, stage;
+    survival_game_reset(&g_game, 0u);
+    for (stage = 0u; stage < 3u; ++stage) {
+        g_game.campaign_stage = stage == 0u ? GAME_CAMPAIGN_TITLE : 1u;
+        g_game.game_over = stage != 0u;
+        g_game.campaign_result = stage == 1u ? 1u : 2u;
+        render_frame(100u + stage*100u);
+        first = mock_game_keys;
+        render_frame(117u + stage*100u);
+        assert(mock_game_keys > first); /* Center title/result text is redrawn. */
+    }
+    restart_game(500u);
+    render_frame(500u);
+    assert(!g_scene_mode && g_hud_cache[1].valid);
+    g_game.enemy_limit = 0u;
+}
+
+static void optimized_fixed_load_reduces_background_and_font_work(void) {
+    uint32_t pixels, glyphs, sprites;
+    survival_game_reset(&g_game, 0u);
+    assert(survival_game_begin_stress_load(&g_game, 0u, 48u, 470u));
+    g_window_background_valid = 0u;
+    render_frame(0u);
+    render_frame(17u);
+    pixels = g_game_runtime.background_pixels;
+    glyphs = g_game_runtime.glyph_blits;
+    sprites = g_rendered_sprites;
+    assert(pixels == 640u*408u && !glyphs);
+    g_window_background_valid = 0u;
+    render_frame(34u); /* Full background + forced HUD redraw, as in baseline. */
+    assert(g_game_runtime.background_pixels == 640u*480u);
+    assert(g_game_runtime.glyph_blits > glyphs && g_rendered_sprites == sprites);
+    printf("PASS offline fixed 48/470 scene: background pixels %u -> %u; font BLITs %u -> %u; sprite count unchanged at %u (not board timing)\n",
+           g_game_runtime.background_pixels, pixels, g_game_runtime.glyph_blits, glyphs, sprites);
+    g_game.enemy_limit = 0u;
+}
+#endif
 
 static void stress_command_and_measurement_preconditions_are_enforced(void) {
     send_command(GAME_DEBUG_CMD_MEASURE_60S, 2500u);
@@ -369,6 +569,12 @@ static void measurement_uses_completed_frames_and_keeps_raw_counters(void) {
     g_debug_status.measurement_min_fps_x100 = UINT32_MAX;
     g_debug_status.measurement_min_sprites = UINT32_MAX;
     g_debug_status.measurement_max_sprites = 0u;
+#if GAME_STRESS_TUNING
+    g_game_stress_status.measurement_min_enemies = UINT32_MAX;
+    g_game_stress_status.measurement_max_enemies = 0u;
+    g_game_stress_status.measurement_min_enemy_bullets = UINT32_MAX;
+    g_game_stress_status.measurement_max_enemy_bullets = 0u;
+#endif
     g_measure_start = g_measure_window_ms = 0u;
     g_measure_window_frames = 0u;
     g_measure_swap_base = 50u;
@@ -395,6 +601,10 @@ static void measurement_uses_completed_frames_and_keeps_raw_counters(void) {
         mock_reader_r_stall += 5u;
         mock_commands += 6u;
         g_rendered_sprites = i & 1u ? 80u : 96u;
+#if GAME_STRESS_TUNING
+        g_game_stress_status.rendered_enemies = i & 1u ? 11u : 12u;
+        g_game_stress_status.rendered_enemy_bullets = i & 1u ? 500u : 512u;
+#endif
         measure_frame(i*1000u/60u);
     }
     assert(g_debug_status.measurement_state == 2u);
@@ -402,6 +612,12 @@ static void measurement_uses_completed_frames_and_keeps_raw_counters(void) {
     assert(g_debug_status.measurement_frames == 3600u && g_debug_status.measurement_swaps == 3600u);
     assert(g_debug_status.measurement_min_fps_x100 == 6000u);
     assert(g_debug_status.measurement_min_sprites == 80u && g_debug_status.measurement_max_sprites == 96u);
+#if GAME_STRESS_TUNING
+    assert(g_game_stress_status.measurement_min_enemies == 11u &&
+           g_game_stress_status.measurement_max_enemies == 12u);
+    assert(g_game_stress_status.measurement_min_enemy_bullets == 500u &&
+           g_game_stress_status.measurement_max_enemy_bullets == 512u);
+#endif
     assert(!g_debug_status.measurement_underflows && !g_debug_status.measurement_missed);
     assert(g_game_runtime.measurement_display_frames == 3600u && !g_game_runtime.measurement_repeated_frames);
     assert(g_game_runtime.measurement_writer_throttle_cycles_lo == 10800u &&
@@ -421,6 +637,43 @@ static void measurement_uses_completed_frames_and_keeps_raw_counters(void) {
     assert(g_game_runtime.measurement_repeated_frames == 1u);
 }
 
+#if GAME_STRESS_TUNING
+static void dynamic_stress_commands_validate_and_measure_actual_draws(void) {
+    g_game_stress_request.enemies = 12u;
+    g_game_stress_request.enemy_bullets = 512u;
+    send_command(GAME_DEBUG_CMD_STRESS_LOAD, 2900u);
+    assert(!g_debug_status.command_result && g_game.enemy_limit == 12u);
+    assert(g_game.stress_mode && survival_game_enemy_bullet_limit(&g_game) == 512u);
+    assert(!g_game_measurement_complete && !g_debug_status.measurement_state);
+    render_frame(2900u);
+    assert(g_game_stress_status.rendered_enemies == 12u);
+    assert(g_game_stress_status.rendered_enemy_bullets == 512u);
+    g_game.enemy_bullets[511].x = GAME_WORLD_WIDTH;
+    g_game.enemies[11].x = GAME_WORLD_WIDTH;
+    render_frame(2910u);
+    assert(g_game_stress_status.rendered_enemies == 11u);
+    assert(g_game_stress_status.rendered_enemy_bullets == 511u);
+    g_game_stress_request.enemy_bullets = 513u;
+    send_command(GAME_DEBUG_CMD_STRESS_LOAD, 2920u);
+    assert(g_debug_status.command_result == 0xed05u);
+    assert(g_game.enemy_limit == 12u && survival_game_enemy_bullet_limit(&g_game) == 512u);
+    send_command(GAME_DEBUG_CMD_MEASURE_60S, 2930u);
+    assert(!g_debug_status.command_result && g_debug_status.measurement_state == 1u);
+    assert(g_game_stress_status.measurement_enemies == 12u &&
+           g_game_stress_status.measurement_enemy_bullets == 512u);
+    g_game_stress_request.enemy_bullets = 1u;
+    send_command(GAME_DEBUG_CMD_STRESS_LOAD, 2940u);
+    assert(g_debug_status.command_result == 0xed04u);
+    assert(survival_game_enemy_bullet_limit(&g_game) == 512u);
+    g_debug_status.measurement_state = 0u;
+    send_command(GAME_DEBUG_CMD_STRESS_LOAD, 2950u);
+    assert(!g_debug_status.command_result && survival_game_enemy_bullet_limit(&g_game) == 1u);
+    assert(!g_game.enemy_bullets[511].active);
+    send_command(GAME_DEBUG_CMD_STRESS, 2960u);
+    assert(survival_game_sprite_count(&g_game, 2960u) == 114u);
+}
+#endif
+
 int main(void) {
     compact_sprites_decode_to_expected_pixels();
 #if GAME_TEAM_BACKGROUND
@@ -437,9 +690,22 @@ int main(void) {
     explosion_frames_and_fade_follow_game_time(UINT32_MAX - 200u);
     both_display_buffers_start_with_the_same_fullscreen_background();
     hardware_hud_is_cached_and_gameplay_cannot_erase_it();
+#if GAME_WINDOW_HUD_CACHE
+    optimized_window_hud_matches_full_redraw(0u);
+    optimized_window_hud_matches_full_redraw(UINT32_MAX - 100u);
+    optimized_hud_refreshes_metrics_and_pause_prompt(0u);
+    optimized_hud_refreshes_metrics_and_pause_prompt(UINT32_MAX - 100u);
+    optimized_hud_uses_shared_samples_across_alternating_buffers(0u);
+    optimized_hud_uses_shared_samples_across_alternating_buffers(UINT32_MAX - 100u);
+    optimized_window_center_overlays_survive_background_restore();
+    optimized_fixed_load_reduces_background_and_font_work();
+#endif
     control_commands_run_once_and_preserve_configuration();
     owned_hardware_and_measurement_reject_transitions();
     stress_command_and_measurement_preconditions_are_enforced();
+#if GAME_STRESS_TUNING
+    dynamic_stress_commands_validate_and_measure_actual_draws();
+#endif
     measurement_uses_completed_frames_and_keeps_raw_counters();
     return 0;
 }

@@ -14,7 +14,9 @@ module rgb_framebuffer #(
     parameter WRITE_FIFO_LOW=RD_FIFO_DEPTH*3/8, WRITE_FIFO_HIGH=RD_FIFO_DEPTH/2,
     parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000,
     parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0, ALPHA_ENABLE=0,
-    parameter COMMAND_QUEUE_ENABLE=0, COMMAND_QUEUE_DEPTH=8
+    parameter COMMAND_QUEUE_ENABLE=0, COMMAND_QUEUE_DEPTH=8,
+    parameter DISPLAY_WINDOW_ENABLE=0,
+    parameter ALPHA_STREAM_ENABLE=0, ALPHA_SPRITE_CACHE_ENABLE=0
 )(
     input wire axi_clk, input wire rst_n,
     input wire i_clk, input wire i_frame_start, input wire i_de,
@@ -76,6 +78,7 @@ module rgb_framebuffer #(
     output wire cpu_rlast,output wire cpu_rvalid,input wire cpu_rready
 );
 localparam [24:0] FRAME_BEATS = FRAME_WIDTH * FRAME_HEIGHT / 4;
+localparam [24:0] DISPLAY_BEATS = DISPLAY_WINDOW_ENABLE ? 640*480/4 : FRAME_BEATS;
 wire [$clog2(COMMAND_QUEUE_DEPTH+1)-1:0] command_queue_count;
 wire [31:0] command_accept_count;
 wire [255:0] command_queue_head;
@@ -320,7 +323,8 @@ generate if(C_MODE) begin: c_control
             .width(dispatch_width),.height(dispatch_height),.src_range_valid(source_valid));
         graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
             .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),
-            .ALPHA_ENABLE(ALPHA_ENABLE)) engine (
+            .ALPHA_ENABLE(ALPHA_ENABLE),.ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),
+            .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE)) engine (
             .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
             .op(dispatch_op),.x(dispatch_x),.y(dispatch_y),.width(dispatch_width),.height(dispatch_height),.color(dispatch_color),
             .src_addr(dispatch_src_addr),.src_stride(dispatch_src_stride),.back_base(d_back_base),
@@ -365,6 +369,17 @@ always @(posedge axi_clk or negedge axi_rst_n)
 wire reader_start=D_MODE ? d_launch : C_MODE ? (read_armed && fifo_rd_period) : fifo_rd_period;
 wire [127:0] rd_fifo_data;
 wire rd_fifo_empty, rd_fifo_read;
+generate if(DISPLAY_WINDOW_ENABLE) begin: window_reader
+    window_display_reader #(.FIFO_DEPTH(RD_FIFO_DEPTH)) reader (
+        .clk(axi_clk),.rst_n(axi_rst_n),.start(reader_start),.flush(rd_fifo_reset),
+        .frame_base(rd_base),.video_clk(o_clk),.fifo_read(rd_fifo_read),
+        .fifo_data(rd_fifo_data),.fifo_empty(rd_fifo_empty),
+        .idle(d_reader_idle),.fifo_write_empty(d_fifo_empty),.fifo_level(reader_fifo_level),
+        .araddr(display_araddr),.arlen(display_arlen),.arvalid(display_arvalid),.arready(display_arready),
+        .rdata(display_rdata),.rvalid(display_rvalid),.rlast(display_rlast),.rready(display_rready));
+    assign rd_id=0;assign display_arsize=4;assign display_arburst=1;
+    assign display_arcache=3;assign display_arprot=2;assign display_arlock=0;assign rd_sw=0;
+end else begin: full_reader
 ddr_rd_buffer #(.AXI_DATA_WIDTH(128), .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
     .RD_FIFO_DEPTH(RD_FIFO_DEPTH), .BURST_LEN(BURST_LEN)) u_ddr_rd_buffer (
     .axi_clk(axi_clk), .axi_clk_rst_n(axi_rst_n), .start(reader_start),
@@ -380,6 +395,7 @@ ddr_rd_buffer #(.AXI_DATA_WIDTH(128), .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
     .rid({{(6-AXI_ID_WIDTH){1'b0}},display_rid}), .rdata(display_rdata),
     .rlast(display_rlast), .rvalid(display_rvalid), .rready(display_rready), .rresp(display_rresp)
 );
+end endgenerate
 generate if(BLIT_ENABLE) begin: shared_read
     ddr_read_arbiter #(.FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH)) arbiter (
         .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),
@@ -412,7 +428,7 @@ generate if(D_MODE) begin: d_buffers
                       !(CPU_DDR_ENABLE && (cpu_ddr_error!=0 || cpu_session_fault)) &&
                       !(CPU_DDR_ENABLE && cpu_ddr_acquire);
     ddr_write_admission #(.ENABLE(WRITE_SERVICE_ENABLE),.READ_QUOTA(WRITE_READ_QUOTA),
-        .FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH)) write_service (
+        .FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH),.WINDOW_MODE(DISPLAY_WINDOW_ENABLE)) write_service (
         .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),
         .raw_awvalid(active_awvalid),.ddr_awready(awready),
         .bvalid(active_bvalid),.bready(active_bready),
@@ -432,7 +448,7 @@ generate if(D_MODE) begin: d_buffers
     video_frame_cdc frame_cdc (
         .video_clk(o_clk),.video_rst_n(rd_rst_n),.video_period(fifo_rd_period),
         .core_clk(axi_clk),.core_rst_n(axi_rst_n),.boundary_tick(d_boundary),.blank_active(d_blank));
-    read_frame_guard #(.FRAME_BEATS(FRAME_BEATS)) guard (
+    read_frame_guard #(.FRAME_BEATS(DISPLAY_BEATS),.STRIDED(DISPLAY_WINDOW_ENABLE)) guard (
         .clk(axi_clk),.rst_n(axi_rst_n),.launch(d_launch),.frame_base(reader_frame_base),
         .reader_idle(d_reader_idle),.araddr(display_araddr),.arlen(display_arlen),.arsize(display_arsize),.arburst(display_arburst),
         .arvalid(display_arvalid),.arready(display_arready),.rvalid(display_rvalid),.rready(display_rready),
@@ -469,16 +485,26 @@ end else begin: no_swaps
 end endgenerate
 // Derive normal FIFO read latency locally; the legacy rdvalid output is not
 // used across clock domains. The unpacker reserves space for its pending read.
+generate if(DISPLAY_WINDOW_ENABLE) begin: window_output
+window_axis_composer #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT)) composer (
+    .clk(o_clk),.rst_n(rd_rst_n),.frame_period(fifo_rd_period),
+    .fifo_data(rd_fifo_data),.fifo_empty(rd_fifo_empty),.fifo_read(rd_fifo_read),
+    .m_axis_tdata(m_axis_tdata),.m_axis_tvalid(m_axis_tvalid),.m_axis_tready(m_axis_tready),
+    .m_axis_tuser(m_axis_tuser),.m_axis_tlast(m_axis_tlast));
+end else begin: full_output
 rgb_unpack128_to64 #(.FRAME_WIDTH(FRAME_WIDTH), .FRAME_HEIGHT(FRAME_HEIGHT)) u_unpack (
     .clk(o_clk), .rst_n(rd_rst_n), .frame_period(fifo_rd_period),
     .fifo_data(rd_fifo_data), .fifo_empty(rd_fifo_empty), .fifo_read(rd_fifo_read),
     .m_axis_tdata(m_axis_tdata), .m_axis_tvalid(m_axis_tvalid),
     .m_axis_tready(m_axis_tready), .m_axis_tuser(m_axis_tuser), .m_axis_tlast(m_axis_tlast)
 );
+end endgenerate
 // synthesis translate_off
 initial if(D_MODE && (WRITE_FIFO_HIGH>=RD_FIFO_DEPTH || WRITE_FIFO_LOW<16))
     $fatal(1,"Display service watermarks must fit the actual FIFO depth");
 initial begin
+    if(DISPLAY_WINDOW_ENABLE && (!D_MODE || FRAME_WIDTH!=1920 || FRAME_HEIGHT!=1080))
+        $fatal(1,"Window scan requires the 1080p double-buffered platform");
     if(BLIT_ENABLE && (!C_MODE || !D_MODE)) $fatal(1,"BLIT requires the double-buffered platform");
     if(COLOR_KEY_ENABLE && !BLIT_ENABLE) $fatal(1,"Color key requires BLIT support");
     if(D_MODE && (!C_MODE || AXI_ID_WIDTH!=4 || AXI_ADDR_WIDTH!=32 || BUFFER0_BASE!=0 ||

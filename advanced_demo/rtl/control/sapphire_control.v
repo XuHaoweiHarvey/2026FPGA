@@ -3,7 +3,9 @@ module sapphire_control #(
     parameter COLOR_KEY_ENABLE = 0,
     parameter CPU_DDR_ENABLE = 0,
     parameter ALPHA_ENABLE = 0,
-    parameter COMMAND_QUEUE_ENABLE = 0
+    parameter COMMAND_QUEUE_ENABLE = 0,
+    parameter DISPLAY_WINDOW_ENABLE = 0,
+    parameter [31:0] HARDWARE_VERSION = 0, EXTRA_CAPABILITIES = 0
 )(
     input wire core_clk,
     input wire platform_rst_n,
@@ -164,7 +166,9 @@ end else begin: no_cpu_ddr
 end endgenerate
 accel_regs #(.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),.BLIT_ENABLE(1),
     .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(CPU_DDR_ENABLE),
-    .ALPHA_ENABLE(ALPHA_ENABLE),.COMMAND_QUEUE_ENABLE(COMMAND_QUEUE_ENABLE)) u_accel_regs (
+    .ALPHA_ENABLE(ALPHA_ENABLE),.COMMAND_QUEUE_ENABLE(COMMAND_QUEUE_ENABLE),
+    .DISPLAY_WINDOW_ENABLE(DISPLAY_WINDOW_ENABLE),.HARDWARE_VERSION(HARDWARE_VERSION),
+    .EXTRA_CAPABILITIES(EXTRA_CAPABILITIES)) u_accel_regs (
     .PCLK(core_clk), .PRESETn(soc_rst_n && !system_reset),
     .PADDR({16'b0,apb_addr}), .PSEL(apb_sel), .PENABLE(apb_enable), .PWRITE(apb_write),
     .PWDATA(apb_wdata), .PRDATA(apb_rdata), .PREADY(apb_ready), .PSLVERROR(apb_error),

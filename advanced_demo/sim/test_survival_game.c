@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <string.h>
 #include "../software/interactive_demo/game_logic.h"
 
 static void movement_is_bounded(void) {
@@ -254,6 +255,46 @@ static void campaign_failure_and_stress_remain_distinct(void) {
     assert(game.stress_mode && game.enemy_limit == 48u && minimum >= 114u);
 }
 
+#if GAME_STRESS_TUNING
+static void dynamic_stress_loads_resize_and_stay_visible(uint32_t origin) {
+    static const uint32_t loads[] = {1u, 64u, 128u, 256u, 512u, 17u};
+    survival_game_t game, saved;
+    uint32_t load, i, step, now = origin;
+    survival_game_reset(&game, now);
+    for (load = 0u; load < sizeof(loads)/sizeof(loads[0]); ++load) {
+        uint32_t enemies = load & 1u ? 1u : GAME_ENEMY_LIMIT;
+        assert(survival_game_begin_stress_load(&game, now, enemies, loads[load]));
+        assert(game.enemy_limit == enemies && game.invincible_mode && game.stress_mode);
+        assert(survival_game_enemy_bullet_limit(&game) == loads[load]);
+        assert(survival_game_sprite_count(&game, now) == enemies + loads[load] + 2u);
+        for (i = 0u; i < loads[load]; ++i) {
+            assert(game.enemy_bullets[i].x >= 0 && game.enemy_bullets[i].y >= (int32_t)GAME_WORLD_TOP);
+            assert((uint32_t)game.enemy_bullets[i].x + GAME_PROJECTILE_SIZE <= GAME_WORLD_WIDTH);
+            assert((uint32_t)game.enemy_bullets[i].y + GAME_PROJECTILE_SIZE <= GAME_WORLD_HEIGHT);
+        }
+        for (step = 0u; step < 400u; ++step) {
+            now += GAME_TICK_MS;
+            survival_game_step(&game, UART_KEY_FIRE, now);
+            for (i = 0u; i < GAME_ENEMY_LIMIT; ++i)
+                assert((game.enemies[i].active != 0u) == (i < enemies));
+            for (i = 0u; i < GAME_ENEMY_BULLET_CAPACITY; ++i)
+                assert((game.enemy_bullets[i].active != 0u) == (i < loads[load]));
+        }
+    }
+    saved = game;
+    assert(!survival_game_begin_stress_load(&game, now, 0u, 64u));
+    assert(!survival_game_begin_stress_load(&game, now, 49u, 64u));
+    assert(!survival_game_begin_stress_load(&game, now, 48u, 0u));
+    assert(!survival_game_begin_stress_load(&game, now, 48u, GAME_ENEMY_BULLET_CAPACITY + 1u));
+    assert(!memcmp(&game, &saved, sizeof(game)));
+    survival_game_begin_stress(&game, now);
+    assert(survival_game_sprite_count(&game, now) == 114u);
+    survival_game_begin_campaign(&game, now);
+    assert(!game.stress_mode && survival_game_enemy_bullet_limit(&game) == 64u);
+    for (i = 0u; i < GAME_ENEMY_BULLET_CAPACITY; ++i) assert(!game.enemy_bullets[i].active);
+}
+#endif
+
 int main(void) {
     survival_game_t easy,normal,hard;
     survival_game_reset(&easy,0);survival_game_reset(&normal,0);survival_game_reset(&hard,0);
@@ -278,5 +319,9 @@ int main(void) {
     campaign_reaches_both_boss_phases_and_restarts(0u);
     campaign_reaches_both_boss_phases_and_restarts(UINT32_MAX - 10000u);
     campaign_failure_and_stress_remain_distinct();
+#if GAME_STRESS_TUNING
+    dynamic_stress_loads_resize_and_stay_visible(0u);
+    dynamic_stress_loads_resize_and_stay_visible(UINT32_MAX - 1000u);
+#endif
     return 0;
 }

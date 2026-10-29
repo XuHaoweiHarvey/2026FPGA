@@ -25,8 +25,8 @@ class DebugWindow:
         self.uart_port = None
         self.last_status = {}
         root.title("Ti60 常驻游戏调试")
-        root.geometry("960x760")
-        root.minsize(840, 660)
+        root.geometry("960x840")
+        root.minsize(840, 740)
         box = ttk.Frame(root, padding=12)
         box.pack(fill="both", expand=True)
         self.elf = tk.StringVar(value=str(elf))
@@ -61,6 +61,21 @@ class DebugWindow:
             ttk.Entry(options, textvariable=variable, width=18).grid(row=1, column=i, padx=5)
         ttk.Checkbutton(options, text="无敌调试", variable=self.invincible).grid(row=1, column=4, padx=8)
         ttk.Button(options, text="应用", command=self.apply).grid(row=1, column=5, padx=8)
+        self.stress_enemies = tk.StringVar(value="48")
+        self.stress_bullets = tk.StringVar(value="64")
+        ttk.Label(options, text="压力敌机 1–48").grid(row=2, column=0, pady=(10,0))
+        ttk.Label(options, text="压力敌弹（容量由 ELF 决定）").grid(row=2, column=1, pady=(10,0))
+        ttk.Entry(options, textvariable=self.stress_enemies, width=18).grid(row=3, column=0, padx=5)
+        ttk.Entry(options, textvariable=self.stress_bullets, width=18).grid(row=3, column=1, padx=5)
+        ttk.Button(options, text="应用压力负载", command=self.apply_stress).grid(row=3, column=2, padx=5)
+        presets = ttk.Frame(options)
+        presets.grid(row=3, column=3, columnspan=3, sticky="w")
+        for count in (64, 128, 256, 384, 512):
+            ttk.Button(presets, text=str(count), width=5,
+                       command=lambda n=count: self.select_stress_preset(n)).pack(side="left", padx=1)
+        self.stress_note = tk.StringVar(value="新增调参需要专用压力 ELF；上方“满负载场景”保留原 48 敌机 / 64 敌弹。")
+        ttk.Label(options, textvariable=self.stress_note, wraplength=880).grid(
+            row=4, column=0, columnspan=6, sticky="w", pady=(5,0))
         uart = ttk.LabelFrame(box, text="键盘串口（WASD / 方向键移动，空格射击，P 暂停）", padding=8)
         uart.grid(row=5, column=0, columnspan=7, sticky="ew")
         self.port = tk.StringVar(value="")
@@ -197,16 +212,34 @@ class DebugWindow:
     def read(self):
         self.run(lambda: self.require_bridge().snapshot(), self.show_status)
 
-    def send(self, command, options=None):
+    def send(self, command, options=None, stress=None):
         def done(sequence):
             if command == 8:
                 self.invincible.set(True)
                 self.cap.set("48")
                 self.delay.set("0")
+                self.stress_enemies.set("48")
+                self.stress_bullets.set("64")
                 self.log("压力场景：持续补充 48 架敌机、64 发敌弹，自动射击；建议稳定 3 秒后再测量。重开/进入游戏可返回关卡。")
+            if command == 9:
+                self.invincible.set(True)
+                self.cap.set(str(stress[0]))
+                self.delay.set("0")
+                self.log(f"已请求动态压力负载：{stress[0]} 架敌机、{stress[1]} 发敌弹；等待板上确认。")
             self.log(f"已提交命令 {command}，序号 {sequence}；等待板上确认")
             self.root.after(700, lambda: self.read_ack(sequence))
-        self.run(lambda: self.require_bridge().command(command, options), done)
+        self.run(lambda: self.require_bridge().command(command, options, stress=stress), done)
+
+    def select_stress_preset(self, count):
+        self.stress_bullets.set(str(count))
+        self.log(f"敌弹数量已填为 {count}；点击“应用压力负载”后生效")
+
+    def apply_stress(self):
+        try:
+            values = (int(self.stress_enemies.get()), int(self.stress_bullets.get()))
+        except ValueError:
+            return self.log("压力敌机和敌弹数量必须是整数")
+        self.send(9, stress=values)
 
     def read_ack(self, sequence):
         def done(status):
@@ -253,6 +286,12 @@ class DebugWindow:
                      f'最低秒窗 {status["measurement_min_fps_x100"]/100:.2f} FPS，'
                      f'精灵范围 {status["measurement_min_sprites"]}–{status["measurement_max_sprites"]}，'
                      f'underflow {status["measurement_underflows"]}，missed {status["measurement_missed"]}')
+            load = status.get("stress_load")
+            if load:
+                self.log(f'本轮配置：{load["measurement_enemies"]} 敌机 / {load["measurement_enemy_bullets"]} 敌弹；'
+                         f'实际绘制敌机 {load["measurement_min_enemies"]}–{load["measurement_max_enemies"]}，'
+                         f'实际绘制敌弹 {load["measurement_min_enemy_bullets"]}–{load["measurement_max_enemy_bullets"]}。'
+                         '总 Sprite 范围还包含玩家、玩家子弹与爆炸。')
             runtime = status.get("runtime", {})
             if runtime:
                 diagnostics = runtime.get("measurement_path_diagnostics", 0)
@@ -298,6 +337,23 @@ class DebugWindow:
                          f'精灵 {status.get("active_sprites")}/峰值 {status.get("max_active_sprites")} | '
                          f'错误 0x{status.get("error", 0):04x}')
         runtime = status.get("runtime", {})
+        limits = status.get("stress_limits")
+        if limits:
+            self.stress_note.set(f'本 ELF 支持敌机 1–{limits["enemies"]}、敌弹 1–{limits["enemy_bullets"]}；'
+                                 '应用后等待 3 秒，再点连续测量 60 秒。')
+        else:
+            self.stress_note.set("当前 ELF 不支持动态压力数量；原版满负载仍可用，调参请加载专用压力 ELF。")
+        load = status.get("stress_load")
+        if load and runtime.get("stress_mode"):
+            self.summary.set(self.summary.get() +
+                             f' | 负载 {load["enemies"]} 敌机 / {load["enemy_bullets"]} 敌弹')
+        if status.get("render_options", {}).get("window_hud_cache"):
+            self.summary.set(self.summary.get() + " | 背景/HUD 优化版")
+        hardware_options = status.get("hardware_optimizations", {})
+        if hardware_options.get("enemy_bullet_source_cache"):
+            self.summary.set(self.summary.get() + " | v10 Alpha流水线+敌弹缓存")
+        elif hardware_options.get("alpha_stream"):
+            self.summary.set(self.summary.get() + " | v9 Alpha流水线")
         if runtime:
             stage = runtime["campaign_stage"]
             scene = ("通关" if runtime["campaign_result"] == 1 else

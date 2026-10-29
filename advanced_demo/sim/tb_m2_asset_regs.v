@@ -2,6 +2,7 @@
 module tb_m2_asset_regs;
 parameter WAIT_CYCLES=0;
 parameter ALPHA_ENABLE=0;
+parameter [31:0] HARDWARE_VERSION=0,EXTRA_CAPABILITIES=0;
 reg clk=0,rst_n=0,sel=0,enable=0,wr=0;
 always #5 clk=~clk;
 reg [31:0] addr=0,data=0,cpu_status=32'h10,cpu_error=0,reader_error=0;
@@ -14,7 +15,8 @@ wire [31:0] asset_status={1'b1,28'b0,1'b0,sealed,loading};
 wire [31:0] sprite_status={1'b1,28'b0,1'b0,sprite_sealed,sprite_loading};
 accel_regs #(.WAIT_CYCLES(WAIT_CYCLES),.ENGINE_ENABLE(1),.DOUBLE_BUFFER(1),
              .BLIT_ENABLE(1),.COLOR_KEY_ENABLE(1),.CPU_DDR_ENABLE(1),
-             .ALPHA_ENABLE(ALPHA_ENABLE)) dut (
+             .ALPHA_ENABLE(ALPHA_ENABLE),.HARDWARE_VERSION(HARDWARE_VERSION),
+             .EXTRA_CAPABILITIES(EXTRA_CAPABILITIES)) dut (
     .PCLK(clk),.PRESETn(rst_n),.PADDR(addr),.PSEL(sel),.PENABLE(enable),
     .PWRITE(wr),.PWDATA(data),.PRDATA(rdata),.PREADY(ready),.PSLVERROR(error),
     .display_buffer_base(32'b0),.tpg_write_buffer_base(32'h00800000),
@@ -49,8 +51,8 @@ end
 endtask
 initial begin
     repeat(3) @(negedge clk);rst_n=1;
-    tx(0,'h04,0,ALPHA_ENABLE?'h60000:'h50000,0);
-    tx(0,'h40,0,ALPHA_ENABLE?'h3fb:'hfb,0);
+    tx(0,'h04,0,HARDWARE_VERSION?HARDWARE_VERSION:ALPHA_ENABLE?'h60000:'h50000,0);
+    tx(0,'h40,0,(ALPHA_ENABLE?'h3fb:'hfb)|EXTRA_CAPABILITIES,0);
     tx(0,'hDC,0,'h80000000,0);
     tx(1,'hD8,2,0,1);tx(1,8,2,0,0); // seal before load
     tx(1,'hD8,1,0,0);tx(0,'hDC,0,'h80000001,0);
@@ -65,7 +67,8 @@ initial begin
     @(negedge clk);rst_n=0;@(negedge clk);rst_n=1;
     tx(0,'hDC,0,'h80000002,0); // control reset cannot unseal platform DDR
     if(ALPHA_ENABLE) begin
-        tx(0,'h04,0,'h60000,0);tx(0,'h40,0,'h3fb,0);
+        tx(0,'h04,0,HARDWARE_VERSION?HARDWARE_VERSION:'h60000,0);
+        tx(0,'h40,0,'h3fb|EXTRA_CAPABILITIES,0);
         tx(0,'hE4,0,'h80000000,0);
         tx(1,'hE0,1,0,0);tx(0,'hE4,0,'h80000001,0);
         tx(1,'hE0,1,0,1);tx(1,8,2,0,0);

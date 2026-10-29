@@ -14,12 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from game_debug_bridge import (APB, CONTROL_MAGIC, DEFAULT_ELF, DEFAULT_IDE, DebugBridge,
                                ElfImage, STATUS_FIELDS, STATUS_MAGIC, RUNTIME_FIELDS,
-                               LEGACY_RUNTIME_FIELDS, inspection_config, tcl_word)
+                               LEGACY_RUNTIME_FIELDS, STRESS_MAGIC, STRESS_STATUS_FIELDS,
+                               inspection_config, tcl_word)
+
+STRESS_ELF = ROOT / "software/interactive_demo/build/game-window640-stress/survival_game.elf"
+OPTIMIZED_ELF = ROOT / "software/interactive_demo/build/game-window640-stress-opt/survival_game.elf"
 
 
 class FakeBridge(DebugBridge):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, elf=DEFAULT_ELF):
+        super().__init__(elf=elf)
         self.cpu = "running"
         self.writes, self.calls = [], []
         self.memory = {}
@@ -77,6 +81,140 @@ class FakeBridge(DebugBridge):
 
 
 class DebugTests(unittest.TestCase):
+    def test_optimized_window_pair_and_build_marker_keep_dynamic_load_contract(self):
+        if not OPTIMIZED_ELF.exists():
+            self.skipTest("Build scripts/build_window_stress_optimized_game.cmd first")
+        bridge = FakeBridge(OPTIMIZED_ELF)
+        self.assertEqual(bridge.image.symbol_u32("g_game_window_hud_cache"), 1)
+        self.assertEqual(bridge.image.symbol_u32("g_game_required_caps"), 0xE00)
+        self.assertEqual(bridge.stress_limits(), {"enemies": 48, "enemy_bullets": 512})
+        self.assertEqual(bridge.image.symbols["g_debug_control"][1], 32)
+        self.assertEqual(bridge.image.symbols["g_debug_status"][1], len(STATUS_FIELDS)*4)
+        self.assertTrue(bridge.snapshot()["render_options"]["window_hud_cache"])
+        self.assertFalse(FakeBridge(STRESS_ELF).snapshot()["render_options"]["window_hud_cache"])
+        with self.assertRaisesRegex(RuntimeError, "必须配套"):
+            bridge.load()
+        self.assertFalse(any(call.startswith("load_image ") for call in bridge.calls))
+        bridge.memory[APB+4] = 0x80000
+        bridge.memory[APB+0x40] = 0xFFB
+        bridge.load()
+        self.assertIn(f"resume {bridge.image.entry:#x}", bridge.calls)
+        self.assertEqual(bridge.command(9, stress=(48, 470)), 1)
+
+    def stress_bridge(self):
+        if not STRESS_ELF.exists():
+            self.skipTest("Build scripts/build_window_stress_game.cmd first")
+        bridge = FakeBridge(STRESS_ELF)
+        bridge.memory[APB+4] = 0x80000
+        bridge.memory[APB+0x40] = 0xFFB
+        return bridge
+
+    def test_alpha_hardware_pairing_and_optimization_report(self):
+        for version, features in ((0x80000,0), (0x90000,0x1000), (0xA0000,0x3000)):
+            with self.subTest(version=version):
+                bridge = FakeBridge(OPTIMIZED_ELF)
+                self.assertEqual(bridge.image.symbol_u32('g_game_alpha_hardware_compatible'), 0x3000)
+                bridge.memory[APB+4] = version
+                bridge.memory[APB+0x40] = 0xFFB | features
+                bridge.load()
+                self.assertIn(f'resume {bridge.image.entry:#x}', bridge.calls)
+                options = bridge.snapshot()['hardware_optimizations']
+                self.assertEqual(options['alpha_stream'], bool(features & 0x1000))
+                self.assertEqual(options['enemy_bullet_source_cache'], bool(features & 0x2000))
+        for elf in (STRESS_ELF, ROOT/'software/interactive_demo/build/game-window640/survival_game.elf'):
+            bridge = FakeBridge(elf)
+            bridge.memory[APB+4] = 0xA0000
+            bridge.memory[APB+0x40] = 0x3FFB
+            with self.assertRaisesRegex(RuntimeError, '新优化 ELF'):
+                bridge.load()
+            self.assertFalse(any(call.startswith('load_image ') for call in bridge.calls))
+        bridge = FakeBridge(OPTIMIZED_ELF)
+        bridge.memory[APB+4] = 0xA0000
+        bridge.memory[APB+0x40] = 0x1FFB
+        with self.assertRaisesRegex(RuntimeError, '能力位不一致'):
+            bridge.load()
+        self.assertFalse(any(call.startswith('load_image ') for call in bridge.calls))
+
+    def test_dynamic_stress_abi_capacity_and_ram_bounds(self):
+        bridge = self.stress_bridge()
+        self.assertEqual(bridge.stress_limits(), {"enemies": 48, "enemy_bullets": 512})
+        self.assertEqual(bridge.image.symbols["g_game_stress_request"][1], 8)
+        self.assertEqual(bridge.image.symbols["g_game_stress_status"][1], len(STRESS_STATUS_FIELDS)*4)
+        self.assertLessEqual(bridge.image.symbols["_sp"][0], 0xF900FC00)
+        header = (ROOT / "software/interactive_demo/game_stress_tuning.h").read_text()
+        body = re.search(r"typedef struct \{([^}]+)\} game_stress_status_t;", header).group(1)
+        names = re.findall(r"uint32_t ([^;]+);", body)
+        self.assertEqual([item.strip() for group in names for item in group.split(",")], STRESS_STATUS_FIELDS)
+        address = bridge.image.symbol("g_game_stress_status", len(STRESS_STATUS_FIELDS)*4)
+        for i, value in enumerate((STRESS_MAGIC, 1, 12, 512, 11, 511, 10, 12, 500, 512, 12, 512)):
+            bridge.memory[address+i*4] = value
+        status = bridge.snapshot()
+        self.assertEqual(status["stress_limits"]["enemy_bullets"], 512)
+        self.assertEqual(status["stress_load"]["measurement_min_enemy_bullets"], 500)
+        bridge.load()
+        self.assertIn(f"resume {bridge.image.entry:#x}", bridge.calls)
+
+    def test_dynamic_stress_commits_request_before_command_and_sequence(self):
+        bridge = self.stress_bridge()
+        request = bridge.image.symbol("g_game_stress_request", 8)
+        control = bridge.image.symbol("g_debug_control", 32)
+        self.assertEqual(bridge.command(9, stress=(12, 512)), 1)
+        self.assertEqual(bridge.writes, [(request, 12), (request+4, 512),
+                                         (control+8, 9), (control+4, 1)])
+        self.assertEqual(bridge.cpu, "running")
+
+    def test_dynamic_stress_invalid_or_legacy_requests_do_not_write(self):
+        for values in (None, (0, 64), (49, 64), (48, 0), (48, 513), (12, 128.5)):
+            with self.subTest(values=values):
+                bridge = self.stress_bridge()
+                with self.assertRaises(ValueError):
+                    bridge.command(9, stress=values)
+                self.assertEqual(bridge.writes, [])
+                self.assertEqual(bridge.cpu, "running")
+        bridge = FakeBridge()
+        with self.assertRaisesRegex(RuntimeError, "专用压力"):
+            bridge.command(9, stress=(48, 128))
+        self.assertEqual(bridge.writes, [])
+        self.assertNotIn("stress_limits", bridge.snapshot())
+
+    def test_dynamic_load_measurement_accepts_smaller_enemy_count_and_locks_commands(self):
+        bridge = self.stress_bridge()
+        bridge.set_status(invincible_mode=1, enemy_limit=12)
+        address, fields, _ = bridge.runtime_layout()
+        bridge.memory[address + 4*fields.index("stress_mode")] = 1
+        self.assertEqual(bridge.command(7), 1)
+        bridge.set_status(acknowledged_sequence=1, measurement_state=1)
+        before = list(bridge.writes)
+        with self.assertRaisesRegex(RuntimeError, "测量尚未结束"):
+            bridge.command(9, stress=(48, 64))
+        self.assertEqual(bridge.writes, before)
+
+    def test_dynamic_stress_gui_presets_inputs_and_legacy_notice(self):
+        import tkinter as tk
+        from game_debug_window import DebugWindow
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            window = DebugWindow(root, STRESS_ELF)
+            window.send = Mock()
+            window.select_stress_preset(256)
+            self.assertEqual(window.stress_bullets.get(), "256")
+            window.send.assert_not_called()
+            window.stress_enemies.set("12")
+            window.apply_stress()
+            window.send.assert_called_once_with(9, stress=(12, 256))
+            window.send.reset_mock()
+            window.stress_bullets.set("a")
+            window.apply_stress()
+            window.send.assert_not_called()
+            self.assertIn("必须是整数", window.rows[-1]["message"])
+            window.show_status({"stress_limits": {"enemies": 48, "enemy_bullets": 512}})
+            self.assertIn("512", window.stress_note.get())
+            window.show_status({})
+            self.assertIn("专用压力", window.stress_note.get())
+        finally:
+            root.destroy()
+
     def test_elf_abi_matches_c(self):
         image = ElfImage(DEFAULT_ELF)
         self.assertEqual(image.symbols["g_debug_control"][1], 32)
@@ -202,6 +340,39 @@ class DebugTests(unittest.TestCase):
         self.assertNotIn("resume", bridge.calls[:image_call])
         self.assertIn(f"resume {bridge.image.entry:#x}", bridge.calls[image_call:])
         self.assertEqual(bridge.cpu, "running")
+
+    def test_window_pairing_checked_before_any_ram_write(self):
+        window_elf = ROOT / "software/interactive_demo/build/game-window640/survival_game.elf"
+        if not window_elf.exists():
+            self.skipTest("Build scripts/build_window_game.cmd to exercise the v8 pair")
+        for elf, required, version in ((DEFAULT_ELF, 0x600, 0x80000),
+                                      (window_elf, 0xE00, 0x70000)):
+            with self.subTest(elf=elf):
+                bridge = FakeBridge(elf)
+                self.assertEqual(bridge.image.symbol_u32("g_game_required_caps"), required)
+                bridge.memory[APB+4] = version
+                bridge.memory[APB+0x40] = 0xFFB
+                with self.assertRaisesRegex(RuntimeError, "必须配套"):
+                    bridge.load()
+                self.assertEqual(bridge.writes, [])
+                self.assertFalse(any(call.startswith("load_image ") for call in bridge.calls))
+                self.assertEqual(bridge.cpu, "running")
+        bridge = FakeBridge(window_elf)
+        bridge.memory[APB+4] = 0x80000
+        bridge.memory[APB+0x40] = 0xFFB
+        bridge.load()
+        self.assertIn(f"resume {bridge.image.entry:#x}", bridge.calls)
+
+    def test_window_elf_requires_window_capability_even_with_v8_version(self):
+        window_elf = ROOT / "software/interactive_demo/build/game-window640/survival_game.elf"
+        if not window_elf.exists():
+            self.skipTest("Window ELF not built")
+        bridge = FakeBridge(window_elf)
+        bridge.memory[APB+4] = 0x80000
+        with self.assertRaisesRegex(RuntimeError, "中央窗口 v8 bit"):
+            bridge.load()
+        self.assertEqual(bridge.writes, [])
+        self.assertFalse(any(call.startswith("load_image ") for call in bridge.calls))
 
     def test_fullscreen_elf_rejects_old_bit_before_ram_write(self):
         bridge = FakeBridge()

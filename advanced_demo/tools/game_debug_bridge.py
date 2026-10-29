@@ -13,6 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IDE = Path("D:/Efinity/efinity-riscv-ide-2026.1")
 DEFAULT_ELF = ROOT / "software/interactive_demo/build/game/survival_game.elf"
 CONTROL_MAGIC, STATUS_MAGIC = 0x47444331, 0x47445331
+STRESS_MAGIC = 0x47535431
+STRESS_STATUS_FIELDS = ("magic version enemies enemy_bullets rendered_enemies rendered_enemy_bullets "
+                        "measurement_min_enemies measurement_max_enemies "
+                        "measurement_min_enemy_bullets measurement_max_enemy_bullets "
+                        "measurement_enemies measurement_enemy_bullets").split()
 RUNTIME_FIELDS = ("magic publication campaign_stage campaign_result boss_hp "
                   "render_us frame_us max_render_us max_frame_us over_budget_frames "
                   "measurement_max_render_us measurement_max_frame_us measurement_over_budget_frames "
@@ -235,6 +240,16 @@ class DebugBridge:
             return address, LEGACY_RUNTIME_FIELDS, True
         return None
 
+    def stress_limits(self):
+        if "g_game_stress_limits" not in self.image.symbols:
+            return None
+        values = [self.image.symbol_u32("g_game_stress_limits", i) for i in range(4)]
+        if values[:2] != [STRESS_MAGIC, 1] or not (1 <= values[2] <= 48 and 1 <= values[3] <= 4096):
+            raise RuntimeError("压力调参 ELF 的容量信息不正确")
+        self.image.symbol("g_game_stress_request", 8)
+        self.image.symbol("g_game_stress_status", 4*len(STRESS_STATUS_FIELDS))
+        return {"enemies": values[2], "enemy_bullets": values[3]}
+
     def verify_code(self):
         for address, data in self.image.code:
             for start in range(0, len(data), 1024):
@@ -283,6 +298,17 @@ class DebugBridge:
                 if marker and marker[1] >= 4:
                     status["measurement_complete"] = bool(
                         self.read_words(self.image.symbol("g_game_measurement_complete", 4), 1)[0])
+                status["render_options"] = {
+                    "window_hud_cache": bool(self.image.symbol_u32("g_game_window_hud_cache"))
+                    if "g_game_window_hud_cache" in self.image.symbols else False
+                }
+                limits = self.stress_limits()
+                if limits:
+                    status["stress_limits"] = limits
+                    values = self.read_words(self.image.symbol("g_game_stress_status",
+                                             4*len(STRESS_STATUS_FIELDS)), len(STRESS_STATUS_FIELDS))
+                    if values[:2] == [STRESS_MAGIC, 1]:
+                        status["stress_load"] = dict(zip(STRESS_STATUS_FIELDS, values))
             else:
                 values = self.read_words(self.image.symbol("g_game_result", 96), 24)
                 status = dict(zip(LEGACY_FIELDS, values))
@@ -291,13 +317,17 @@ class DebugBridge:
                 status["legacy_read_only"] = True
             hardware = self.read_words(APB, 2)
             status["hardware_id"], status["hardware_version"] = hardware
+            status["hardware_optimizations"] = {
+                "alpha_stream": hardware[1] in (0x00090000, 0x000A0000),
+                "enemy_bullet_source_cache": hardware[1] == 0x000A0000,
+            }
             status["cpu_was_running"] = running
             status["jtag_halts"] = self.halts
             status["measurement_disturbed"] = True
             status["host_monotonic"] = time.monotonic()
             return status
 
-    def command(self, command, options=None):
+    def command(self, command, options=None, stress=None):
         with self.halted() as running:
             if not running:
                 raise RuntimeError("CPU 原本已暂停。请先在原调试器继续运行，再发送游戏命令。")
@@ -315,6 +345,17 @@ class DebugBridge:
                 raise RuntimeError("固件仍在初始化，请稍后再试")
             if status["phase"] == 255:
                 raise RuntimeError("固件处于故障状态；请导出日志检查首个错误")
+            if status["measurement_state"] == 1:
+                raise RuntimeError("60 秒测量尚未结束，不能调整负载或发送命令")
+            limits = self.stress_limits()
+            if command == 9:
+                if not limits:
+                    raise RuntimeError("当前 ELF 不支持动态压力数量；请加载专用压力调参 ELF，v8 bit 无需重烧")
+                if (stress is None or len(stress) != 2 or
+                        not all(isinstance(v, int) for v in stress) or
+                        not 1 <= stress[0] <= limits["enemies"] or
+                        not 1 <= stress[1] <= limits["enemy_bullets"]):
+                    raise ValueError(f'敌机须为 1–{limits["enemies"]}，敌弹须为 1–{limits["enemy_bullets"]}')
             if command == 7 and (status["phase"] != 4 or not status["invincible_mode"]):
                 raise RuntimeError("测量前先应用无敌模式，再进入游戏；可等弹幕达到目标数量后测量")
             runtime_layout = self.runtime_layout()
@@ -326,7 +367,8 @@ class DebugBridge:
                 runtime_address, runtime_fields, _ = runtime_layout
                 runtime = self.read_words(runtime_address, len(runtime_fields))
                 if (runtime[0] != 0x47525431 or
-                        not runtime[runtime_fields.index("stress_mode")] or status["enemy_limit"] != 48):
+                        not runtime[runtime_fields.index("stress_mode")] or
+                        (not limits and status["enemy_limit"] != 48)):
                     raise RuntimeError("请先点击“满负载场景”，等画面稳定后再测量 60 秒")
             sequence = (words[1] + 1) & 0xFFFFFFFF
             if options is not None:
@@ -336,6 +378,10 @@ class DebugBridge:
                     raise ValueError("参数范围不正确")
                 for i, value in enumerate(options, 3):
                     self.rpc(f"mww {address+i*4:#x} {value:#x}")
+            if command == 9:
+                request = self.image.symbol("g_game_stress_request", 8)
+                for i, value in enumerate(stress):
+                    self.rpc(f"mww {request+i*4:#x} {value:#x}")
             self.rpc(f"mww {address+8:#x} {int(command):#x}")
             # Sequence is the commit word, always written last while halted.
             self.rpc(f"mww {address+4:#x} {sequence:#x}")
@@ -351,13 +397,25 @@ class DebugBridge:
             retry_after_running = False
             with self.halted() as was_running:
                 hardware = self.read_words(APB, 2)
-                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000):
-                    raise RuntimeError("硬件 ID/版本不匹配，需要 advanced v6/v7 位流")
+                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000, 0x00080000, 0x00090000, 0x000A0000):
+                    raise RuntimeError("硬件 ID/版本不匹配，需要配套 advanced v6/v7/v8/v9/v10 位流")
+                required = (self.image.symbol_u32("g_game_required_caps")
+                            if "g_game_required_caps" in self.image.symbols else 0)
+                if bool(required & 0x800) != (hardware[1] in (0x00080000, 0x00090000, 0x000A0000)):
+                    raise RuntimeError("窗口读取 v8 bit 与专用窗口 ELF 必须配套；全屏/旧居中 ELF 使用原 v7 bit。")
+                if hardware[1] in (0x00090000, 0x000A0000):
+                    if ("g_game_alpha_hardware_compatible" not in self.image.symbols or
+                            self.image.symbol_u32("g_game_alpha_hardware_compatible") != 0x3000):
+                        raise RuntimeError("v9/v10 硬件需加载修正 SPR 后的新优化 ELF；旧窗口 ELF 请配原 v8 bit。")
+                    expected_features = 0x1000 if hardware[1] == 0x00090000 else 0x3000
+                    if self.read_words(APB+0x40, 1)[0] & 0x3000 != expected_features:
+                        raise RuntimeError("v9/v10 版本与硬件优化能力位不一致，停止加载。")
                 if "g_game_required_caps" in self.image.symbols:
                     required = self.image.symbol_u32("g_game_required_caps")
                     available = self.read_words(APB+0x40, 1)[0]
                     if available & required != required:
-                        label = ("全屏背景 bit 和命令队列 bit" if required == 0x600
+                        label = ("中央窗口 v8 bit（显示窗口、背景和命令队列能力）" if required & 0x800
+                                 else "全屏背景 bit 和命令队列 bit" if required == 0x600
                                  else "命令队列 bit")
                         raise RuntimeError("所选游戏需要" + label + "。请先重新配置本版 "
                                            "outflow/ti60f225_oob.bit，再加载 ELF；旧 v6 bit 不支持这些能力。")

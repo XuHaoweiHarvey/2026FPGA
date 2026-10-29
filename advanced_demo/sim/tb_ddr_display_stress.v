@@ -221,7 +221,7 @@ always @(posedge pixel_clk) begin
   end
   if(checking && underflow) begin
    $display("Writer rate before failure: %0f MB/s",1600.0*(w_beats-writer_start_beats)/(ticks-writer_start_tick));
-   $fatal(1,"STRESS display underflow during Back build: busy=%b R_wait=%0d missed=%0d FIFO=%0d",busy,max_r_wait,missed_boundary_count,dut.u_ddr_rd_buffer.rd_fifo_wrusedw);
+   $fatal(1,"STRESS display underflow during Back build: busy=%b R_wait=%0d missed=%0d FIFO=%0d",busy,max_r_wait,missed_boundary_count,dut.full_reader.u_ddr_rd_buffer.rd_fifo_wrusedw);
   end
   if(de) begin
    if(x==0 && y==0) begin frame_index=buffer_status[0];frame_tag=image_tag[frame_index];end

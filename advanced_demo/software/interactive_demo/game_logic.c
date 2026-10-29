@@ -93,9 +93,9 @@ static void fire_enemy_volley(survival_game_t *game, uint32_t now_ms) {
         if ((dy < 0 ? -dy : dy) > scale) scale = dy < 0 ? -dy : dy;
         if (!scale) scale = 1;
         for (lane = 0; lane < ((game->wave & 1u) ? 1u : 3u); ++lane) {
-            for (slot = 0; slot < GAME_ENEMY_BULLET_LIMIT; ++slot)
+            for (slot = 0; slot < survival_game_enemy_bullet_limit(game); ++slot)
                 if (!game->enemy_bullets[slot].active) break;
-            if (slot == GAME_ENEMY_BULLET_LIMIT) return;
+            if (slot == survival_game_enemy_bullet_limit(game)) return;
             game->enemy_bullets[slot].x = (int16_t)(enemy->x + ENEMY_SIZE / 2 - ENEMY_BULLET_SIZE / 2);
             game->enemy_bullets[slot].y = (int16_t)(enemy->y + ENEMY_SIZE - ENEMY_BULLET_SIZE / 2);
             game->enemy_bullets[slot].vx = (int8_t)(dx * ENEMY_BULLET_SPEED / scale);
@@ -160,7 +160,12 @@ void survival_game_begin_campaign(survival_game_t *game, uint32_t now_ms) {
 /* Reproducible full-pool scene. Refill departing/hit objects continuously;
  * unlike the campaign it cannot finish during the 60-second measurement. */
 static void refill_stress(survival_game_t *game) {
-    uint32_t i;
+    uint32_t i, limit = survival_game_enemy_bullet_limit(game);
+    uint32_t rows = (limit + 15u) / 16u, row_step = GAME_PLAYER_SIZE;
+    uint32_t vertical_space = GAME_WORLD_HEIGHT - GAME_WORLD_TOP -
+                              GAME_PLAYER_SIZE - GAME_PROJECTILE_SIZE - 8u;
+    if (rows > 1u && row_step * (rows - 1u) > vertical_space)
+        row_step = vertical_space / (rows - 1u);
     for (i = 0u; i < game->enemy_limit; ++i) if (!game->enemies[i].active) {
         game_enemy_t *enemy = &game->enemies[i];
         enemy->x = (int16_t)(16u + (i % 12u) * (GAME_WORLD_WIDTH - GAME_PLAYER_SIZE - 32u) / 11u);
@@ -168,10 +173,10 @@ static void refill_stress(survival_game_t *game) {
         enemy->vx = (int8_t)((i & 1u) ? (int32_t)GAME_PIXEL_SCALE : -(int32_t)GAME_PIXEL_SCALE);
         enemy->active = 1u;
     }
-    for (i = 0u; i < GAME_ENEMY_BULLET_LIMIT; ++i) if (!game->enemy_bullets[i].active) {
+    for (i = 0u; i < limit; ++i) if (!game->enemy_bullets[i].active) {
         game_enemy_bullet_t *bullet = &game->enemy_bullets[i];
         bullet->x = (int16_t)(16u + (i % 16u) * (GAME_WORLD_WIDTH - GAME_PROJECTILE_SIZE - 32u) / 15u);
-        bullet->y = (int16_t)(GAME_WORLD_TOP + GAME_PLAYER_SIZE + (i / 16u) * GAME_PLAYER_SIZE);
+        bullet->y = (int16_t)(GAME_WORLD_TOP + GAME_PLAYER_SIZE + (i / 16u) * row_step);
         bullet->vx = (int8_t)(((int32_t)(i % 3u) - 1) * (int32_t)GAME_PIXEL_SCALE);
         bullet->vy = ENEMY_BULLET_SPEED;
         bullet->active = 1u;
@@ -183,14 +188,32 @@ void survival_game_begin_stress(survival_game_t *game, uint32_t now_ms) {
     reset_with_options(game, now_ms, 0u, interval ? interval : DEFAULT_ENEMY_FIRE_INTERVAL_MS,
                        (uint8_t)GAME_ENEMY_LIMIT, 1u);
     game->stress_mode = 1u;
+#if GAME_STRESS_TUNING
+    game->stress_enemy_bullet_limit = GAME_ENEMY_BULLET_LIMIT;
+#endif
     refill_stress(game);
 }
+
+#if GAME_STRESS_TUNING
+int survival_game_begin_stress_load(survival_game_t *game, uint32_t now_ms,
+                                    uint32_t enemies, uint32_t enemy_bullets) {
+    uint32_t interval = game->enemy_fire_interval_ms;
+    if (enemies < 1u || enemies > GAME_ENEMY_LIMIT ||
+        enemy_bullets < 1u || enemy_bullets > GAME_ENEMY_BULLET_CAPACITY) return 0;
+    reset_with_options(game, now_ms, 0u, interval ? interval : DEFAULT_ENEMY_FIRE_INTERVAL_MS,
+                       (uint8_t)enemies, 1u);
+    game->stress_mode = 1u;
+    game->stress_enemy_bullet_limit = enemy_bullets;
+    refill_stress(game);
+    return 1;
+}
+#endif
 
 static void clear_combat(survival_game_t *game) {
     uint32_t i;
     for (i = 0u; i < GAME_ENEMY_LIMIT; ++i) game->enemies[i].active = 0u;
     for (i = 0u; i < GAME_BULLET_LIMIT; ++i) game->bullets[i].active = 0u;
-    for (i = 0u; i < GAME_ENEMY_BULLET_LIMIT; ++i) game->enemy_bullets[i].active = 0u;
+    for (i = 0u; i < GAME_ENEMY_BULLET_CAPACITY; ++i) game->enemy_bullets[i].active = 0u;
     for (i = 0u; i < GAME_EFFECT_LIMIT; ++i) game->effects[i].active = 0u;
 }
 
@@ -234,9 +257,9 @@ static void tick_boss(survival_game_t *game, uint32_t now_ms) {
     count = boss->attack_phase == 1u ? 7u : 16u;
     for (lane = 0u; lane < count; ++lane) {
         game_enemy_bullet_t *bullet;
-        for (slot = 0u; slot < GAME_ENEMY_BULLET_LIMIT; ++slot)
+        for (slot = 0u; slot < survival_game_enemy_bullet_limit(game); ++slot)
             if (!game->enemy_bullets[slot].active) break;
-        if (slot == GAME_ENEMY_BULLET_LIMIT) break;
+        if (slot == survival_game_enemy_bullet_limit(game)) break;
         bullet = &game->enemy_bullets[slot];
         bullet->x = (int16_t)(boss->x + (GAME_BOSS_SIZE - GAME_PROJECTILE_SIZE) / 2u);
         bullet->y = (int16_t)(boss->y + GAME_BOSS_SIZE - GAME_PROJECTILE_SIZE);
@@ -268,7 +291,7 @@ uint32_t survival_game_sprite_count(const survival_game_t *game, uint32_t now_ms
     count += game->boss.active != 0u;
     for (i = 0; i < GAME_ENEMY_LIMIT; ++i) count += game->enemies[i].active != 0u;
     for (i = 0; i < GAME_BULLET_LIMIT; ++i) count += game->bullets[i].active != 0u;
-    for (i = 0; i < GAME_ENEMY_BULLET_LIMIT; ++i)
+    for (i = 0; i < survival_game_enemy_bullet_limit(game); ++i)
         count += game->enemy_bullets[i].active != 0u;
     for (i = 0; i < GAME_EFFECT_LIMIT; ++i)
         count += game->effects[i].active && !time_reached(now_ms, game->effects[i].expires_ms);
@@ -380,7 +403,7 @@ static void simulation_tick(survival_game_t *game, uint8_t buttons, uint32_t now
             game->invulnerable_until_ms = now_ms + PLAYER_INVULNERABLE_MS;
         }
     }
-    for (i = 0; i < GAME_ENEMY_BULLET_LIMIT; ++i) {
+    for (i = 0; i < survival_game_enemy_bullet_limit(game); ++i) {
         game_enemy_bullet_t *bullet = &game->enemy_bullets[i];
         if (!bullet->active) continue;
         bullet->x = (int16_t)(bullet->x + bullet->vx);

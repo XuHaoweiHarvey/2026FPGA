@@ -3,6 +3,7 @@
 // accelerator, CVO and serializer. No CPU or encrypted-controller simulation.
 module tb_checkpoint_d;
 parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0, COLOR_KEY=0, CPU_DDR=0, ALPHA_ENABLE=0, QUEUE_ENABLE=0, QUEUE_STRESS_ONLY=0;
+parameter ALPHA_STREAM_ENABLE=0,ALPHA_SPRITE_CACHE_ENABLE=0;
 localparam INIT_ONLY=0;
 localparam BEATS=WIDTH*HEIGHT/4;
 reg axi_clk=0, i_clk=0, o_clk=0, rst_n=0;
@@ -102,7 +103,8 @@ wire [1:0] wr_bank,rd_bank;
 rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_ONLY?1024:256),
  .RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS),
  .COLOR_KEY_ENABLE(COLOR_KEY),.CPU_DDR_ENABLE(CPU_DDR),.ALPHA_ENABLE(ALPHA_ENABLE),
- .COMMAND_QUEUE_ENABLE(QUEUE_ENABLE)) dut (
+ .COMMAND_QUEUE_ENABLE(QUEUE_ENABLE),.ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),
+ .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE)) dut (
     .axi_clk(axi_clk),.rst_n(rst_n),.i_clk(i_clk),.i_frame_start(frame_start),
     .i_de(source_de),.vin(vin),.o_clk(o_clk),.fifo_rd_period(period),
     .display_underflow(underflow),
@@ -196,7 +198,8 @@ reg [31:0] source;
 integer aa,rr,gg,bb;
 begin
  alpha_scene_pixel=24'h182838;
- if(xx>=64 && xx<96 && yy>=16 && yy<48) begin
+ if(xx>=64 && xx<(ALPHA_SPRITE_CACHE_ENABLE?80:96) &&
+    yy>=16 && yy<(ALPHA_SPRITE_CACHE_ENABLE?32:48)) begin
   source=alpha_sprite_pixel(xx-64,yy-16);
   aa=(((source>>24)&255)*173+127)/255;
   rr=((((source>>16)&255)*aa+24*(255-aa)+127)/255);
@@ -265,6 +268,7 @@ always @(posedge axi_clk) begin
                 $fatal(1,"Bad AR burst");
             if(araddr>=32'h01384000 && araddr<32'h014b0000) begin
                 if(!ALPHA_ENABLE || !sprite_status[1]) $fatal(1,"Read from unsealed sprite");
+                alpha_source_reads=alpha_source_reads+1;
             end else if(read_owner_blit &&
                         araddr>=back_base && araddr+(arlen+1)*16<=back_base+BEATS*16) begin
                 // Only the Alpha BLIT's registered arbiter owner may read Back.
@@ -543,7 +547,7 @@ generate if(GRAPHICS) begin: graphics_checks
  assign read_owner_blit=dut.shared_read.arbiter.owner_blit;
  always @(posedge axi_clk) if(rst_n) begin
   if(dut.display_rvalid && dut.b_rvalid) $fatal(1,"Read owners broadcast");
-  if(dut.u_ddr_rd_buffer.rvalid !== dut.display_rvalid)
+  if(dut.full_reader.u_ddr_rd_buffer.rvalid !== dut.display_rvalid)
    $fatal(1,"Display reader received another client's response");
   if(dut.d_buffers.write_service.rf !== (dut.display_rvalid && dut.display_rready))
    $fatal(1,"BLIT read counted as display write-admission quota");
@@ -733,8 +737,9 @@ begin
    $fatal(1,"Alpha full-memory mismatch x=%0d y=%0d got=%h expected=%h",xx,yy,actual,expected);
  end
 end endtask
+integer alpha_source_reads=0;
 task alpha_round;
-integer before_ar,before_aw,underflow_before,missed_before,display_before;
+integer before_ar,before_aw,underflow_before,missed_before,display_before,before_source;
 begin
  underflow_before=display_underflow_count;missed_before=missed_boundary_count;
  access('hD8,1,1,0);wait(asset_status[0]);
@@ -751,10 +756,12 @@ begin
  before_ar=ar_count;before_aw=aw_count;display_before=display_during_blit;
  wait(dut.d_active && reader_fifo_level>=128);
  stall_read=1;copy_in_progress=1;
- start_copy(3,32'h01384000,2560,64,16,32,32,173);
+ start_copy(3,ALPHA_SPRITE_CACHE_ENABLE?32'h01384240:32'h01384000,2560,64,16,
+            ALPHA_SPRITE_CACHE_ENABLE?16:32,ALPHA_SPRITE_CACHE_ENABLE?16:32,173);
  wait(dut.b_arvalid && dut.display_arvalid);repeat(3)@(negedge axi_clk);stall_read=0;
  access('h20,1,255,0);access('hC0,1,back_base,0);access('hC4,1,16,0);
- wait(wvalid && wlast && wready && w_index%BEATS==(47*WIDTH/4+23));
+ wait(wvalid && wlast && wready && w_index%BEATS==
+      (ALPHA_SPRITE_CACHE_ENABLE?(31*WIDTH/4+19):(47*WIDTH/4+23)));
  @(negedge axi_clk);hold_b=1;
  wait(bvalid);repeat(5)@(negedge axi_clk);
  if(done || !busy || !buffer_status[5]) $fatal(1,"Alpha finished before final B");
@@ -770,6 +777,17 @@ begin
  check_alpha_memory(back_slot);image_tag[back_slot]=7;
  hold_b=0;wait_fill;wait_swap(old_sw);copy_in_progress=0;
  old_frames=frames;wait(frames>=old_frames+3);
+ if(ALPHA_SPRITE_CACHE_ENABLE) begin
+  back_slot=buffer_status[1];old_sw=swap_count;
+  start_rect(0,0,WIDTH,HEIGHT,'h00182838);wait_fill;
+  before_source=alpha_source_reads;
+  start_copy(3,32'h01384240,2560,64,16,16,16,173);wait_fill;
+  check_alpha_memory(back_slot);image_tag[back_slot]=7;
+  if(alpha_source_reads!=before_source)$fatal(1,"Warm cache made DDR source reads");
+  request_swap;wait_swap(old_sw);
+  old_frames=frames;wait(frames>=old_frames+2);
+  $display("PASS shared Alpha cache: cold fill then zero warm source AR; fresh Back background; exact scanout");
+ end
  if(engine_error || reader_error || display_underflow_count!=underflow_before ||
     missed_boundary_count!=missed_before)
   $fatal(1,"Alpha shared display error underflow=%0d missed=%0d",
@@ -803,6 +821,8 @@ initial begin
  for(j=0;j<76800;j=j+1) sprite_memory[j]=0;
  for(j=0;j<32;j=j+1) for(lane=0;lane<32;lane=lane+1)
   sprite_memory[j*160+lane/4][(lane%4)*32+:32]=alpha_sprite_pixel(lane,j);
+ for(j=0;j<16;j=j+1) for(lane=0;lane<16;lane=lane+1)
+  sprite_memory[j*160+(144+lane)/4][(lane%4)*32+:32]=alpha_sprite_pixel(lane,j);
  repeat(20) @(negedge i_clk);rst_n=1;apb_reset=1;
 end
 initial begin #60000000; $fatal(1,"pipeline timeout tpg=%0d checked=%0d",tpg_frames,frames);end

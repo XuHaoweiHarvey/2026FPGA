@@ -13,7 +13,9 @@ module accel_regs #(
     parameter COLOR_KEY_ENABLE = 0,
     parameter CPU_DDR_ENABLE = 0,
     parameter ALPHA_ENABLE = 0,
-    parameter COMMAND_QUEUE_ENABLE = 0
+    parameter COMMAND_QUEUE_ENABLE = 0,
+    parameter DISPLAY_WINDOW_ENABLE = 0,
+    parameter [31:0] HARDWARE_VERSION = 0, EXTRA_CAPABILITIES = 0
 )(
     input wire PCLK,
     input wire PRESETn,
@@ -70,7 +72,7 @@ always @(*) begin
     writable = 0;
     case (PADDR)
         32'h00: PRDATA = ID;
-        32'h04: PRDATA = COMMAND_QUEUE_ENABLE ? 32'h00070000 : ALPHA_ENABLE ? 32'h00060000 : COLOR_KEY_ENABLE ? 32'h00050000 : BLIT_ENABLE ? 32'h00040000 : DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
+        32'h04: PRDATA = HARDWARE_VERSION != 0 ? HARDWARE_VERSION : DISPLAY_WINDOW_ENABLE ? 32'h00080000 : COMMAND_QUEUE_ENABLE ? 32'h00070000 : ALPHA_ENABLE ? 32'h00060000 : COLOR_KEY_ENABLE ? 32'h00050000 : BLIT_ENABLE ? 32'h00040000 : DOUBLE_BUFFER ? 32'h00030000 : ENGINE_ENABLE ? 32'h00020000 : VERSION;
         32'h08: begin PRDATA = {control,1'b0}; writable = 1; end
         32'h0C: PRDATA = ENGINE_ENABLE ?
             COMMAND_QUEUE_ENABLE ?
@@ -92,7 +94,8 @@ always @(*) begin
         32'h38: PRDATA = FRAME_WIDTH;
         32'h3C: PRDATA = FRAME_HEIGHT;
         32'h40: PRDATA = (ALPHA_ENABLE ? 32'h000003FB : COLOR_KEY_ENABLE ? 32'h000000FB : BLIT_ENABLE ? 32'h0000007B : DOUBLE_BUFFER ? 32'h0000003B : ENGINE_ENABLE ? 32'h0000001B : 32'h00000007) |
-                         (COMMAND_QUEUE_ENABLE ? 32'h00000400 : 32'b0);
+                         (COMMAND_QUEUE_ENABLE ? 32'h00000400 : 32'b0) |
+                         (DISPLAY_WINDOW_ENABLE ? 32'h00000800 : 32'b0) | EXTRA_CAPABILITIES;
         32'h44: begin PRDATA=init_data_beats;if(!ENGINE_ENABLE) mapped=0;end
         32'h48: begin PRDATA=init_aw_bursts;if(!ENGINE_ENABLE) mapped=0;end
         32'h4C: begin PRDATA=init_wlast_bursts;if(!ENGINE_ENABLE) mapped=0;end

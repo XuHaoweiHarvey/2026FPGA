@@ -1,7 +1,8 @@
 // Back writer admission only. Never revoke an exposed AW, interrupt W, or
 // withhold B. Reader AR/R have no gate and no dependency on this state machine.
 module ddr_write_admission #(
-    parameter ENABLE=1, READ_QUOTA=128, FIFO_LOW=384, FIFO_HIGH=512
+    parameter ENABLE=1, READ_QUOTA=128, FIFO_LOW=384, FIFO_HIGH=512,
+    parameter WINDOW_MODE=0
 )(
     input wire clk,rst_n,enabled,
     input wire raw_awvalid,ddr_awready,bvalid,bready,
@@ -22,11 +23,12 @@ wire bf=enabled && bvalid && bready;
 wire ar_wait=arvalid && !arready;
 wire r_wait=(reader_outstanding!=0) && !rf;
 wire new_grant=enabled && !reader_launch && !fifo_flush && reader_error==0 &&
-    (reader_safe || (reader_active && healthy && fifo_level>FIFO_LOW && read_credit>=READ_QUOTA));
+    (reader_safe || (reader_active && healthy && fifo_level>FIFO_LOW &&
+     (read_credit>=READ_QUOTA || (WINDOW_MODE && fifo_level>=FIFO_HIGH))));
 assign admit_aw=ENABLE ? grant : 1'b1;
 // bit0 admission held, bit1 low-water hold, bit2 waiting AW, bit3 AW..B active,
 // bit4 quota earned, bit5 policy enabled. Raw counters reset only with video.
-assign service_status={26'b0,(ENABLE!=0),(read_credit>=READ_QUOTA),transaction_active,
+assign service_status={25'b0,(WINDOW_MODE!=0),(ENABLE!=0),(read_credit>=READ_QUOTA),transaction_active,
                        (raw_awvalid && !admit_aw),!healthy,admit_aw};
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
