@@ -1,1 +1,0 @@
-Checkpoint D hardware-validated software snapshot, archived before Checkpoint E. Not part of the active IDE build. The active apb_reg_test project retains the successful launch/BSP/OpenOCD configuration.

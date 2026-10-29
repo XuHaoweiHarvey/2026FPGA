@@ -1,7 +1,7 @@
 /* M2 competition loop: identical complete frame tasks on CPU and FPGA. */
-#include "../apb_reg_test/accel_api.h"
-#include "../apb_reg_test/benchmark_clock.h"
-#include "../m1b_compare/hud.h"
+#include "accel_api.h"
+#include "benchmark_clock.h"
+#include "hud.h"
 #include "scene.h"
 #include "assets.h"
 #include "metrics.h"
