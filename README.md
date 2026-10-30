@@ -1,5 +1,9 @@
 # Ti60F225 RISC-V + FPGA 2D Accelerator
 
+## 星空版共同开发入口
+
+星空版低配的完整独立工程位于 [`starry_demo/`](starry_demo/README.md)，包含可编辑源码、FPGA 工程、素材和配套 bit/ELF。团队修改此版请在这个目录工作；启动、重编译和本机路径配置见该目录说明。Git 拉取包含全部必要文件，无需另外解压 ZIP。
+
 ## 工程目录
 
 - [`basic_demo`](basic_demo/ti60f225_oob.xml)：从当前 `main` 移入的工程，包含后续 M1b/M2 软件与现有构建产物。

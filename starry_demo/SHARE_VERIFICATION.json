@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-30",
+  "source_commit": "6f021a898665a761316d9eb45d8fd75427b77205",
+  "software_build": "passed using Efinity RISC-V IDE 2026.1 toolchain",
+  "elf_sha256": "f62f132e9876f5a93a63578d03240f997a5f8e7b16430ced4888a117f7a97701",
+  "elf_assets_source_consistent": true,
+  "loader_tests": 12,
+  "native_logic_render": "passed: 815702 checks, three campaign simulations, 600064 ms simulated endurance",
+  "hardware_v11_inputs": "131 recorded inputs match compiled v11 source after line-ending normalization",
+  "hardware_recompiled_for_delivery": false,
+  "existing_v10_v11_bit_hashes_verified": true,
+  "portable_ide_make_command": "checked with make -n",
+  "board_tested": false,
+  "stable_60_fps_measured": false,
+  "included": "complete advanced_demo tracked source, docs, delivery, paths and launcher helpers",
+  "excluded_from_distribution": [
+    "advanced_demo/output",
+    "software build folders",
+    "__pycache__",
+    "paths.local.cmd",
+    ".git"
+  ],
+  "instructions": "README.md",
+  "distribution": "Git working directory: 2026FPGA/starry_demo",
+  "paths": "relative project paths; paths.local.cmd ignored; byte-stable Git attributes"
+}

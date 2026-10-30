@@ -1,0 +1,7 @@
+@echo off
+rem Copy this file to paths.local.cmd and edit only the paths you need.
+rem Efinity and Efinity RISC-V IDE are separate installations.
+set "EFINITY_ROOT=D:\Efinity"
+set "RISCV_IDE_ROOT=D:\Efinity\efinity-riscv-ide-2026.1"
+rem Optional: choose Python explicitly, otherwise detect Python 3 or Efinity Python.
+rem set "FPGA_PYTHON=C:\Python311\python.exe"

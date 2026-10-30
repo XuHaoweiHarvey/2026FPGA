@@ -1,0 +1,3 @@
+PASS generated RAM starts with RV32 jal x0,0 at 0xF9000000
+PASS three IDE launches use the local game/probe/maintenance ELF and OCRAM entry
+PASS real physical interface, LPF, .bit and .hex files exist (no board access)

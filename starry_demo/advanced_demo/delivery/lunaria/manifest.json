@@ -1,0 +1,151 @@
+{
+  "name": "LUNARIA 星海梦境",
+  "date": "2026-10-30",
+  "core_hz": 100000000,
+  "settings": {
+    "minimum_bullets": 64,
+    "maximum_bullets": 512,
+    "default_bullets": 256,
+    "spin_patterns_optional": true,
+    "resets_current_pattern_on_apply": true
+  },
+  "preview": {
+    "scenes": 16,
+    "maximum_bullets": 4096,
+    "source_sha256": "30e3e7f3184f27ab5ebb962d75678a112a216e8dbd530baa720fdc94931ff0d2",
+    "assertions": 10914,
+    "board_tested": false
+  },
+  "build_sources": {
+    "software/lunaria/lunaria.c": "be874ffec01433a4b3396b2f85ec44f34e2b5e868fb8e79650d01c7adb7f2d77",
+    "software/lunaria/lunaria_render.c": "802039e2144296e42086310fa8905a2f62add6dd9ac71a08213371d56d7245bb",
+    "software/lunaria/main.c": "3e1c2d2699dc170c193e6f131ade328eddbee850a791c34629631400553e05f7",
+    "software/lunaria/lunaria.h": "153f387759f92a2a60e79a6b3878b5b6dd72efdc260d55036866438418aff4df",
+    "software/lunaria/lunaria_asset_ids.h": "2acd491fb74675397d7eb0e6b7da7b6aedb308195aadc50e6ba4db9f90d880f5",
+    "software/lunaria/lunaria_render.h": "69c93d1c82eb4645897d0f12ef671c2c7ca5db53b753788a362a67309d9b86cb",
+    "software/lunaria/lunaria_tables.h": "24498a67df3792e2c42d2d43786f4bc8bbf31b2e48393859cd3afdaa361df89b",
+    "software/lunaria/lunaria_upload.h": "72c81d5c3d4cca8708124703a8f2ff45e9f5bcafbecba183dbc4bf6d943595db"
+  },
+  "board_tested": false,
+  "stable_60_fps_measured": false,
+  "board_endurance_tested": false,
+  "hardware_compile_required": false,
+  "compatible_hardware": [
+    "v10",
+    "v11"
+  ],
+  "source_window": [
+    640,
+    300,
+    640,
+    480
+  ],
+  "display": {
+    "v10": [
+      640,
+      300,
+      640,
+      480
+    ],
+    "v11": [
+      320,
+      60,
+      1280,
+      960
+    ]
+  },
+  "build_config": {
+    "magic": 1195524913,
+    "version": 1,
+    "fullscreen": 0,
+    "view_x": 640,
+    "view_y": 300,
+    "view_width": 640,
+    "view_height": 480,
+    "pixel_scale": 1,
+    "flash_enabled": 0,
+    "team_sprites": 0,
+    "path_diagnostics": 1,
+    "submit_timing": 0,
+    "require_queue": 1,
+    "enemy_limit": 1,
+    "enemy_bullet_limit": 512,
+    "output_width": 1920,
+    "output_height": 1080
+  },
+  "elf_sha256": "f62f132e9876f5a93a63578d03240f997a5f8e7b16430ced4888a117f7a97701",
+  "ocram": {
+    "start": "0xf9000000",
+    "stack_top": "0xf900ebf0",
+    "stack_bytes": 8192,
+    "used_including_stack": 60400,
+    "bytes_before_debug_reserved": 4112
+  },
+  "asset_transfer_bytes": 2457600,
+  "hardware_sha256": {
+    "v10": "8ee68842bc866382e9eee37c9c17ad1cbeb3e9c7f758a6c54bc642f04f3496f5",
+    "v11": "8cdca78187e0cab8540a56917b153833172af2db1eb85a1babbf824196c0f156"
+  },
+  "manual_acceptance": "../../../README.md",
+  "note": "Complete editable project is in advanced_demo; built from GitHub 6f021a8.",
+  "host_checks": {
+    "logic_render": "passed",
+    "board_tested": false,
+    "source": "native lunaria.c and lunaria_render.c; accelerator command rasterization",
+    "output": "PASS collision-driven campaign 1: 50464 ms\nPASS collision-driven campaign 2: 50464 ms\nPASS collision-driven campaign 3: 50464 ms\nPASS 600064 ms simulated endurance across all eight patterns\nPASS configurable limit 64: eight patterns, peak allocated 64\nPASS configurable limit 65: eight patterns, peak allocated 65\nPASS configurable limit 128: eight patterns, peak allocated 128\nPASS configurable limit 256: eight patterns, peak allocated 256\nPASS configurable limit 384: eight patterns, peak allocated 381\nPASS configurable limit 512: eight patterns, peak allocated 512\nPASS 815702 checks, max 775 commands / 221904 sprite pixels per sampled frame\n",
+    "frames": [
+      "title.png",
+      "phase0-1200ms.png",
+      "phase0-2192ms.png",
+      "phase1-1200ms.png",
+      "phase1-2192ms.png",
+      "phase2-1200ms.png",
+      "phase2-2192ms.png",
+      "phase3-1200ms.png",
+      "phase3-2192ms.png",
+      "phase4-1200ms.png",
+      "phase4-2192ms.png",
+      "phase5-1200ms.png",
+      "phase5-2192ms.png",
+      "phase6-1200ms.png",
+      "phase6-2192ms.png",
+      "phase7-1200ms.png",
+      "phase7-2192ms.png",
+      "rose4-first-burst.png",
+      "rose5-first-burst.png",
+      "rose6-first-burst.png",
+      "final-explosion.png",
+      "victory-hold.png",
+      "victory-restart.png",
+      "rose-past-old-ttl.png",
+      "laser-warning.png",
+      "laser-active.png",
+      "metrics-59-9fps.png",
+      "phase3-spin-512.png",
+      "phase4-spin-512.png",
+      "phase5-spin-512.png",
+      "fusion-512.png"
+    ],
+    "source_sha256": {
+      "sim/test_lunaria.c": "47d65d2479324f4d30b53980e9b0030b4d2d8b84d8d0b921783160cbd2041f39",
+      "software/lunaria/lunaria.c": "be874ffec01433a4b3396b2f85ec44f34e2b5e868fb8e79650d01c7adb7f2d77",
+      "software/lunaria/lunaria.h": "153f387759f92a2a60e79a6b3878b5b6dd72efdc260d55036866438418aff4df",
+      "software/lunaria/lunaria_render.c": "802039e2144296e42086310fa8905a2f62add6dd9ac71a08213371d56d7245bb",
+      "software/lunaria/lunaria_render.h": "69c93d1c82eb4645897d0f12ef671c2c7ca5db53b753788a362a67309d9b86cb"
+    },
+    "atlas_sha256": "74d726c8e38772dd6fbec53dde1eaac8317a2617c1be849a577c622c95e1f586"
+  },
+  "loader_checks": {
+    "status": "passed",
+    "tests": 12,
+    "board_tested": false,
+    "elf_sha256": "f62f132e9876f5a93a63578d03240f997a5f8e7b16430ced4888a117f7a97701",
+    "sources": {
+      "tools/lunaria_debug_bridge.py": "a89ecd883bad2a4dbfe42343156fedc09b626ffb993814c0150c8de08e548877",
+      "tools/lunaria_debug_window.py": "d0e890d6bf4f7d3f71f6c92570a93519336a9dbe9ead6e1dde2a2e64473e286b",
+      "tools/game_debug_bridge.py": "4053d7f5cdbb8ea34fb496021f94cc8661c0b0c9196ca83c4ddd15117bc4ffaa",
+      "tools/game_debug_window.py": "2b4eeb8732ef02451ab2fc984a3d6bbeb24beeef0616782f6f4c62004e6fa05f",
+      "scripts/run_lunaria_loader_checks.py": "f365ea341d191a05ee41a4ca3cff01d72dbc8217ca058130f946923a252c9146"
+    }
+  }
+}

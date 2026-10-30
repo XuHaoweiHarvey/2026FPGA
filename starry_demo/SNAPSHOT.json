@@ -1,0 +1,8 @@
+{
+  "version": "LUNARIA starry GitHub snapshot",
+  "commit": "6f021a898665a761316d9eb45d8fd75427b77205",
+  "date": "2026-10-30",
+  "source": "git archive: advanced_demo + docs",
+  "scope": "Editable FPGA/RISC-V project and matching runtime; work in progress excluded",
+  "board_tested": false
+}

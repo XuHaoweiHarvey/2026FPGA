@@ -1,0 +1,8 @@
+C:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/../../../../riscv-none-elf/bin/ld.exe: warning: D:\desktop\qiansai\2026FPGA\advanced_demo\software\flash\build\flash-maint\flash_maint.elf has a LOAD segment with RWX permissions
+PASS formal BSP RAM ELF: APB base=0xf8100000, RAM=0xf9000000/65536 bytes
+f9000000 T _start
+f900006c 000002c4 T main
+f9000330 00000008 T flash_maint_ready
+f9001cfc 00001028 B g_flash_maint
+f9004d30 B _sp
+ELF: D:\desktop\qiansai\2026FPGA\advanced_demo\software\flash\build\flash-maint\flash_maint.elf

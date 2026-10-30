@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "format": "little-endian ARGB8888",
+  "assets": {
+    "background": {
+      "file": "background.argb",
+      "bytes": 1228800,
+      "width": 640,
+      "height": 480,
+      "fnv_words": 1707577214,
+      "sha256": "674d9a756f3fd58b515b28fad18511ac8d7cb0b7e11f95228cc44a11d58efd83"
+    },
+    "atlas": {
+      "file": "atlas.argb",
+      "bytes": 1228800,
+      "width": 640,
+      "height": 480,
+      "fnv_words": 927816786,
+      "sha256": "74d726c8e38772dd6fbec53dde1eaac8317a2617c1be849a577c622c95e1f586"
+    }
+  },
+  "sprite_window": {
+    "base": 20463616,
+    "stride": 2560,
+    "bytes": 1228800
+  },
+  "render": {
+    "x": 640,
+    "y": 300,
+    "width": 640,
+    "height": 480
+  },
+  "bullet_size": 16,
+  "board_tested": false,
+  "art_source": "Original procedural LUNARIA preview"
+}
