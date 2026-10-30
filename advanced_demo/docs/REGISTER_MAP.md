@@ -1,4 +1,4 @@
-# Register Map — advanced_demo v7 / 窗口构建 v8–v10
+# Register Map — advanced_demo v7 / 窗口构建 v8–v11
 
 本表逐项对照当前 [accel_regs.v](../rtl/control/accel_regs.v)、[sapphire_control.v](../rtl/control/sapphire_control.v)、平台输入模块和[软件宏](../software/apb_reg_test/accel_regs.h)。高级工程启用ENGINE、双缓冲、BLIT、Color Key、CPU DDR、M2素材、Alpha 与 8 项绘图命令队列；硬件版本为v7。`basic_demo` 保持M2验收基线，高级工程仍需独立综合和上板验收。
 
@@ -15,6 +15,9 @@ v8 的显示 AR 必须逐行覆盖中央区域，跳过行间外围像素，原�
 | v8 | `0x00080000` | `0x00000FFB` | bit11 窗口显示 |
 | v9 | `0x00090000` | `0x00001FFB` | bit12 Alpha 连续供数 |
 | v10 | `0x000A0000` | `0x00003FFB` | bit12 连续供数、bit13 敌弹源图缓存 |
+| v11 | `0x000B0000` | `0x00007FFB` | bit14 两倍显示，保留 v10 的连续供数与源缓存 |
+
+v11 由独立 `DISPLAY_SCALE2_ENABLE=1` 构建：640×480 的源窗口保持在 (640,300)，显示为 (320,60) 的 1280×960；WIDTH/HEIGHT/STRIDE、每帧 76,800 beat、所有 APB 偏移、Alpha / 队列 / 换帧规则保持原定义。核心仍为 100 MHz。新展示 / 压力 ELF 支持 v10 / v11；旧 ELF 使用原 bit。新增软件邮箱命令 10 和可选 `g_game_presentation`，没有新增 APB 寄存器，详见 [展示版说明](SHOWCASE_GAME.md)。
 
 `HARDWARE_VERSION` / `EXTRA_CAPABILITIES` 参数仅改变版本和能力只读值，默认工程仍为 v7。缓存只复用已封存的 16×16 敌弹源图片，仍逐次读取当前 Back 背景；有效标记随平台复位清除，CPU Debug reset 不清除素材封存或缓存。v9 / v10 未新增 APB 寄存器，也没有软件缓存清除操作。
 
@@ -57,7 +60,7 @@ v8 写准入保留 LOW=384 / HIGH=512 迟滞及 B 完成前保持事务的规则
 | 34 | FRAME_STRIDE | RO | 7680=0x1E00 / 常量 | bytes/line |
 | 38 | FRAME_WIDTH | RO | 1920=0x780 / 常量 | pixels/line |
 | 3C | FRAME_HEIGHT | RO | 1080=0x438 / 常量 | lines/frame |
-| 40 | CAPABILITIES | RO | 默认 0x000007FB / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT、7 Color Key、8 Alpha、9封存全屏背景、10命令队列、11窗口显示、12 Alpha连续供数、13敌弹源图缓存；bit2=0，按构建启用 |
+| 40 | CAPABILITIES | RO | 默认 0x000007FB / 常量 | bit0寄存器、1 SCRATCH、3 FILL_RECT、4 INIT/写owner、5双缓冲swap、6 BLIT、7 Color Key、8 Alpha、9封存全屏背景、10命令队列、11窗口显示、12 Alpha连续供数、13敌弹源图缓存、14两倍显示；bit2=0，按构建启用 |
 | 44 | INIT_DATA_BEATS | RO | 0 / P | 初始化WVALID&&WREADY数，单位128bit beat；INIT_DONE后冻结 |
 | 48 | INIT_AW_BURSTS | RO | 0 / P | 初始化AW握手数，单位burst；完成后冻结 |
 | 4C | INIT_WLAST_BURSTS | RO | 0 / P | 初始化W握手且WLAST数，单位burst；完成后冻结 |

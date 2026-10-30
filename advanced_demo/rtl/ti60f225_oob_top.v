@@ -20,6 +20,7 @@
 module ti60f225_oob_top #(
 
     parameter DISPLAY_WINDOW_ENABLE = 0,
+    parameter DISPLAY_SCALE2_ENABLE = 0,
     parameter ALPHA_STREAM_ENABLE = 0,
     parameter ALPHA_SPRITE_CACHE_ENABLE = 0,
     parameter [31:0] HARDWARE_VERSION = 0,
@@ -487,7 +488,8 @@ rgb_framebuffer #(
     .WR_FIFO_DEPTH(1024), .RD_FIFO_DEPTH(1024), .BURST_LEN(127), .C_MODE(1), .D_MODE(1), .BLIT_ENABLE(1),
     .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),.ALPHA_ENABLE(ALPHA_ENABLE),
     .ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),.ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE),
-    .COMMAND_QUEUE_ENABLE(1),.COMMAND_QUEUE_DEPTH(8),.DISPLAY_WINDOW_ENABLE(DISPLAY_WINDOW_ENABLE)
+    .COMMAND_QUEUE_ENABLE(1),.COMMAND_QUEUE_DEPTH(8),.DISPLAY_WINDOW_ENABLE(DISPLAY_WINDOW_ENABLE),
+    .DISPLAY_SCALE2_ENABLE(DISPLAY_SCALE2_ENABLE)
 ) checker0(
     .diag_wr_fifo_full(wr_fifo_full),
     .diag_wr_bank(wr_buffer_index), .diag_rd_bank(rd_buffer_index),
@@ -957,7 +959,8 @@ sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),
                     .ALPHA_ENABLE(ALPHA_ENABLE),.COMMAND_QUEUE_ENABLE(1),
                     .DISPLAY_WINDOW_ENABLE(DISPLAY_WINDOW_ENABLE),.HARDWARE_VERSION(HARDWARE_VERSION),
                     .EXTRA_CAPABILITIES((ALPHA_STREAM_ENABLE ? 32'h1000 : 0) |
-                        (ALPHA_SPRITE_CACHE_ENABLE ? 32'h2000 : 0))) u_control (
+                        (ALPHA_SPRITE_CACHE_ENABLE ? 32'h2000 : 0) |
+                        (DISPLAY_SCALE2_ENABLE ? 32'h4000 : 0))) u_control (
     .core_clk(core_clk), .platform_rst_n(i_arstn && w_arstn),
     .uart_rx(uart_rx), .uart_tx(uart_tx),
     .flash_cs_n(flash_cs_n), .flash_sck(flash_sck),

@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include "game_display_config.h"
 #include "uart_keyboard_protocol.h"
+#ifndef GAME_SHOWCASE
+#define GAME_SHOWCASE 0
+#endif
 
 #define GAME_ENEMY_LIMIT 48u
 #define GAME_BULLET_LIMIT 16u
@@ -26,6 +29,12 @@
 #define GAME_BOSS_MAX_HP 90u
 #define GAME_BOSS_SIZE (64u * GAME_PIXEL_SCALE)
 #define GAME_CAMPAIGN_TITLE 255u
+#define GAME_SHOWCASE_WAVE_MS 7000u
+#define GAME_SHOWCASE_BOSS_HP 60u
+#define GAME_SHOWCASE_HIT_MS 120u
+enum { GAME_EFFECT_EXPLOSION=0, GAME_EFFECT_HIT=1, GAME_EFFECT_DEFEAT=2 };
+enum { GAME_SHOWCASE_WAVES=1, GAME_SHOWCASE_INTRO=2, GAME_SHOWCASE_BOSS=3,
+       GAME_SHOWCASE_DEFEAT=4, GAME_SHOWCASE_VICTORY=5, GAME_SHOWCASE_FAILURE=6 };
 
 typedef struct {
     int16_t x, y;
@@ -47,7 +56,7 @@ typedef struct {
 typedef struct {
     int16_t x, y;
     uint32_t expires_ms;
-    uint8_t active;
+    uint8_t active, kind;
 } game_effect_t;
 
 typedef struct {
@@ -69,6 +78,10 @@ typedef struct {
     uint32_t invulnerable_until_ms;
     uint32_t boss_next_fire_ms;
     uint8_t campaign_stage, campaign_result, stress_mode;
+#if GAME_SHOWCASE
+    uint8_t showcase, showcase_state, victory_armed, boss_angle, defeat_bursts;
+    uint32_t showcase_state_ms, boss_phase_ms, boss_warning_until_ms;
+#endif
 #if GAME_STRESS_TUNING
     uint32_t stress_enemy_bullet_limit;
 #endif
@@ -81,12 +94,18 @@ typedef struct {
 
 void survival_game_reset(survival_game_t *game, uint32_t now_ms);
 void survival_game_begin_campaign(survival_game_t *game, uint32_t now_ms);
+#if GAME_SHOWCASE
+void survival_game_begin_showcase(survival_game_t *game, uint32_t now_ms);
+#endif
 void survival_game_begin_stress(survival_game_t *game, uint32_t now_ms);
 #if GAME_STRESS_TUNING
 int survival_game_begin_stress_load(survival_game_t *game, uint32_t now_ms,
                                     uint32_t enemies, uint32_t enemy_bullets);
 #endif
 static inline uint32_t survival_game_enemy_bullet_limit(const survival_game_t *game) {
+#if GAME_SHOWCASE
+    if (game->showcase && !game->stress_mode) return GAME_ENEMY_BULLET_CAPACITY;
+#endif
 #if GAME_STRESS_TUNING
     return game->stress_mode ? game->stress_enemy_bullet_limit : GAME_ENEMY_BULLET_LIMIT;
 #else

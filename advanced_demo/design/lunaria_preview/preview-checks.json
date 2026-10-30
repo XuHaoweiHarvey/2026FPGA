@@ -1,0 +1,518 @@
+{
+  "status": "passed",
+  "duration": 128,
+  "sceneCount": 16,
+  "assertionCount": 10914,
+  "profiles": [
+    {
+      "density": "board",
+      "peakGenerated": 229,
+      "peakVisible": 198,
+      "maxDeferrals": 0
+    },
+    {
+      "density": "reference",
+      "peakGenerated": 3073,
+      "peakVisible": 2372,
+      "maxDeferrals": 0
+    }
+  ],
+  "limitChecks": [
+    {
+      "density": "board",
+      "limit": 64,
+      "peakGenerated": 63
+    },
+    {
+      "density": "board",
+      "limit": 65,
+      "peakGenerated": 65
+    },
+    {
+      "density": "board",
+      "limit": 128,
+      "peakGenerated": 124
+    },
+    {
+      "density": "board",
+      "limit": 256,
+      "peakGenerated": 223
+    },
+    {
+      "density": "board",
+      "limit": 384,
+      "peakGenerated": 343
+    },
+    {
+      "density": "board",
+      "limit": 512,
+      "peakGenerated": 456
+    },
+    {
+      "density": "reference",
+      "limit": 64,
+      "peakGenerated": 64
+    },
+    {
+      "density": "reference",
+      "limit": 512,
+      "peakGenerated": 345
+    },
+    {
+      "density": "reference",
+      "limit": 1024,
+      "peakGenerated": 762
+    },
+    {
+      "density": "reference",
+      "limit": 2048,
+      "peakGenerated": 1481
+    },
+    {
+      "density": "reference",
+      "limit": 4096,
+      "peakGenerated": 2948
+    }
+  ],
+  "rotationChecks": [
+    {
+      "phase": 3,
+      "birthAngle": 0,
+      "laterBirthAngle": 0.3930825768956957
+    },
+    {
+      "phase": 4,
+      "birthAngle": 0,
+      "laterBirthAngle": 0.40746364678212416
+    },
+    {
+      "phase": 5,
+      "birthAngle": 0,
+      "laterBirthAngle": 0.40746364678212416
+    }
+  ],
+  "petalChecks": [
+    {
+      "petals": 3,
+      "bullets": 150,
+      "maxima": 3
+    },
+    {
+      "petals": 4,
+      "bullets": 200,
+      "maxima": 4
+    },
+    {
+      "petals": 5,
+      "bullets": 250,
+      "maxima": 5
+    },
+    {
+      "petals": 6,
+      "bullets": 300,
+      "maxima": 6
+    }
+  ],
+  "sampledBrowserFPS": 60,
+  "sourceSha256": "30e3e7f3184f27ab5ebb962d75678a112a216e8dbd530baa720fdc94931ff0d2",
+  "layouts": [
+    {
+      "width": 788,
+      "scroll": 788,
+      "ratio": 1.3333333333333333,
+      "controls": [
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 172
+        },
+        {
+          "x": 180,
+          "right": 276
+        },
+        {
+          "x": 284,
+          "right": 366
+        },
+        {
+          "x": 374,
+          "right": 442
+        },
+        {
+          "x": 450,
+          "right": 518
+        },
+        {
+          "x": 526,
+          "right": 608
+        },
+        {
+          "x": 616,
+          "right": 684
+        },
+        {
+          "x": 692,
+          "right": 760
+        },
+        {
+          "x": 0,
+          "right": 96
+        },
+        {
+          "x": 104,
+          "right": 172
+        },
+        {
+          "x": 180,
+          "right": 262
+        },
+        {
+          "x": 270,
+          "right": 338
+        },
+        {
+          "x": 346,
+          "right": 428
+        },
+        {
+          "x": 436,
+          "right": 518
+        },
+        {
+          "x": 526,
+          "right": 608
+        },
+        {
+          "x": 0,
+          "right": 345
+        },
+        {
+          "x": 353,
+          "right": 698
+        },
+        {
+          "x": 706,
+          "right": 788
+        },
+        {
+          "x": 0,
+          "right": 581.6875
+        },
+        {
+          "x": 589.6875,
+          "right": 605.6875
+        },
+        {
+          "x": 0,
+          "right": 54
+        },
+        {
+          "x": 0,
+          "right": 788
+        }
+      ]
+    },
+    {
+      "width": 448,
+      "scroll": 448,
+      "ratio": 1.3333333333333333,
+      "controls": [
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 172
+        },
+        {
+          "x": 180,
+          "right": 276
+        },
+        {
+          "x": 284,
+          "right": 366
+        },
+        {
+          "x": 374,
+          "right": 442
+        },
+        {
+          "x": 0,
+          "right": 68
+        },
+        {
+          "x": 76,
+          "right": 158
+        },
+        {
+          "x": 166,
+          "right": 234
+        },
+        {
+          "x": 242,
+          "right": 310
+        },
+        {
+          "x": 318,
+          "right": 414
+        },
+        {
+          "x": 0,
+          "right": 68
+        },
+        {
+          "x": 76,
+          "right": 158
+        },
+        {
+          "x": 166,
+          "right": 234
+        },
+        {
+          "x": 242,
+          "right": 324
+        },
+        {
+          "x": 332,
+          "right": 414
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 0,
+          "right": 448
+        },
+        {
+          "x": 0,
+          "right": 358
+        },
+        {
+          "x": 366,
+          "right": 448
+        },
+        {
+          "x": 0,
+          "right": 448
+        },
+        {
+          "x": 0,
+          "right": 16
+        },
+        {
+          "x": 0,
+          "right": 54
+        },
+        {
+          "x": 0,
+          "right": 448
+        }
+      ]
+    },
+    {
+      "width": 328,
+      "scroll": 328,
+      "ratio": 1.3333333333333333,
+      "controls": [
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 172
+        },
+        {
+          "x": 180,
+          "right": 276
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 158
+        },
+        {
+          "x": 166,
+          "right": 234
+        },
+        {
+          "x": 242,
+          "right": 324
+        },
+        {
+          "x": 0,
+          "right": 68
+        },
+        {
+          "x": 76,
+          "right": 144
+        },
+        {
+          "x": 152,
+          "right": 248
+        },
+        {
+          "x": 256,
+          "right": 324
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 158
+        },
+        {
+          "x": 166,
+          "right": 248
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 172
+        },
+        {
+          "x": 0,
+          "right": 328
+        },
+        {
+          "x": 0,
+          "right": 328
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 0,
+          "right": 328
+        },
+        {
+          "x": 0,
+          "right": 16
+        },
+        {
+          "x": 0,
+          "right": 54
+        },
+        {
+          "x": 0,
+          "right": 328
+        }
+      ]
+    },
+    {
+      "width": 288,
+      "scroll": 288,
+      "ratio": 1.3333333333333333,
+      "controls": [
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 172
+        },
+        {
+          "x": 180,
+          "right": 276
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 158
+        },
+        {
+          "x": 166,
+          "right": 234
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 90,
+          "right": 158
+        },
+        {
+          "x": 166,
+          "right": 234
+        },
+        {
+          "x": 0,
+          "right": 96
+        },
+        {
+          "x": 104,
+          "right": 172
+        },
+        {
+          "x": 180,
+          "right": 262
+        },
+        {
+          "x": 0,
+          "right": 68
+        },
+        {
+          "x": 76,
+          "right": 158
+        },
+        {
+          "x": 166,
+          "right": 248
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 0,
+          "right": 288
+        },
+        {
+          "x": 0,
+          "right": 288
+        },
+        {
+          "x": 0,
+          "right": 82
+        },
+        {
+          "x": 0,
+          "right": 288
+        },
+        {
+          "x": 0,
+          "right": 16
+        },
+        {
+          "x": 0,
+          "right": 54
+        },
+        {
+          "x": 0,
+          "right": 288
+        }
+      ]
+    }
+  ],
+  "runtimeErrors": [],
+  "boardTested": false
+}

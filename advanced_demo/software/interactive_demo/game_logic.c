@@ -40,6 +40,10 @@ static void spawn_enemy(survival_game_t *game, uint32_t now_ms) {
         enemy->x = (int16_t)(8u + v % (GAME_WORLD_WIDTH - ENEMY_SIZE - 16u));
         enemy->y = (int16_t)(GAME_WORLD_TOP + (v >> 8) % 40u);
         enemy->vx = (int8_t)(((int32_t)((v >> 16) % 3u) - 1) * (int32_t)GAME_PIXEL_SCALE);
+#if GAME_SHOWCASE
+        if (game->showcase) enemy->vx = game->campaign_stage == 1u ? 0 :
+            (int8_t)((i & 1u) ? 2 : -2);
+#endif
         enemy->active = 1u;
         break;
     }
@@ -51,6 +55,9 @@ static void spawn_enemy(survival_game_t *game, uint32_t now_ms) {
         if(game->difficulty==0u)interval=interval*3u/2u;
         else if(game->difficulty==2u)interval=interval*3u/4u;
         game->next_spawn_ms = now_ms + interval;
+#if GAME_SHOWCASE
+        if (game->showcase) game->next_spawn_ms = now_ms + 600u - 80u * game->campaign_stage;
+#endif
     }
 }
 
@@ -92,7 +99,11 @@ static void fire_enemy_volley(survival_game_t *game, uint32_t now_ms) {
         scale = dx < 0 ? -dx : dx;
         if ((dy < 0 ? -dy : dy) > scale) scale = dy < 0 ? -dy : dy;
         if (!scale) scale = 1;
-        for (lane = 0; lane < ((game->wave & 1u) ? 1u : 3u); ++lane) {
+        uint32_t lanes = (game->wave & 1u) ? 1u : 3u;
+#if GAME_SHOWCASE
+        if (game->showcase) lanes = game->campaign_stage == 3u ? 3u : 1u;
+#endif
+        for (lane = 0; lane < lanes; ++lane) {
             for (slot = 0; slot < survival_game_enemy_bullet_limit(game); ++slot)
                 if (!game->enemy_bullets[slot].active) break;
             if (slot == survival_game_enemy_bullet_limit(game)) return;
@@ -100,7 +111,7 @@ static void fire_enemy_volley(survival_game_t *game, uint32_t now_ms) {
             game->enemy_bullets[slot].y = (int16_t)(enemy->y + ENEMY_SIZE - ENEMY_BULLET_SIZE / 2);
             game->enemy_bullets[slot].vx = (int8_t)(dx * ENEMY_BULLET_SPEED / scale);
             game->enemy_bullets[slot].vy = (int8_t)(dy * ENEMY_BULLET_SPEED / scale);
-            if (!(game->wave & 1u)) {
+            if (lanes == 3u) {
                 game->enemy_bullets[slot].vx = (int8_t)(((int32_t)lane * 2 - 2) * (int32_t)GAME_PIXEL_SCALE);
                 game->enemy_bullets[slot].vy = ENEMY_BULLET_SPEED;
             }
@@ -137,6 +148,7 @@ static void add_effect(survival_game_t *game, int16_t x, int16_t y, uint32_t now
             game->effects[i].y = y;
             game->effects[i].expires_ms = now_ms + GAME_EFFECT_LIFETIME_MS;
             game->effects[i].active = 1u;
+            game->effects[i].kind = GAME_EFFECT_EXPLOSION;
             return;
         }
     }
@@ -156,6 +168,47 @@ void survival_game_begin_campaign(survival_game_t *game, uint32_t now_ms) {
     game->difficulty = difficulty;
     game->campaign_stage = 1u;
 }
+
+#if GAME_SHOWCASE
+void survival_game_begin_showcase(survival_game_t *game, uint32_t now_ms) {
+    survival_game_begin_campaign(game, now_ms);
+    game->showcase = 1u;
+    game->showcase_state = GAME_SHOWCASE_WAVES;
+    game->showcase_state_ms = now_ms;
+    game->auto_restart_ms = 0u;
+}
+
+static void showcase_effect(survival_game_t *game, int16_t x, int16_t y,
+                            uint32_t now_ms, uint8_t kind) {
+    uint32_t i, selected = GAME_EFFECT_LIMIT;
+    for (i = 0; i < GAME_EFFECT_LIMIT; ++i) {
+        if (!game->effects[i].active || time_reached(now_ms, game->effects[i].expires_ms)) {
+            selected = i; break;
+        }
+        if (kind == GAME_EFFECT_DEFEAT && game->effects[i].kind != GAME_EFFECT_DEFEAT)
+            selected = i;
+    }
+    if (selected < GAME_EFFECT_LIMIT) {
+        game_effect_t *effect = &game->effects[selected];
+        effect->x = x; effect->y = y; effect->kind = kind; effect->active = 1u;
+        effect->expires_ms = now_ms + (kind == GAME_EFFECT_HIT ? GAME_SHOWCASE_HIT_MS : GAME_EFFECT_LIFETIME_MS);
+    }
+}
+
+static void showcase_death_tick(survival_game_t *game, uint32_t now_ms) {
+    if (game->defeat_bursts < 4u && time_reached(now_ms, game->next_spawn_ms)) {
+        uint32_t n = game->defeat_bursts++;
+        showcase_effect(game, (int16_t)(game->boss.x + (n & 1u) * 24u),
+            (int16_t)(game->boss.y + (n >> 1) * 24u), now_ms, GAME_EFFECT_DEFEAT);
+        game->next_spawn_ms = now_ms + 125u;
+    }
+    if ((uint32_t)(now_ms - game->showcase_state_ms) >= 800u) {
+        game->showcase_state = GAME_SHOWCASE_VICTORY;
+        game->showcase_state_ms = now_ms;
+        game->campaign_result = 1u; game->game_over = 1u; game->victory_armed = 0u;
+    }
+}
+#endif
 
 /* Reproducible full-pool scene. Refill departing/hit objects continuously;
  * unlike the campaign it cannot finish during the 60-second measurement. */
@@ -218,12 +271,23 @@ static void clear_combat(survival_game_t *game) {
 }
 
 static void advance_campaign(survival_game_t *game, uint32_t now_ms) {
-    uint32_t stage = 1u + (now_ms - game->started_ms) / GAME_CAMPAIGN_WAVE_MS;
+    uint32_t period = GAME_CAMPAIGN_WAVE_MS;
+    uint32_t stage;
+#if GAME_SHOWCASE
+    if (game->showcase) period = GAME_SHOWCASE_WAVE_MS;
+#endif
+    stage = 1u + (now_ms - game->started_ms) / period;
     if (stage > GAME_CAMPAIGN_BOSS_STAGE) stage = GAME_CAMPAIGN_BOSS_STAGE;
     if (stage != game->campaign_stage) {
         game->campaign_stage = (uint8_t)stage;
         game->next_spawn_ms = now_ms;
         game->next_enemy_fire_ms = now_ms + 500u;
+#if GAME_SHOWCASE
+        if (game->showcase) {
+            clear_combat(game);
+            game->showcase_state_ms = now_ms;
+        }
+#endif
         if (stage == GAME_CAMPAIGN_BOSS_STAGE) {
             clear_combat(game);
             game->boss.active = 1u;
@@ -233,12 +297,86 @@ static void advance_campaign(survival_game_t *game, uint32_t now_ms) {
             game->boss.vx = (int8_t)(2u * GAME_PIXEL_SCALE);
             game->boss.attack_phase = 1u;
             game->boss_next_fire_ms = now_ms + 800u;
+#if GAME_SHOWCASE
+            if (game->showcase) {
+                game->boss.hp = GAME_SHOWCASE_BOSS_HP;
+                game->showcase_state = GAME_SHOWCASE_INTRO;
+                game->boss_warning_until_ms = now_ms + 1000u;
+                game->boss_next_fire_ms = now_ms + 1000u;
+            }
+#endif
         }
     }
     game->wave = stage;
 }
 
+#if GAME_SHOWCASE
+static void showcase_boss_phase(survival_game_t *game, uint32_t now_ms) {
+    uint32_t lane;
+    uint8_t phase = game->boss.hp <= 20u ? 3u : game->boss.hp <= 40u ? 2u : 1u;
+    if (phase == game->boss.attack_phase) return;
+    game->boss.attack_phase = phase;
+    for (lane = 0; lane < GAME_ENEMY_BULLET_CAPACITY; ++lane)
+        game->enemy_bullets[lane].active = 0u;
+    game->boss_warning_until_ms = now_ms + 500u;
+    game->boss_next_fire_ms = now_ms + 500u;
+    game->boss_angle = 0u;
+}
+
+static void tick_showcase_boss(survival_game_t *game, uint32_t now_ms) {
+    static const int8_t direction[32][2] = {
+        {4,0},{4,1},{4,2},{3,2},{3,3},{2,3},{2,4},{1,4},
+        {0,4},{-1,4},{-2,4},{-2,3},{-3,3},{-3,2},{-4,2},{-4,1},
+        {-4,0},{-4,-1},{-4,-2},{-3,-2},{-3,-3},{-2,-3},{-2,-4},{-1,-4},
+        {0,-4},{1,-4},{2,-4},{2,-3},{3,-3},{3,-2},{4,-2},{4,-1}
+    };
+    game_boss_t *boss = &game->boss;
+    uint32_t phase = boss->hp <= 20u ? 3u : boss->hp <= 40u ? 2u : 1u;
+    uint32_t lane, count, interval, moving;
+    if (game->showcase_state == GAME_SHOWCASE_INTRO) {
+        if (!time_reached(now_ms, game->boss_warning_until_ms)) return;
+        game->showcase_state = GAME_SHOWCASE_BOSS;
+        game->boss_phase_ms = now_ms;
+    }
+    showcase_boss_phase(game, now_ms);
+    moving = ((now_ms - game->boss_phase_ms) % 5000u) < 3000u;
+    if (moving) {
+        boss->x = (int16_t)(boss->x + boss->vx);
+        if (boss->x <= 32 || boss->x >= (int32_t)(GAME_WORLD_WIDTH - GAME_BOSS_SIZE - 32u)) {
+            boss->vx = (int8_t)-boss->vx;
+            boss->x = (int16_t)clamp_i32(boss->x, 32, GAME_WORLD_WIDTH - GAME_BOSS_SIZE - 32u);
+        }
+    }
+    if (!time_reached(now_ms, game->boss_next_fire_ms)) return;
+    count = phase == 1u ? 4u : phase == 2u ? 14u : 24u;
+    interval = phase == 1u ? 112u : phase == 2u ? 320u :
+        (game->boss_angle % 3u == 2u ? 800u : 180u);
+    game->boss_next_fire_ms = now_ms + interval * (moving ? 2u : 1u);
+    for (lane = 0; lane < count; ++lane) {
+        uint32_t slot, angle;
+        game_enemy_bullet_t *bullet;
+        for (slot = 0; slot < GAME_ENEMY_BULLET_CAPACITY; ++slot)
+            if (!game->enemy_bullets[slot].active) break;
+        if (slot == GAME_ENEMY_BULLET_CAPACITY) break;
+        angle = phase == 1u ? game->boss_angle + (lane / 2u) * 16u + lane % 2u :
+                phase == 2u ? (lane < 7u ? 2u : 8u) + lane % 7u :
+                lane * 32u / 24u + game->boss_angle;
+        bullet = &game->enemy_bullets[slot];
+        bullet->x = (int16_t)(boss->x + (GAME_BOSS_SIZE - GAME_PROJECTILE_SIZE) / 2u);
+        if (phase == 2u) bullet->x = (int16_t)(boss->x +
+            (lane < 7u ? 8u : GAME_BOSS_SIZE - GAME_PROJECTILE_SIZE - 8u));
+        bullet->y = (int16_t)(boss->y + (GAME_BOSS_SIZE - GAME_PROJECTILE_SIZE) / 2u);
+        bullet->vx = direction[angle & 31u][0]; bullet->vy = direction[angle & 31u][1];
+        bullet->active = 1u;
+    }
+    ++game->boss_angle;
+}
+#endif
+
 static void tick_boss(survival_game_t *game, uint32_t now_ms) {
+#if GAME_SHOWCASE
+    if (game->showcase) { tick_showcase_boss(game, now_ms); return; }
+#endif
     /* Integer velocity table keeps the second phase independent of libm. */
     static const int8_t ring[16][2] = {
         {0,4},{2,4},{3,3},{4,2},{4,0},{4,-2},{3,-3},{2,-4},
@@ -307,6 +445,13 @@ static void freeze_game_timers(survival_game_t *game, uint32_t elapsed_ms) {
     game->next_fire_ms += elapsed_ms;
     game->next_enemy_fire_ms += elapsed_ms;
     game->boss_next_fire_ms += elapsed_ms;
+#if GAME_SHOWCASE
+    if (game->showcase) {
+        game->showcase_state_ms += elapsed_ms;
+        game->boss_phase_ms += elapsed_ms;
+        game->boss_warning_until_ms += elapsed_ms;
+    }
+#endif
     if (game->invulnerable) game->invulnerable_until_ms += elapsed_ms;
     for (i = 0; i < GAME_EFFECT_LIMIT; ++i)
         if (game->effects[i].active) game->effects[i].expires_ms += elapsed_ms;
@@ -315,6 +460,11 @@ static void freeze_game_timers(survival_game_t *game, uint32_t elapsed_ms) {
 static void simulation_tick(survival_game_t *game, uint8_t buttons, uint32_t now_ms) {
     uint32_t i;
     int32_t dx = 0, dy = 0;
+#if GAME_SHOWCASE
+    if (game->showcase && game->showcase_state == GAME_SHOWCASE_DEFEAT) {
+        showcase_death_tick(game, now_ms); ++game->frames; return;
+    }
+#endif
     if (game->campaign_stage) advance_campaign(game, now_ms);
     else game->wave = 1u + (now_ms - game->started_ms) / 12000u;
     if (game->stress_mode) buttons |= UART_KEY_FIRE;
@@ -337,6 +487,10 @@ static void simulation_tick(survival_game_t *game, uint8_t buttons, uint32_t now
         uint32_t limit = game->enemy_limit;
         if (game->campaign_stage && limit > 8u + 4u * game->campaign_stage)
             limit = 8u + 4u * game->campaign_stage;
+#if GAME_SHOWCASE
+        if (game->showcase && limit > 4u + 2u * game->campaign_stage)
+            limit = 4u + 2u * game->campaign_stage;
+#endif
         if (time_reached(now_ms, game->next_spawn_ms) && enemy_count(game) < limit)
             spawn_enemy(game, now_ms);
         if (time_reached(now_ms, game->next_enemy_fire_ms)) fire_enemy_volley(game, now_ms);
@@ -354,16 +508,39 @@ static void simulation_tick(survival_game_t *game, uint8_t buttons, uint32_t now
         if (game->boss.active && intersects(bullet->x, bullet->y, BULLET_W, BULLET_H,
                 game->boss.x, game->boss.y, GAME_BOSS_SIZE, GAME_BOSS_SIZE)) {
             bullet->active = 0u;
+#if GAME_SHOWCASE
+            if (game->showcase && game->showcase_state == GAME_SHOWCASE_INTRO) continue;
+            if (game->showcase) {
+                int16_t hit_x = (int16_t)(bullet->x + BULLET_W / 2 - 8);
+                int16_t hit_y = (int16_t)(bullet->y + BULLET_H / 2 - 8);
+                showcase_effect(game, hit_x, hit_y, now_ms, GAME_EFFECT_HIT);
+            }
+#endif
             game->score += 5u;
             if (--game->boss.hp == 0u) {
                 game->score += 1000u;
                 game->boss.active = 0u;
+#if GAME_SHOWCASE
+                if (game->showcase) {
+                    for (j = 0; j < GAME_ENEMY_LIMIT; ++j) game->enemies[j].active = 0u;
+                    for (j = 0; j < GAME_BULLET_LIMIT; ++j) game->bullets[j].active = 0u;
+                    for (j = 0; j < GAME_ENEMY_BULLET_CAPACITY; ++j) game->enemy_bullets[j].active = 0u;
+                    game->showcase_state = GAME_SHOWCASE_DEFEAT;
+                    game->showcase_state_ms = now_ms;
+                    game->defeat_bursts = 0u; game->next_spawn_ms = now_ms;
+                    showcase_death_tick(game, now_ms);
+                    ++game->frames; return;
+                }
+#endif
                 game->campaign_result = 1u;
                 game->game_over = 1u;
                 game->auto_restart_at_ms = now_ms + game->auto_restart_ms;
                 clear_combat(game);
                 break;
             }
+#if GAME_SHOWCASE
+            if (game->showcase) showcase_boss_phase(game, now_ms);
+#endif
             continue;
         }
         for (j = 0; j < GAME_ENEMY_LIMIT; ++j) {
@@ -435,6 +612,12 @@ static void simulation_tick(survival_game_t *game, uint8_t buttons, uint32_t now
     if (game->lives == 0u && !game->game_over) {
         game->game_over = 1u;
         if (game->campaign_stage) game->campaign_result = 2u;
+#if GAME_SHOWCASE
+        if (game->showcase) {
+            game->showcase_state = GAME_SHOWCASE_FAILURE;
+            game->showcase_state_ms = now_ms; game->victory_armed = 0u;
+        }
+#endif
         game->auto_restart_at_ms = now_ms + game->auto_restart_ms;
     }
     if (game->stress_mode) refill_stress(game);
@@ -450,12 +633,26 @@ void survival_game_step(survival_game_t *game, uint8_t buttons, uint32_t now_ms)
     uint8_t was_paused = game->paused;
     if (game->campaign_stage == GAME_CAMPAIGN_TITLE) {
         if ((buttons & UART_KEY_FIRE) && !(game->previous_buttons & UART_KEY_FIRE))
+#if GAME_SHOWCASE
+            survival_game_begin_showcase(game, now_ms);
+#else
             survival_game_begin_campaign(game, now_ms);
+#endif
         game->previous_buttons = buttons;
         game->last_ms = now_ms;
         return;
     }
     if (game->game_over) {
+#if GAME_SHOWCASE
+        if (game->showcase) {
+            uint32_t hold_ms = game->campaign_result == 1u ? 3000u : 500u;
+            if ((uint32_t)(now_ms - game->showcase_state_ms) >= hold_ms && !(buttons & UART_KEY_FIRE))
+                game->victory_armed = 1u;
+            if (game->victory_armed && (buttons & UART_KEY_FIRE) && !(game->previous_buttons & UART_KEY_FIRE))
+                survival_game_begin_showcase(game, now_ms);
+            game->previous_buttons = buttons; game->last_ms = now_ms; return;
+        }
+#endif
         if (((buttons & UART_KEY_FIRE) && !(game->previous_buttons & UART_KEY_FIRE)) ||
             (game->auto_restart_ms && time_reached(now_ms, game->auto_restart_at_ms))) {
             uint32_t delay = game->auto_restart_ms, interval = game->enemy_fire_interval_ms;

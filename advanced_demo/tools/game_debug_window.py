@@ -15,8 +15,9 @@ import keyboard_uart
 
 
 class DebugWindow:
-    def __init__(self, root, elf=DEFAULT_ELF):
+    def __init__(self, root, elf=DEFAULT_ELF, bridge_factory=DebugBridge):
         self.root, self.bridge = root, None
+        self.bridge_factory = bridge_factory
         self.events = queue.Queue()
         self.busy = self.measuring = self.closing = False
         self.rows = []
@@ -45,7 +46,7 @@ class DebugWindow:
         controls = ttk.LabelFrame(box, text="板上操作：不重新烧录", padding=8)
         controls.grid(row=3, column=0, columnspan=7, sticky="ew")
         for label, command in (("重开", 1), ("暂停", 2), ("继续", 3),
-                               ("一键自测", 5), ("进入游戏", 6)):
+                               ("一键自测", 5), ("进入游戏", 6), ("演示战役", 10)):
             ttk.Button(controls, text=label, command=lambda c=command: self.send(c)).pack(side="left", padx=4)
         ttk.Button(controls, text="满负载场景", command=lambda: self.send(8)).pack(side="left", padx=4)
         ttk.Button(controls, text="连续测量 60 秒", command=self.measure).pack(side="left", padx=10)
@@ -140,6 +141,9 @@ class DebugWindow:
                         self.summary.set("JTAG 已连接；新 ELF 尚未加载。请点击“加载并运行 ELF”。")
                     else:
                         self.summary.set("操作未完成，详情见日志")
+                elif kind == "progress":
+                    self.summary.set(value)
+                    self.log(value)
                 elif kind == "uart":
                     if isinstance(value, tuple):
                         label, message = value
@@ -176,7 +180,7 @@ class DebugWindow:
             return self.read()
         elf, ide = self.elf.get(), self.ide.get()
         def work():
-            bridge = DebugBridge(elf, ide)
+            bridge = self.bridge_factory(elf, ide)
             bridge.connect()
             self.bridge = bridge
             return bridge.snapshot(verify=True)
@@ -293,6 +297,11 @@ class DebugWindow:
                          f'实际绘制敌弹 {load["measurement_min_enemy_bullets"]}–{load["measurement_max_enemy_bullets"]}。'
                          '总 Sprite 范围还包含玩家、玩家子弹与爆炸。')
             runtime = status.get("runtime", {})
+            presentation = status.get("presentation")
+            if presentation:
+                self.log(f'相邻呈现边界：{presentation["presentation_intervals"]} 个完整间隔，'
+                         f'跨过边界 {presentation["missing_boundaries"]} 次，'
+                         f'最大边界差 {presentation["max_boundary_gap"]}；原始重复旧帧计数另行保留。')
             if runtime:
                 diagnostics = runtime.get("measurement_path_diagnostics", 0)
                 self.log(f'测量区间：最慢绘制 {runtime["measurement_max_render_us"]/1000:.3f} ms，'
@@ -337,6 +346,14 @@ class DebugWindow:
                          f'精灵 {status.get("active_sprites")}/峰值 {status.get("max_active_sprites")} | '
                          f'错误 0x{status.get("error", 0):04x}')
         runtime = status.get("runtime", {})
+        presentation = status.get("presentation")
+        if presentation:
+            config = status.get("build_config", {})
+            self.log(f'渲染 {config.get("view_width",640)}x{config.get("view_height",480)} / '
+                     f'显示 {presentation["display_width"]}x{presentation["display_height"]} '
+                     f'@({presentation["display_x"]},{presentation["display_y"]})，'
+                     f'{presentation["scale"]} 倍；战役状态 {presentation["state"]}，'
+                     f'Boss 阶段 {presentation["boss_phase"]}。')
         limits = status.get("stress_limits")
         if limits:
             self.stress_note.set(f'本 ELF 支持敌机 1–{limits["enemies"]}、敌弹 1–{limits["enemy_bullets"]}；'
@@ -350,7 +367,9 @@ class DebugWindow:
         if status.get("render_options", {}).get("window_hud_cache"):
             self.summary.set(self.summary.get() + " | 背景/HUD 优化版")
         hardware_options = status.get("hardware_optimizations", {})
-        if hardware_options.get("enemy_bullet_source_cache"):
+        if hardware_options.get("display_scale2"):
+            self.summary.set(self.summary.get() + " | v11 两倍显示+Alpha流水线+敌弹缓存")
+        elif hardware_options.get("enemy_bullet_source_cache"):
             self.summary.set(self.summary.get() + " | v10 Alpha流水线+敌弹缓存")
         elif hardware_options.get("alpha_stream"):
             self.summary.set(self.summary.get() + " | v9 Alpha流水线")

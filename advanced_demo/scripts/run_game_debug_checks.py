@@ -15,10 +15,12 @@ sys.path.insert(0, str(ROOT / "tools"))
 from game_debug_bridge import (APB, CONTROL_MAGIC, DEFAULT_ELF, DEFAULT_IDE, DebugBridge,
                                ElfImage, STATUS_FIELDS, STATUS_MAGIC, RUNTIME_FIELDS,
                                LEGACY_RUNTIME_FIELDS, STRESS_MAGIC, STRESS_STATUS_FIELDS,
-                               inspection_config, tcl_word)
+                               PRESENTATION_FIELDS, inspection_config, tcl_word)
 
 STRESS_ELF = ROOT / "software/interactive_demo/build/game-window640-stress/survival_game.elf"
 OPTIMIZED_ELF = ROOT / "software/interactive_demo/build/game-window640-stress-opt/survival_game.elf"
+SHOWCASE_ELF = ROOT / "software/interactive_demo/build/game-showcase/survival_game.elf"
+SHOWCASE_BENCHMARK_ELF = ROOT / "software/interactive_demo/build/game-showcase-benchmark/survival_game.elf"
 
 
 class FakeBridge(DebugBridge):
@@ -81,6 +83,63 @@ class FakeBridge(DebugBridge):
 
 
 class DebugTests(unittest.TestCase):
+    def test_showcase_v10_v11_pairing_and_unchanged_mailboxes(self):
+        for elf,capacity in ((SHOWCASE_ELF,256),(SHOWCASE_BENCHMARK_ELF,512)):
+            self.assertTrue(elf.exists(), 'Build scripts/build_showcase_game.py first')
+            for version,caps in ((0xA0000,0x3FFB),(0xB0000,0x7FFB)):
+                with self.subTest(elf=elf.name,version=version):
+                    bridge=FakeBridge(elf)
+                    bridge.memory[APB+4]=version
+                    bridge.memory[APB+0x40]=caps
+                    self.assertEqual(bridge.image.symbol_u32('g_game_scale2_compatible'),0x4000)
+                    self.assertEqual(bridge.image.symbols['g_debug_control'][1],32)
+                    self.assertEqual(bridge.image.symbols['g_debug_status'][1],4*len(STATUS_FIELDS))
+                    self.assertEqual(bridge.stress_limits()['enemy_bullets'],capacity)
+                    self.assertLessEqual(bridge.image.symbols['_sp'][0],0xF900FC00)
+                    bridge.load()
+                    self.assertIn(f'resume {bridge.image.entry:#x}',bridge.calls)
+                    self.assertEqual(bridge.snapshot()['hardware_optimizations']['display_scale2'],version==0xB0000)
+
+    def test_scale2_mismatches_rejected_before_loading_or_writing(self):
+        for elf,version,caps in ((SHOWCASE_ELF,0xA0000,0x7FFB),
+                                  (SHOWCASE_ELF,0xB0000,0x3FFB),
+                                  (SHOWCASE_ELF,0xB0000,0x5FFB),
+                                  (OPTIMIZED_ELF,0xB0000,0x7FFB)):
+            with self.subTest(elf=str(elf),version=version,caps=caps):
+                bridge=FakeBridge(elf)
+                bridge.memory[APB+4]=version
+                bridge.memory[APB+0x40]=caps
+                with self.assertRaises(RuntimeError): bridge.load()
+                self.assertFalse(bridge.writes)
+                self.assertFalse(any(call.startswith('load_image ') for call in bridge.calls))
+
+    def test_showcase_command10_requires_matching_elf(self):
+        for elf in (DEFAULT_ELF,OPTIMIZED_ELF,SHOWCASE_BENCHMARK_ELF):
+            bridge=FakeBridge(elf)
+            with self.assertRaisesRegex(RuntimeError,'不含紧凑战役'):
+                bridge.command(10)
+            self.assertFalse(bridge.writes)
+        bridge=FakeBridge(SHOWCASE_ELF)
+        self.assertEqual(bridge.command(10),1)
+        address=bridge.image.symbol('g_debug_control',32)
+        self.assertEqual(bridge.writes[-2:],[(address+8,10),(address+4,1)])
+
+    def test_optional_presentation_snapshot_and_publication(self):
+        bridge=FakeBridge(SHOWCASE_ELF)
+        address=bridge.image.symbol('g_game_presentation',4*len(PRESENTATION_FIELDS))
+        fields=dict(magic=0x47505231,publication=2,scale=2,display_x=320,display_y=60,
+                    display_width=1280,display_height=960,showcase=1,state=3,boss_phase=2,
+                    boss_moving=1,first_boundary=10,last_boundary=101,presentation_intervals=90,
+                    missing_boundaries=1,max_boundary_gap=2)
+        for i,name in enumerate(PRESENTATION_FIELDS): bridge.memory[address+i*4]=fields[name]
+        status=bridge.snapshot()
+        self.assertEqual(status['presentation'],fields)
+        self.assertFalse(status['partial_presentation'])
+        self.assertTrue(status['showcase_available'])
+        bridge.memory[address+4]=3
+        self.assertTrue(bridge.snapshot()['partial_presentation'])
+        self.assertNotIn('presentation',FakeBridge(OPTIMIZED_ELF).snapshot())
+
     def test_optimized_window_pair_and_build_marker_keep_dynamic_load_contract(self):
         if not OPTIMIZED_ELF.exists():
             self.skipTest("Build scripts/build_window_stress_optimized_game.cmd first")

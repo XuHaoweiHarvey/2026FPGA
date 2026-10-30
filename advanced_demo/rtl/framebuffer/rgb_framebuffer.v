@@ -15,7 +15,7 @@ module rgb_framebuffer #(
     parameter [31:0] BUFFER0_BASE=0, BUFFER1_BASE=32'h00800000,
     parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0, ALPHA_ENABLE=0,
     parameter COMMAND_QUEUE_ENABLE=0, COMMAND_QUEUE_DEPTH=8,
-    parameter DISPLAY_WINDOW_ENABLE=0,
+    parameter DISPLAY_WINDOW_ENABLE=0, DISPLAY_SCALE2_ENABLE=0,
     parameter ALPHA_STREAM_ENABLE=0, ALPHA_SPRITE_CACHE_ENABLE=0
 )(
     input wire axi_clk, input wire rst_n,
@@ -485,7 +485,13 @@ end else begin: no_swaps
 end endgenerate
 // Derive normal FIFO read latency locally; the legacy rdvalid output is not
 // used across clock domains. The unpacker reserves space for its pending read.
-generate if(DISPLAY_WINDOW_ENABLE) begin: window_output
+generate if(DISPLAY_WINDOW_ENABLE && DISPLAY_SCALE2_ENABLE) begin: scaled_window_output
+window_scale2_composer #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT)) composer (
+    .clk(o_clk),.rst_n(rd_rst_n),.frame_period(fifo_rd_period),
+    .fifo_data(rd_fifo_data),.fifo_empty(rd_fifo_empty),.fifo_read(rd_fifo_read),
+    .m_axis_tdata(m_axis_tdata),.m_axis_tvalid(m_axis_tvalid),.m_axis_tready(m_axis_tready),
+    .m_axis_tuser(m_axis_tuser),.m_axis_tlast(m_axis_tlast));
+end else if(DISPLAY_WINDOW_ENABLE) begin: window_output
 window_axis_composer #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT)) composer (
     .clk(o_clk),.rst_n(rd_rst_n),.frame_period(fifo_rd_period),
     .fifo_data(rd_fifo_data),.fifo_empty(rd_fifo_empty),.fifo_read(rd_fifo_read),
@@ -503,6 +509,7 @@ end endgenerate
 initial if(D_MODE && (WRITE_FIFO_HIGH>=RD_FIFO_DEPTH || WRITE_FIFO_LOW<16))
     $fatal(1,"Display service watermarks must fit the actual FIFO depth");
 initial begin
+    if(DISPLAY_SCALE2_ENABLE && !DISPLAY_WINDOW_ENABLE) $fatal(1,"Scale2 requires window scan");
     if(DISPLAY_WINDOW_ENABLE && (!D_MODE || FRAME_WIDTH!=1920 || FRAME_HEIGHT!=1080))
         $fatal(1,"Window scan requires the 1080p double-buffered platform");
     if(BLIT_ENABLE && (!C_MODE || !D_MODE)) $fatal(1,"BLIT requires the double-buffered platform");

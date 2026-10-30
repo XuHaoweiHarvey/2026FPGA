@@ -24,6 +24,7 @@
 #define ACCEL_CAP_FULLSCREEN_BACKGROUND (1u << 9)
 #define ACCEL_CAP_COMMAND_QUEUE (1u << 10)
 #define ACCEL_CAP_DISPLAY_WINDOW (1u << 11)
+#define ACCEL_CAP_DISPLAY_SCALE2 (1u << 14)
 #define ACCEL_CAP_COLOR_KEY (1u << 7)
 #define FRAME_FRONT_VALID (1u << 4)
 #define FRAME_WRITER_OWNED (1u << 5)
@@ -89,12 +90,21 @@ static inline uint32_t accel_color_key_blit(uint32_t s, uint32_t st, uint32_t x,
 }
 static inline uint32_t accel_alpha_blend(uint32_t s, uint32_t st, uint32_t x, uint32_t y,
                                          uint32_t w, uint32_t h, uint32_t a) {
+#ifdef MOCK_GAME_DRAW
+    MOCK_GAME_DRAW(3u, s, st, x, y, w, h, a);
+#endif
     (void)s; (void)st; (void)a; ++mock_game_alphas;
     mock_game_sprite_x = x; mock_game_sprite_y = y;
     mock_game_sprite_w = w; mock_game_sprite_h = h; return 0u;
 }
-static inline uint32_t display_get_back_buffer(void) { return 0x800000u; }
-static inline uint32_t display_get_front_buffer(void) { return 0u; }
+static inline uint32_t display_get_back_buffer(void) {
+#ifdef MOCK_GAME_BACK_BUFFER
+    return MOCK_GAME_BACK_BUFFER;
+#else
+    return 0x800000u;
+#endif
+}
+static inline uint32_t display_get_front_buffer(void) { return display_get_back_buffer() ^ 0x800000u; }
 static inline uint32_t display_swap_request(uint32_t *ticket) {
     *ticket = ++mock_game_swaps;
     if (mock_game_display_op_count < 4u)

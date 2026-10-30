@@ -1,5 +1,9 @@
 # 高级图形与游戏演示
 
+2026-10-29 新增独立 [LUNARIA / 星海梦境](docs/LUNARIA_GAME.md)：八种弹幕、旋转花瓣与五角星/六芒星、命中爆炸和 VICTORY。复用现有 v10 / v11 bit，入口为 `start_lunaria_debug.cmd`；首次含 ELF 与素材上传，板端验收待用户完成。原战机与压力包保留。
+
+2026-10-29 新增独立[紧凑战役与两倍显示版](docs/SHOWCASE_GAME.md)：三波各 7 秒、60 HP 移动 Boss、命中爆炸、800 ms 击毁演出和 VICTORY。v11 保持 100 MHz，把 640×480 源窗口显示为 1280×960；完整编译、setup / hold、1080p 仿真与主机回归通过，板端验收待用户完成。入口为 `start_showcase_debug.cmd`；交付在 `output/showcase_v11/`，另保留 `output/showcase_v10_fallback/`。下文原版说明继续作为基线记录。
+
 > 2026-10-24 新增 Flash 游戏实现：SPI0、图片/特效图集、最高分和难度存档、维护与只读导出工具。每次仍由电脑 JTAG/IDE 下载运行。详见 [Flash 封装与操作交付](docs/FLASH_DELIVERY.md) 和 [验证记录](docs/FLASH_VALIDATION.md)。下文原游戏报告保留为 Flash 接入前的基线记录。
 
 2026-10-24 已合并常驻调试/弹幕与 Flash 两套改动。默认构建启用 Flash，需要带 SPI0

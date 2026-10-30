@@ -48,6 +48,7 @@
         <efx:design_file name="rtl/framebuffer/rgb_framebuffer.v" version="default" library="default" />
         <efx:design_file name="rtl/framebuffer/window_display_reader.v" version="default" library="default" />
         <efx:design_file name="rtl/framebuffer/window_axis_composer.v" version="default" library="default" />
+        <efx:design_file name="rtl/framebuffer/window_scale2_composer.v" version="default" library="default" />
         <efx:design_file name="rtl/framebuffer/cpu_ddr_bridge.v" version="default" library="default" />
         <efx:design_file name="rtl/framebuffer/rgb_unpack128_to64.v" version="default" library="default" />
         <efx:design_file name="rtl/display/rgb_to_hdmi.v" version="default" library="default" />

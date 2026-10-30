@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 // Full resolution, asynchronous clocks, shared reads, random stalls and swap.
-module tb_window_display #(parameter REAL_CVO=0);
+module tb_window_display #(parameter REAL_CVO=0, SCALE2=0);
 reg clk=0,video_clk=0,pixel_clk=0,rst_n=0,manual_period=1,manual_boundary=0,request=0;
 wire period,boundary,blank;
 always #5 clk=~clk;
@@ -48,11 +48,19 @@ read_frame_guard #(.FRAME_BEATS(76800),.STRIDED(1)) guard (
     .rvalid(rv),.rready(rr),.rlast(rl),.rid(4'b0),.rresp(2'b0),
     .safe(safe),.active(active),.outstanding(outstanding),.data_beats(data_beats),
     .reserved_beats(reserved),.error_code(error_code));
+generate if(SCALE2) begin: scale_output
+window_scale2_composer composer (
+    .clk(video_clk),.rst_n(rst_n),.frame_period(period),.fifo_data(fifo_data),
+    .fifo_empty(empty),.fifo_read(fifo_read),.m_axis_tdata(axis_data),
+    .m_axis_tvalid(axis_valid),.m_axis_tready(axis_ready),
+    .m_axis_tuser(axis_user),.m_axis_tlast(axis_last));
+end else begin: original_output
 window_axis_composer composer (
     .clk(video_clk),.rst_n(rst_n),.frame_period(period),.fifo_data(fifo_data),
     .fifo_empty(empty),.fifo_read(fifo_read),.m_axis_tdata(axis_data),
     .m_axis_tvalid(axis_valid),.m_axis_tready(axis_ready),
     .m_axis_tuser(axis_user),.m_axis_tlast(axis_last));
+end endgenerate
 wire mv,mr;
 reg [31:0] mem_address=0;
 reg [8:0] mem_left=0;
@@ -79,6 +87,20 @@ function [31:0] pixel;
     input [31:0] address;
     begin pixel=(address>=32'h00800000 ? 32'h40000000 : 32'h10000000) |
                 ((address & 32'h007fffff)>>2);end
+endfunction
+function [31:0] expected_pixel;
+    input integer px,py,frame_number;
+    integer sx,sy;
+    begin
+        expected_pixel=0;
+        if(SCALE2) begin
+            if(px>=320 && px<1600 && py>=60 && py<1020) begin
+                sx=640+(px-320)/2;sy=300+(py-60)/2;
+                expected_pixel=pixel((frame_number==0 ? 0 : 32'h00800000)+sy*7680+sx*4);
+            end
+        end else if(px>=640 && px<1280 && py>=300 && py<780)
+            expected_pixel=pixel((frame_number==0 ? 0 : 32'h00800000)+py*7680+px*4);
+    end
 endfunction
 wire [127:0] mem_data={pixel(mem_address+12),pixel(mem_address+8),
                        pixel(mem_address+4),pixel(mem_address)};
@@ -145,10 +167,7 @@ generate if(REAL_CVO) begin : real_display
                 display_pixels=0;display_lines=0;
             end
             if(de) begin
-                rgb_expected=0;
-                if(line_pixels>=640 && line_pixels<1280 && display_lines>=300 && display_lines<780)
-                    rgb_expected=pixel((display_frames==0 ? 0 : 32'h00800000)+
-                                       display_lines*7680+line_pixels*4);
+                rgb_expected=expected_pixel(line_pixels,display_lines,display_frames);
                 if({red,green,blue}!==rgb_expected)
                     $fatal(1,"HDMI mismatch frame%0d (%0d,%0d) got %h expected %h",
                         display_frames,line_pixels,display_lines,{red,green,blue},rgb_expected);
@@ -171,11 +190,7 @@ always @(posedge video_clk) if(rst_n && !period) begin
     saved<={axis_user,axis_last,axis_data};
     if(axis_valid && axis_ready) begin
         x=(pairs%960)*2;y=pairs/960;
-        expected0=0;expected1=0;
-        if(x>=640 && x<1280 && y>=300 && y<780) begin
-            expected0=pixel((frames==0 ? 0 : 32'h00800000)+y*7680+x*4);
-            expected1=pixel((frames==0 ? 0 : 32'h00800000)+y*7680+(x+1)*4);
-        end
+        expected0=expected_pixel(x,y,frames);expected1=expected_pixel(x+1,y,frames);
         if(axis_data!=={expected1,expected0} || axis_user!==(pairs==0) ||
            axis_last!==(x==1918))
             $fatal(1,"Pixel/framing mismatch frame%0d (%0d,%0d): %h expected %h",
@@ -208,7 +223,7 @@ initial begin
        writer_bursts<100 || throttle_cycles==0)
         $fatal(1,"Swap/count/competing client check failed");
     $display("PASS two 1080p frames: viewport pixels, black border, 76800 beats/frame, strided/4KiB reads, AXIS stalls, shared reads and safe swap (%0d bursts)",display_reads);
-    $display("PASS write pressure: %0d bounded writes, %0d throttle cycles, REAL_CVO=%0d",writer_bursts,throttle_cycles,REAL_CVO);
+    $display("PASS write pressure: %0d bounded writes, %0d throttle cycles, REAL_CVO=%0d SCALE2=%0d",writer_bursts,throttle_cycles,REAL_CVO,SCALE2);
     $finish;
 end
 initial begin #100000000;$fatal(1,"Window display timeout");end

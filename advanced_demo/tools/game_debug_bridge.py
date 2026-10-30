@@ -14,6 +14,9 @@ DEFAULT_IDE = Path("D:/Efinity/efinity-riscv-ide-2026.1")
 DEFAULT_ELF = ROOT / "software/interactive_demo/build/game/survival_game.elf"
 CONTROL_MAGIC, STATUS_MAGIC = 0x47444331, 0x47445331
 STRESS_MAGIC = 0x47535431
+PRESENTATION_FIELDS = ("magic publication scale display_x display_y display_width display_height "
+                       "showcase state boss_phase boss_moving first_boundary last_boundary "
+                       "presentation_intervals missing_boundaries max_boundary_gap").split()
 STRESS_STATUS_FIELDS = ("magic version enemies enemy_bullets rendered_enemies rendered_enemy_bullets "
                         "measurement_min_enemies measurement_max_enemies "
                         "measurement_min_enemy_bullets measurement_max_enemy_bullets "
@@ -303,6 +306,15 @@ class DebugBridge:
                     if "g_game_window_hud_cache" in self.image.symbols else False
                 }
                 limits = self.stress_limits()
+                marker = self.image.symbols.get("g_game_presentation")
+                if marker and marker[1] >= 4 * len(PRESENTATION_FIELDS):
+                    values = self.read_words(self.image.symbol("g_game_presentation", 4*len(PRESENTATION_FIELDS)),
+                                             len(PRESENTATION_FIELDS))
+                    if values[0] == 0x47505231:
+                        status["presentation"] = dict(zip(PRESENTATION_FIELDS, values))
+                        status["partial_presentation"] = bool(values[1] & 1)
+                status["showcase_available"] = ("g_game_showcase_available" in self.image.symbols and
+                    self.image.symbol_u32("g_game_showcase_available") == 1)
                 if limits:
                     status["stress_limits"] = limits
                     values = self.read_words(self.image.symbol("g_game_stress_status",
@@ -318,8 +330,9 @@ class DebugBridge:
             hardware = self.read_words(APB, 2)
             status["hardware_id"], status["hardware_version"] = hardware
             status["hardware_optimizations"] = {
-                "alpha_stream": hardware[1] in (0x00090000, 0x000A0000),
-                "enemy_bullet_source_cache": hardware[1] == 0x000A0000,
+                "alpha_stream": hardware[1] in (0x00090000, 0x000A0000, 0x000B0000),
+                "enemy_bullet_source_cache": hardware[1] in (0x000A0000, 0x000B0000),
+                "display_scale2": hardware[1] == 0x000B0000,
             }
             status["cpu_was_running"] = running
             status["jtag_halts"] = self.halts
@@ -348,6 +361,18 @@ class DebugBridge:
             if status["measurement_state"] == 1:
                 raise RuntimeError("60 秒测量尚未结束，不能调整负载或发送命令")
             limits = self.stress_limits()
+            lunaria = ("g_lunaria_available" in self.image.symbols and
+                       self.image.symbol_u32("g_lunaria_available") == 1)
+            if lunaria and command not in (1, 2, 3, 4, 6, 7, 10):
+                raise RuntimeError("LUNARIA 不支持原战机压力场景/自测命令，请使用专用窗口")
+            if lunaria and command == 7:
+                values = self.read_words(self.image.symbol("g_game_presentation",
+                                         4*len(PRESENTATION_FIELDS)), len(PRESENTATION_FIELDS))
+                if values[PRESENTATION_FIELDS.index("state")] != 2:
+                    raise RuntimeError("LUNARIA 测量需要进入 Boss 战斗阶段")
+            if command == 10 and ("g_game_showcase_available" not in self.image.symbols or
+                                  self.image.symbol_u32("g_game_showcase_available") != 1):
+                raise RuntimeError("当前 ELF 不含紧凑战役，请加载 game-showcase/survival_game.elf")
             if command == 9:
                 if not limits:
                     raise RuntimeError("当前 ELF 不支持动态压力数量；请加载专用压力调参 ELF，v8 bit 无需重烧")
@@ -366,9 +391,9 @@ class DebugBridge:
             if command == 7 and runtime_layout is not None:
                 runtime_address, runtime_fields, _ = runtime_layout
                 runtime = self.read_words(runtime_address, len(runtime_fields))
-                if (runtime[0] != 0x47525431 or
+                if (runtime[0] != 0x47525431 or (not lunaria and (
                         not runtime[runtime_fields.index("stress_mode")] or
-                        (not limits and status["enemy_limit"] != 48)):
+                        (not limits and status["enemy_limit"] != 48)))):
                     raise RuntimeError("请先点击“满负载场景”，等画面稳定后再测量 60 秒")
             sequence = (words[1] + 1) & 0xFFFFFFFF
             if options is not None:
@@ -397,13 +422,21 @@ class DebugBridge:
             retry_after_running = False
             with self.halted() as was_running:
                 hardware = self.read_words(APB, 2)
-                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000, 0x00080000, 0x00090000, 0x000A0000):
-                    raise RuntimeError("硬件 ID/版本不匹配，需要配套 advanced v6/v7/v8/v9/v10 位流")
+                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000, 0x00080000, 0x00090000, 0x000A0000, 0x000B0000):
+                    raise RuntimeError("硬件 ID/版本不匹配，需要配套 advanced v6/v7/v8/v9/v10/v11 位流")
                 required = (self.image.symbol_u32("g_game_required_caps")
                             if "g_game_required_caps" in self.image.symbols else 0)
-                if bool(required & 0x800) != (hardware[1] in (0x00080000, 0x00090000, 0x000A0000)):
+                if bool(self.read_words(APB+0x40, 1)[0] & 0x4000) != (hardware[1] == 0x000B0000):
+                    raise RuntimeError("硬件版本与两倍显示能力位不一致，停止加载。")
+                if bool(required & 0x800) != (hardware[1] in (0x00080000, 0x00090000, 0x000A0000, 0x000B0000)):
                     raise RuntimeError("窗口读取 v8 bit 与专用窗口 ELF 必须配套；全屏/旧居中 ELF 使用原 v7 bit。")
-                if hardware[1] in (0x00090000, 0x000A0000):
+                if hardware[1] == 0x000B0000:
+                    if ("g_game_scale2_compatible" not in self.image.symbols or
+                            self.image.symbol_u32("g_game_scale2_compatible") != 0x4000):
+                        raise RuntimeError("v11 两倍显示需要兼容的新展示/压力 ELF；旧 ELF 使用原 v10 bit。")
+                    if not self.read_words(APB+0x40, 1)[0] & 0x4000:
+                        raise RuntimeError("v11 缺少两倍显示能力，停止加载。")
+                if hardware[1] in (0x00090000, 0x000A0000, 0x000B0000):
                     if ("g_game_alpha_hardware_compatible" not in self.image.symbols or
                             self.image.symbol_u32("g_game_alpha_hardware_compatible") != 0x3000):
                         raise RuntimeError("v9/v10 硬件需加载修正 SPR 后的新优化 ELF；旧窗口 ELF 请配原 v8 bit。")

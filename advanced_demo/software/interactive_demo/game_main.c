@@ -10,6 +10,7 @@
 #include "game_logic.h"
 #include "game_debug_abi.h"
 #include "game_runtime.h"
+#include "game_presentation.h"
 #include "game_stress_tuning.h"
 #include "uart_keyboard_input.h"
 #ifndef GAME_FLASH_ENABLE
@@ -126,6 +127,14 @@ const volatile game_build_config_t g_game_build_config = {
     1920u, 1080u
 };
 volatile uint32_t g_game_measurement_complete;
+#if GAME_ALLOW_SCALE2
+const volatile uint32_t g_game_scale2_compatible = UINT32_C(0x4000);
+volatile game_presentation_t g_game_presentation;
+static uint32_t g_presentation_measure_started;
+#endif
+#if GAME_SHOWCASE
+const volatile uint32_t g_game_showcase_available = 1u;
+#endif
 #if GAME_WINDOW_HUD_CACHE
 /* Optional retained build marker; existing status/config layouts stay intact. */
 const volatile uint32_t g_game_window_hud_cache = GAME_WINDOW_HUD_CACHE;
@@ -400,13 +409,23 @@ static uint32_t asset_hash(uint32_t image, int write_pixels) {
 }
 
 #if GAME_TEAM_BACKGROUND
+static uint32_t display_background_pixel(uint32_t x, uint32_t y) {
+#if GAME_SHOWCASE && GAME_DISPLAY_WINDOW
+    /* Fit the supplied island into the showcase viewport at upload time.
+       The sealed DDR address/stride and every per-frame BLIT stay unchanged. */
+    if (x >= VIEW_X && x < VIEW_X + VIEW_W && y >= VIEW_Y && y < VIEW_Y + VIEW_H)
+        return game_background_pixel((x - VIEW_X) * 3u, (y - VIEW_Y) * 9u / 4u);
+#endif
+    return game_background_pixel(x, y);
+}
+
 static void fullscreen_background_assets(int write_pixels) {
     uint32_t x, y;
     volatile uint32_t *dst = ddr(FULL_BACKGROUND_PHYS);
     for (y = 0u; y < 1080u; ++y) {
         if (!(y & 31u)) poll_keyboard();
         for (x = 0u; x < 1920u; ++x) {
-            uint32_t pixel = game_background_pixel(x, y);
+            uint32_t pixel = display_background_pixel(x, y);
             if (write_pixels) dst[y * 1920u + x] = pixel;
             else if (dst[y * 1920u + x] != pixel) fail(ERROR_ASSET);
         }
@@ -460,6 +479,18 @@ static uint32_t team_atlas_pixel(uint32_t x, uint32_t y) {
     return game_team_sprite_pixel(x, y);
 }
 static uint32_t atlas_pixel(uint32_t x, uint32_t y) {
+#if GAME_SHOWCASE
+    if (x >= 160u && x < 256u && y < 16u) {
+        uint32_t frame = (x - 160u) / 16u;
+        return team_atlas_pixel(frame * 32u + ((x - 160u) % 16u) * 2u, 64u + y * 2u);
+    }
+    if (x >= 144u && x < 160u && y < 16u) {
+        int32_t dx = (int32_t)x - 151, dy = (int32_t)y - 7;
+        uint32_t d2 = (uint32_t)(dx * dx + dy * dy);
+        uint32_t a = d2 >= 49u ? 0u : 255u - d2 * 4u;
+        return (a << 24) | (d2 < 6u ? 0x00fff1d0u : 0x00ff6038u);
+    }
+#endif
     if (y >= GAME_FONT_Y && y < GAME_FONT_Y + 72u) return game_font_pixel(x, y);
     if (y >= 320u && y < 320u + GAME_BOSS_SIZE && x < GAME_BOSS_SIZE)
         return team_atlas_pixel(96u + x / (2u * GAME_PIXEL_SCALE), (y - 320u) / (2u * GAME_PIXEL_SCALE));
@@ -907,11 +938,25 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
     p = append_u32(p, g_game.wave, 2u); p = append(p, " SCORE:");
     p = append_u32(p, g_game.score % 100000u, 5u); p = append(p, " HP:");
     p = append_u32(p, g_game.lives, 1u); *p = 0;
+#if GAME_SHOWCASE
+    if (g_game.showcase && g_game.boss.active) {
+        p = line; p = append(p, "BOSS:"); p = append_u32(p, g_game.boss.attack_phase, 1u);
+        p = append(p, " SCORE:"); p = append_u32(p, g_game.score % 100000u, 5u);
+        p = append(p, " HP:"); p = append_u32(p, g_game.lives, 1u); *p = 0;
+    }
+    if (g_game.showcase && g_game.invincible_mode) {
+        p = append(p, " INV"); *p = 0;
+    }
+#endif
     cached_hud_line(cache, 0u, line, 0u);
 #if GAME_WINDOW_HUD_CACHE
     {
         uint32_t mode = g_game.campaign_stage == GAME_CAMPAIGN_TITLE ? 1u :
             g_game.paused ? 2u : g_game.game_over ? 3u + g_game.campaign_result : 0u;
+#if GAME_SHOWCASE
+        if (g_game.showcase) mode |= (uint32_t)g_game.showcase_state << 4 |
+            (uint32_t)g_game.boss.attack_phase << 8;
+#endif
         if (!g_hud_metrics.valid || g_hud_metrics.mode != mode ||
             (uint32_t)(now_ms - g_hud_metrics.refreshed_ms) >= 250u) {
 #else
@@ -921,11 +966,27 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
         p = line;
         if (g_game.campaign_stage == GAME_CAMPAIGN_TITLE) p = append(p, "FIRE TO START");
         else if (g_game.paused) p = append(p, "PAUSED P TO CONTINUE");
-        else if (g_game.game_over) p = append(p, g_game.campaign_result == 1u ? "MISSION CLEAR FIRE TO RESTART" : "GAME OVER FIRE TO RESTART");
+        else if (g_game.game_over) p = append(p, g_game.campaign_result == 1u ?
+#if GAME_SHOWCASE
+            "VICTORY FIRE TO RESTART" :
+#else
+            "MISSION CLEAR FIRE TO RESTART" :
+#endif
+            "GAME OVER FIRE TO RESTART");
         else {
+#if GAME_SHOWCASE
+            if (g_game.showcase && g_game.boss.active) {
+                p = append(p, g_game.boss.attack_phase == 1u ? "ROTATING ARMS" :
+                    g_game.boss.attack_phase == 2u ? "CROSSING FANS" : "RING BURST");
+                p = append(p, ((now_ms - g_game.boss_phase_ms) % 5000u) < 3000u ? " MOVE" : " FIRE");
+            } else {
+#endif
             p = append(p, "FPS:"); p = m1b_fixed2(p, g_game_result.fps_x100);
             p = append(p, " SPR:"); p = append_u32(p, g_game_result.active_sprites, 1u);
             p = append(p, " MAX:"); p = append_u32(p, g_game_result.max_active_sprites, 1u);
+#if GAME_SHOWCASE
+            }
+#endif
         }
         *p = 0;
 #if GAME_WINDOW_HUD_CACHE
@@ -966,6 +1027,28 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
         cache->boss_hp = hp;
     }
 #endif
+#if GAME_SHOWCASE
+    if (g_game.showcase && cache->boss_hp != (g_game.boss.active ? g_game.boss.hp : 0u)) {
+        uint32_t hp = g_game.boss.active ? g_game.boss.hp : 0u;
+        issue_command(accel_fill_rect(VIEW_X + 12u, VIEW_Y + 55u, VIEW_W - 24u, 8u, PANEL));
+        if (hp) {
+            uint32_t width = ((VIEW_W - 24u) * hp / GAME_SHOWCASE_BOSS_HP) & ~3u;
+            if (width) issue_command(accel_fill_rect(VIEW_X + 12u, VIEW_Y + 55u, width, 8u, 0x00e85a70u));
+        }
+        cache->boss_hp = hp;
+    }
+    if (g_game.showcase && !g_game.game_over) {
+        if (g_game.showcase_state == GAME_SHOWCASE_INTRO ||
+            (g_game.showcase_state == GAME_SHOWCASE_BOSS &&
+             (int32_t)(g_game.boss_warning_until_ms - now_ms) > 0))
+            centered_text(VIEW_H / 2u - 12u, "WARNING", 2u);
+        else if (g_game.showcase_state == GAME_SHOWCASE_WAVES &&
+            (now_ms - g_game.started_ms) % GAME_SHOWCASE_WAVE_MS < 400u) {
+            p = line; p = append(p, "WAVE "); p = append_u32(p, g_game.campaign_stage, 1u); *p = 0;
+            centered_text(VIEW_H / 2u - 12u, line, 2u);
+        }
+    }
+#endif
     if (cache->overlay != g_scene_mode || (GAME_WINDOW_HUD_CACHE && g_scene_mode != 0u)) {
         /* Window gameplay is restored every frame, including center overlays. */
         uint32_t y = VIEW_H / 2u - 48u;
@@ -974,7 +1057,13 @@ static void render_hud(uint32_t back, uint32_t now_ms) {
             centered_text(y + 40u, "3 WAVES THEN BOSS", 2u);
             centered_text(y + 80u, "FIRE TO START", 1u);
         } else if (g_scene_mode == 2u || g_scene_mode == 3u) {
-            centered_text(y, g_scene_mode == 2u ? "MISSION CLEAR" : "GAME OVER", 2u);
+            centered_text(y, g_scene_mode == 2u ?
+#if GAME_SHOWCASE
+                "VICTORY" :
+#else
+                "MISSION CLEAR" :
+#endif
+                "GAME OVER", 2u);
             p = line; p = append(p, "SCORE:"); p = append_u32(p, g_game.score, 1u); *p = 0;
             centered_text(y + 40u, line, 0u);
             centered_text(y + 80u, "FIRE TO RESTART", 1u);
@@ -1046,6 +1135,21 @@ static void measure_frame(uint32_t now_ms) {
     elapsed = now_ms - g_measure_start;
     g_debug_status.measurement_elapsed_ms = elapsed;
     ++g_debug_status.measurement_frames;
+#if GAME_ALLOW_SCALE2
+    {
+        uint32_t boundary = accel_read(ACCEL_BOUNDARY_COUNT);
+        if (g_presentation_measure_started) {
+            uint32_t gap = boundary - g_game_presentation.last_boundary;
+            ++g_game_presentation.presentation_intervals;
+            if (gap > 1u) g_game_presentation.missing_boundaries += gap - 1u;
+            if (gap > g_game_presentation.max_boundary_gap) g_game_presentation.max_boundary_gap = gap;
+        } else {
+            g_game_presentation.first_boundary = boundary;
+            g_presentation_measure_started = 1u;
+        }
+        g_game_presentation.last_boundary = boundary;
+    }
+#endif
     g_game_runtime.measurement_display_frames = accel_read(ACCEL_BOUNDARY_COUNT) - g_measure_boundary_base;
     g_game_runtime.measurement_repeated_frames =
         g_game_runtime.measurement_display_frames > g_debug_status.measurement_frames ?
@@ -1123,6 +1227,9 @@ static void render_frame(uint32_t now_ms) {
         (g_game.game_over ? (g_game.campaign_result == 1u ? 2u : 3u) : 0u);
     uint64_t began = ticks(), rendered, presented;
     ++g_game_runtime.publication;
+#if GAME_ALLOW_SCALE2
+    ++g_game_presentation.publication;
+#endif
     GAME_FENCE();
     g_game_runtime.background_pixels = g_game_runtime.background_rectangles = 0u;
     g_game_runtime.sprite_pixels = g_game_runtime.glyph_blits = 0u;
@@ -1158,6 +1265,9 @@ static void render_frame(uint32_t now_ms) {
     for (i = 0; i < GAME_EFFECT_LIMIT; ++i) {
         const game_effect_t *effect = &g_game.effects[i];
         if (effect->active && (int32_t)(effect->expires_ms - now_ms) > 0) {
+#if GAME_SHOWCASE
+            if (effect->kind == GAME_EFFECT_HIT) continue;
+#endif
 #if GAME_TEAM_SPRITES
             uint32_t frame = game_team_explosion_frame(now_ms, effect->expires_ms);
             draw_alpha_sprite(frame * GAME_TEAM_EXPLOSION_SIZE * GAME_PIXEL_SCALE,
@@ -1226,6 +1336,17 @@ static void render_frame(uint32_t now_ms) {
         }
     }
     }
+#if GAME_SHOWCASE
+    if (mode == 0u) for (i = 0; i < GAME_EFFECT_LIMIT; ++i) {
+        const game_effect_t *effect = &g_game.effects[i];
+        if (effect->active && effect->kind == GAME_EFFECT_HIT &&
+            (int32_t)(effect->expires_ms - now_ms) > 0) {
+            uint32_t age = GAME_SHOWCASE_HIT_MS - (effect->expires_ms - now_ms);
+            uint32_t frame = age * 6u / GAME_SHOWCASE_HIT_MS;
+            draw_alpha_sprite(160u + frame * 16u, 0u, effect->x, effect->y, 16u, 255u);
+        }
+    }
+#endif
     update_metrics(now_ms);
     render_hud(back, now_ms);
     /* Drain queued work before checking or publishing the completed Back. */
@@ -1261,6 +1382,17 @@ static void render_frame(uint32_t now_ms) {
 #endif
     }
     measure_frame(milliseconds());
+#if GAME_ALLOW_SCALE2
+    g_game_presentation.showcase = GAME_SHOWCASE;
+#if GAME_SHOWCASE
+    g_game_presentation.showcase = g_game.showcase;
+    g_game_presentation.state = g_game.campaign_stage == GAME_CAMPAIGN_TITLE ? 0u : g_game.showcase_state;
+    g_game_presentation.boss_phase = g_game.boss.attack_phase;
+    g_game_presentation.boss_moving = g_game.showcase_state == GAME_SHOWCASE_BOSS &&
+        ((now_ms - g_game.boss_phase_ms) % 5000u) < 3000u;
+#endif
+    GAME_FENCE(); ++g_game_presentation.publication;
+#endif
     GAME_FENCE();
     ++g_game_runtime.publication;
     ++g_game_result.frame;
@@ -1287,7 +1419,11 @@ static void restart_game(uint32_t now_ms) {
     uint8_t invincible = g_game.enemy_limit ? g_game.invincible_mode : (uint8_t)(g_debug_control.flags & 1u);
     survival_game_reset(&g_game, now_ms);
     survival_game_set_options(&g_game, delay, interval, limit, invincible);
+#if GAME_SHOWCASE
+    survival_game_begin_showcase(&g_game, now_ms);
+#else
     survival_game_begin_campaign(&g_game, now_ms);
+#endif
     g_test_page = 0u;
 #if GAME_FULLSCREEN
     g_background_dirty[0].valid = g_background_dirty[1].valid = 0u;
@@ -1381,7 +1517,11 @@ static void service_debug_command(uint32_t now_ms) {
     } else if ((accel_read(ACCEL_STATUS) & ACCEL_BUSY) ||
         (accel_read(ACCEL_BUFFER_STATUS) & (FRAME_SWAP_PENDING | FRAME_WRITER_OWNED))) {
         g_debug_status.command_result = UINT32_C(0xed02);
-    } else if (command == GAME_DEBUG_CMD_RESTART || command == GAME_DEBUG_CMD_ENTER_GAME) {
+    } else if (command == GAME_DEBUG_CMD_RESTART || command == GAME_DEBUG_CMD_ENTER_GAME
+#if GAME_SHOWCASE
+               || command == GAME_DEBUG_CMD_SHOWCASE
+#endif
+               ) {
         restart_game(now_ms);
     } else if (command == GAME_DEBUG_CMD_PAUSE || command == GAME_DEBUG_CMD_RESUME) {
         uint8_t should_pause = command == GAME_DEBUG_CMD_PAUSE;
@@ -1451,6 +1591,12 @@ static void service_debug_command(uint32_t now_ms) {
         g_game_runtime.measurement_max_frame_us = 0u;
         g_game_runtime.measurement_over_budget_frames = 0u;
         g_game_runtime.measurement_display_frames = g_game_runtime.measurement_repeated_frames = 0u;
+#if GAME_ALLOW_SCALE2
+        g_presentation_measure_started = 0u;
+        g_game_presentation.first_boundary = g_game_presentation.last_boundary = 0u;
+        g_game_presentation.presentation_intervals = g_game_presentation.missing_boundaries = 0u;
+        g_game_presentation.max_boundary_gap = 0u;
+#endif
         g_game_runtime.measurement_path_diagnostics =
             (GAME_PATH_DIAGNOSTICS ? GAME_RUNTIME_DIAG_HW_COUNTERS : 0u) |
             (GAME_SUBMIT_TIMING ? GAME_RUNTIME_DIAG_SUBMIT_TIMING : 0u);
@@ -1511,6 +1657,18 @@ int main(void) {
     publish_status();
     require(accel_init());
     if (g_game_build_config.magic != GAME_BUILD_CONFIG_MAGIC) fail(ERROR_RENDER);
+#if GAME_SHOWCASE
+    if (g_game_showcase_available != 1u) fail(ERROR_RENDER);
+#endif
+#if GAME_ALLOW_SCALE2
+    if (g_game_scale2_compatible != UINT32_C(0x4000)) fail(ERROR_RENDER);
+    g_game_presentation.magic = UINT32_C(0x47505231);
+    g_game_presentation.scale = (accel_read(ACCEL_CAPABILITIES) & ACCEL_CAP_DISPLAY_SCALE2) ? 2u : 1u;
+    g_game_presentation.display_x = g_game_presentation.scale == 2u ? 320u : 640u;
+    g_game_presentation.display_y = g_game_presentation.scale == 2u ? 60u : 300u;
+    g_game_presentation.display_width = 640u * g_game_presentation.scale;
+    g_game_presentation.display_height = 480u * g_game_presentation.scale;
+#endif
 #if GAME_WINDOW_HUD_CACHE
     if (g_game_window_hud_cache != 1u) fail(ERROR_RENDER);
     if (g_game_alpha_hardware_compatible != UINT32_C(0x3000)) fail(ERROR_RENDER);
