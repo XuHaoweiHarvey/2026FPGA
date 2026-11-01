@@ -1,0 +1,121 @@
+
+Elitestek FPGA Placement and Routing.
+Version: 2026.1.132 
+Date: Sun Nov  1 15:39:36 2026
+
+Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+ 
+Family: Titanium 
+Device: Ti60F225
+Top-level Entity Name: ti60f225_oob
+
+---------- IO Interface Summary (begin) ----------
+
++------------------------+--------------+
+| Missing Interface Pins | Input/Output |
++------------------------+--------------+
+|    jtag_inst1_DRCK     |    Input     |
+|     jtag_inst1_TMS     |    Input     |
+|    jtag_inst1_RESET    |    Input     |
+|   jtag_inst1_RUNTEST   |    Input     |
+|   jtag_inst1_UPDATE    |    Input     |
+| mipi_dp_data0_LP_P_IN  |    Input     |
+| mipi_dp_data0_LP_N_IN  |    Input     |
+|    cam_d2_HS_IN[0]     |    Input     |
+|    cam_d2_HS_IN[1]     |    Input     |
+|    cam_d2_HS_IN[2]     |    Input     |
+|    cam_d2_HS_IN[3]     |    Input     |
+|    cam_d2_HS_IN[4]     |    Input     |
+|    cam_d2_HS_IN[5]     |    Input     |
+|    cam_d2_HS_IN[6]     |    Input     |
+|    cam_d2_HS_IN[7]     |    Input     |
+|     cam_d2_LP_P_IN     |    Input     |
+|     cam_d2_LP_N_IN     |    Input     |
+|   cam_d2_FIFO_EMPTY    |    Input     |
+|    cam_d0_HS_IN[0]     |    Input     |
+|    cam_d0_HS_IN[1]     |    Input     |
+|    cam_d0_HS_IN[2]     |    Input     |
+|    cam_d0_HS_IN[3]     |    Input     |
+|    cam_d0_HS_IN[4]     |    Input     |
+|    cam_d0_HS_IN[5]     |    Input     |
+|    cam_d0_HS_IN[6]     |    Input     |
+|    cam_d0_HS_IN[7]     |    Input     |
+|     cam_d0_LP_P_IN     |    Input     |
+|     cam_d0_LP_N_IN     |    Input     |
+|   cam_d0_FIFO_EMPTY    |    Input     |
+|    i_cam_ck_LP_P_IN    |    Input     |
+|    i_cam_ck_LP_N_IN    |    Input     |
+|    cam_d1_HS_IN[0]     |    Input     |
+|    cam_d1_HS_IN[1]     |    Input     |
+|    cam_d1_HS_IN[2]     |    Input     |
+|    cam_d1_HS_IN[3]     |    Input     |
+|    cam_d1_HS_IN[4]     |    Input     |
+|    cam_d1_HS_IN[5]     |    Input     |
+|    cam_d1_HS_IN[6]     |    Input     |
+|    cam_d1_HS_IN[7]     |    Input     |
+|     cam_d1_LP_P_IN     |    Input     |
+|     cam_d1_LP_N_IN     |    Input     |
+|   cam_d1_FIFO_EMPTY    |    Input     |
+|    cam_d3_HS_IN[0]     |    Input     |
+|    cam_d3_HS_IN[1]     |    Input     |
+|    cam_d3_HS_IN[2]     |    Input     |
+|    cam_d3_HS_IN[3]     |    Input     |
+|    cam_d3_HS_IN[4]     |    Input     |
+|    cam_d3_HS_IN[5]     |    Input     |
+|      ddr_addr[15]      |    Output    |
+|    cam_d3_HS_IN[6]     |    Input     |
+|    cam_d3_HS_IN[7]     |    Input     |
+|     cam_d3_LP_P_IN     |    Input     |
+|     cam_d3_LP_N_IN     |    Input     |
+|   cam_d3_FIFO_EMPTY    |    Input     |
+|      ddr_addr[14]      |    Output    |
+|         CLK_5M         |    Input     |
+|     io_cam_sda_IN      |    Input     |
+|     io_cam_scl_IN      |    Input     |
++------------------------+--------------+
+
+----------- IO Interface Summary (end) ----------
+
+
+---------- IO Placement Summary (begin) ----------
+
++----------------------+--------------+
+| Unassigned Core Pins | Input/Output |
++----------------------+--------------+
+|    pll_inst4_RSTN    |    Output    |
++----------------------+--------------+
+
+----------- IO Placement Summary (end) ----------
+
+
+---------- Module Resource Usage Distribution Estimates (begin) ----------
+
+'Module Resource Usage Distribution Estimates' table printed in: outflow\ti60f225_oob.hier_util.rpt
+
+----------- Module Resource Usage Distribution Estimates (end) ----------
+
+Elapsed time for packing: 0 hours 0 minutes 4 seconds
+---------- Resource Summary (begin) ----------
+Inputs: 64 / 1703 (3.76%)
+Outputs: 351 / 2267 (15.48%)
+Global Clocks (GBUF): 17 / 32 (53.12%)
+Regional Clocks (RBUF): 1 / 32 (3.12%)
+	RBUF: Core: 0 / 16 (0.00%)
+	RBUF: Periphery: 1 / 8 (12.50%)
+	RBUF: Multi-Region: 0 / 8 (0.00%)
+XLRs: 47799 / 60800 (78.62%)
+	XLRs needed for LUT4: 18809 / 60800 (30.94%)
+	XLRs needed for LUT4 + FF: 7619 / 60800 (12.53%)
+	XLRs needed for COMB4: 0 / 60800 (0.00%)
+	XLRs needed for COMB4 + FF: 0 / 60800 (0.00%)
+	XLRs needed for Adder: 2495 / 60800 (4.10%)
+	XLRs needed for Adder + FF: 1671 / 60800 (2.75%)
+	XLRs needed for SRL8: 1151 / 14720 (7.82%)
+	XLRs needed for SRL8 + FF: 0 / 14720 (0.00%)
+	XLRs needed for FF: 16054 / 60800 (26.40%)
+	XLRs needed for Routing: 0 / 60800 (0.00%)
+Memory Blocks: 205 / 256 (80.08%)
+DSP Blocks: 46 / 160 (28.75%)
+---------- Resource Summary (end) ----------
+
+Elapsed time for placement: 0 hours 1 minutes 4 seconds

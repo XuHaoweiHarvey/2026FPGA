@@ -2,7 +2,7 @@
 // Exact reference pixels plus DDR stalls, clipped cache hits, page splitting,
 // cache read-error validity, reset lifetime and measured command cycle counts.
 module tb_alpha_stream_cache;
-parameter STREAM=1, CACHE=1;
+parameter STREAM=1, CACHE=1, PIXEL_X=0;
 localparam TILE=32'h01384240, STRIDE=1024, FRAME_WORDS=256*48;
 reg clk=0,rst_n=0,start=0;
 always #5 clk=~clk;
@@ -43,7 +43,7 @@ begin
     b=((fg&255)*a+(bg&255)*(255-a)+127)/255;
     blend=(bg&32'hff000000)|(r<<16)|(g<<8)|b;
 end endfunction
-alpha_blit_engine #(.FRAME_WIDTH(256),.FRAME_HEIGHT(48),.FRAME_STRIDE(STRIDE),
+alpha_blit_engine #(.PIXEL_X_ENABLE(PIXEL_X),.FRAME_WIDTH(256),.FRAME_HEIGHT(48),.FRAME_STRIDE(STRIDE),
     .MAX_BURST_BEATS(32),.STREAM_ENABLE(STREAM),.SPRITE_CACHE_ENABLE(CACHE),.WATCHDOG_BITS(12)) dut(
     .clk(clk),.rst_n(rst_n),.enabled(1'b1),.start(start),
     .src_addr(src),.src_stride(ss),.back_base(back),.global_alpha(ga),
@@ -139,11 +139,22 @@ initial begin
     reads_before=source_reads;
     command(TILE+64,2560,0,2,16,1,127,0);
     command(TILE,128,0,3,16,1,225,0);
-    if(source_reads-reads_before!=2)$fatal(1,"cache matched wrong source/stride");
+    if(source_reads-reads_before!=2 && !PIXEL_X)$fatal(1,"cache matched wrong source/stride");
     // Source 4KiB split; 32-beat, 1-beat and consecutive result bursts.
     command(32'h01400ff0,640,124,3,132,2,173,0);
     command(32'h01400000,512,0,0,128,2,1,0);
     command(TILE,2560,0,0,4,1,254,0);
+    if (PIXEL_X) begin
+        command(32'h01384700,2560,33,4,16,16,225,0);
+        reads_before=source_reads;
+        command(32'h01384700,2560,38,5,16,16,127,0);
+        if(CACHE && source_reads != reads_before) $fatal(1,"starry shifted cache missed");
+        for (i=1;i<4;i=i+1) begin
+            command(TILE,2560,32+i,4,16,16,225,0);
+            command(32'h01400ff0,640,120+i,23,132,2,173,0);
+            command(TILE,2560,248+i,40,4,2,255,0);
+        end
+    end
     // Platform reset invalidates every row, including after a partial fill.
     @(negedge clk);rst_n=0;repeat(3)@(negedge clk);rst_n=1;
     inject_source_error=1;

@@ -13,6 +13,7 @@ module graphics_engine #(
     parameter COLOR_KEY_ENABLE = 0,
     parameter [31:0] OP_COLOR_KEY = 32'd2,
     parameter ALPHA_ENABLE = 0,
+    parameter ALPHA_PIXEL_X_ENABLE = 0,
     parameter ALPHA_STREAM_ENABLE = 0, ALPHA_SPRITE_CACHE_ENABLE = 0,
     parameter [31:0] OP_ALPHA_BLEND = 32'd3
 )(
@@ -154,7 +155,7 @@ blit_engine #(
 generate if(ALPHA_ENABLE) begin: alpha_path
     alpha_blit_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
         .FRAME_STRIDE(FRAME_STRIDE),.MAX_BURST_BEATS(MAX_BURST_BEATS),
-        .WATCHDOG_BITS(WATCHDOG_BITS),.STREAM_ENABLE(ALPHA_STREAM_ENABLE),
+        .WATCHDOG_BITS(WATCHDOG_BITS),.PIXEL_X_ENABLE(ALPHA_PIXEL_X_ENABLE),.STREAM_ENABLE(ALPHA_STREAM_ENABLE),
         .SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE)) alpha_unit (
         .clk(clk),.rst_n(rst_n),.enabled(1'b1),
         .start(state==LAUNCH && selected_alpha && source_range_checked),

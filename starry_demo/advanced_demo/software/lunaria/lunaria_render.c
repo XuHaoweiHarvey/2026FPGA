@@ -35,11 +35,13 @@ static void sprite(renderer_t *r, uint32_t sx, uint32_t sy, int32_t x,
     w -= trim;
     x = 0;
   }
-  x &= ~3;
+  /* v12 preserves integer-pixel destination coordinates. */
   if (x >= 640)
     return;
   if (w > 640u - (uint32_t)x)
-    w = 640u - (uint32_t)x;
+    w = (640u - (uint32_t)x) & ~3u;
+  if (!w)
+    return;
   if (y < 72) {
     trim = (uint32_t)(72 - y);
     if (trim >= h)
@@ -64,7 +66,7 @@ static void art(renderer_t *r, uint32_t sx, uint32_t sy, uint32_t x, uint32_t y,
 static void text(renderer_t *r, uint32_t x, uint32_t y, const char *s) {
   while (*s) {
     uint32_t n = (uint8_t)*s++ - 32u;
-    if (n < 64u && x + 16u <= 640u) {
+    if (n && n < 64u && x + 16u <= 640u) {
       art(r, 448u + n % 12u * 16u, 224u + n / 12u * 24u, x, y, 16u, 24u);
       r->stats->glyphs++;
     }
@@ -106,18 +108,84 @@ static void metrics(renderer_t *r, const lunaria_t *g) {
   text(r, 160, 44, a);
   text(r, 292, 44, l);
   if (g->spin_patterns)
-    text(r, 292, 68, "SPIN");
+    text(r, 156, 445, "SPIN");
 }
-static void laser(renderer_t *r, const ln_laser_t *l, uint32_t color) {
+static void fill(renderer_t *r, uint32_t x, uint32_t y, uint32_t w, uint32_t h,
+                 uint32_t c) {
+  command(r, 0, 0, 0, x, y, w, h, c);
+}
+static void value(renderer_t *r, uint32_t x, uint32_t y, uint32_t n,
+                  uint32_t digits) {
+  char b[8];
+  uint32_t i;
+  b[digits] = 0;
+  for (i = digits; i > 0; i--) {
+    b[i - 1] = (char)('0' + n % 10);
+    n /= 10;
+  }
+  text(r, x, y, b);
+}
+#ifdef __GNUC__
+/* Menus are cold; retain O2 for the simulation and battle renderer. */
+__attribute__((noinline, optimize("Os")))
+#endif
+static void
+menu(renderer_t *r, const lunaria_t *g) {
+  uint32_t result = g->state != LN_TITLE,
+           accent = g->state == LN_FAILURE ? 0x00b6a0cd : 0x009bc9dd;
+  fill(r, 72, 82, 496, 330, 0x00101728);
+  fill(r, 72, 82, 496, 1, accent);
+  fill(r, 72, 411, 496, 1, 0x00384b67);
+  fill(r, 88, 96, 16, 2, accent);
+  fill(r, 536, 96, 16, 2, accent);
+  if (!result) {
+    text(r, 236, 112, "A STARRY REVERIE");
+    art(r, 0, 448, 192, 164, 256, 32);
+    art(r, 256, 448, 224, 204, 192, 32);
+    fill(r, 256, 254, 128, 1, accent);
+    text(r, 176, 278, "MOVE  WASD / ARROWS");
+    text(r, 188, 306, "FIRE  SPACE / CTRL");
+    fill(r, 208, 350, 224, 34, 0x002b3c55);
+    text(r, 240, 354, "FIRE TO BEGIN");
+    text(r, 278, 432, "P PAUSE");
+  } else {
+    text(r, 236, 104, "VOYAGE ARCHIVE");
+    if (g->state == LN_VICTORY)
+      art(r, 448, 368, 224, 140, 192, 40);
+    else
+      text(r, 248, 148, "JOURNEY ENDS");
+    fill(r, 112, 194, 416, 1, 0x00384b67);
+    text(r, 116, 210, "SCORE");
+    value(r, 380, 210, g->score, 7);
+    text(r, 116, 242, "BATTLE TIME");
+    value(r, 404, 242, (g->combat_ms / 60000) % 100, 2);
+    text(r, 428, 242, ":");
+    value(r, 440, 242, g->combat_ms / 1000 % 60, 2);
+    text(r, 116, 274, "STAGES CLEARED");
+    value(r, 440, 274, g->state == LN_VICTORY ? 8 : g->phase, 1);
+    text(r, 452, 274, "/8");
+    text(r, 116, 306, "LIVES");
+    value(r, 224, 306, g->lives, 1);
+    text(r, 308, 306, "PEAK BULLETS");
+    value(r, 464, 306, g->peak_visible_bullets, 3);
+    if (g->invincible)
+      text(r, 212, 432, "ASSISTED VOYAGE");
+    if (g->state_ms >= (g->state == LN_VICTORY ? 3000u : 500u)) {
+      fill(r, 208, 356, 224, 32, 0x002b3c55);
+      text(r, 230, 360, "FIRE TO RESTART");
+    }
+  }
+}
+static void laser(renderer_t *r, const ln_laser_t *l) {
   uint32_t d;
   int32_t ux = ln_cos(l->angle), uy = ln_sin(l->angle);
-  for (d = 20; d < 820; d += l->age < 700u ? 16u : 3u) {
+  for (d = 20; d < 820; d += l->age < 700u ? 24u : LN_LASER_STEP) {
     int32_t x = l->x + ux * (int32_t)d / 16384;
     int32_t y = l->y + uy * (int32_t)d / 16384;
-    if (x < -16 || x > 656 || y < 56 || y > 496)
+    if (x < -32 || x > 672 || y < 40 || y > 512)
       break;
-    sprite(r, 448, color * 16u, x - 8, y - 8, 16, 16,
-           l->age < 700u ? 70u : 245u);
+    sprite(r, l->age < 700u ? 608u : 576u, 96, x - 16, y - 16, LN_LASER_TILE,
+           LN_LASER_TILE, 255u);
   }
 }
 uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
@@ -135,36 +203,14 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
   command(&r, 1, LN_BACKGROUND_BASE + LN_VIEW_Y * 7680u + LN_VIEW_X * 4u, 7680,
           0, 0, 640, 480, 0);
   stats->background_pixels = 640u * 480u;
+  if (g->state == LN_TITLE || g->state == LN_VICTORY ||
+      g->state == LN_FAILURE) {
+    menu(&r, g);
+    return r.error;
+  }
   art(&r, 0, 448, 16, 12, 256, 32);
   metrics(&r, g);
-  if (g->state == LN_TITLE) {
-    art(&r, 0, 448, 192, 176, 256, 32);
-    art(&r, 256, 448, 224, 216, 192, 32);
-    text(&r, 228, 286, "FIRE TO START");
-    text(&r, 176, 320, "ARROWS MOVE  P PAUSE");
-    return r.error;
-  }
-  if (g->state == LN_VICTORY || g->state == LN_FAILURE) {
-    if (g->state == LN_VICTORY)
-      art(&r, 448, 368, 224, 190, 192, 40);
-    else
-      text(&r, 260, 192, "GAME OVER");
-    text(&r, 260, 250, "SCORE");
-    {
-      char s[8];
-      uint32_t n = g->score;
-      s[7] = 0;
-      for (i = 0; i < 7; i++) {
-        s[6 - i] = (char)('0' + n % 10u);
-        n /= 10u;
-      }
-      text(&r, 248, 280, s);
-    }
-    if (g->state_ms >= (g->state == LN_VICTORY ? 3000u : 500u))
-      text(&r, 224, 338, "FIRE TO RESTART");
-    return r.error;
-  }
-  text(&r, 420, 18, names[g->phase]);
+  text(&r, 420, 18, LN_STRESS_TEST ? "STRESS" : names[g->phase]);
   if (g->phase == 3) {
     uint32_t event = g->event ? g->event - 1u : 0u;
     char petals[2] = {(char)(event % 5u == 3u ? '3' : '4' + event % 3u), 0};
@@ -176,10 +222,22 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
     command(&r, 0, 0, 0, 420, 52, width ? width : 1u, 3, 0x00edbadf);
   }
   for (i = 0; i < g->lives; i++)
-    sprite(&r, 480, 32, (int32_t)(20 + i * 20u), 445, 16, 16, 220);
+    sprite(&r, 560, 64, (int32_t)(20 + i * 20u), 445, 16, 16, 220);
   if (g->invincible)
     text(&r, 96, 445, "INV");
   score(&r, g->score);
+#if LN_STRESS_TEST
+  if (alpha)
+    for (i = 0; i < g->stress_active; i++) {
+      const ln_bullet_t *b = &g->bullets[i];
+      /* Live stress bullets are fully inside the viewport; no generic clipping.
+       */
+      command(&r, 3, LN_SPRITE_BASE + 64u * 2560u + 448u * 4u, 2560u,
+              (uint32_t)(b->x / LN_Q - 6), (uint32_t)(b->y / LN_Q - 6),
+              LN_STRESS_BULLET_SIZE, LN_STRESS_BULLET_SIZE, alpha);
+      r.stats->sprite_pixels += LN_STRESS_BULLET_SIZE * LN_STRESS_BULLET_SIZE;
+    }
+#else
   for (i = 0; i < LN_CAPACITY; i++)
     if (g->bullets[i].active) {
       const ln_bullet_t *b = &g->bullets[i];
@@ -187,17 +245,19 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
       if (b->age < 5u)
         a = a * b->age / 5u;
       uint32_t sx = 448u + b->shape * 16u, sy = b->color * 16u;
-      if (b->shape == 1u) sx = 512u + (((b->angle + 16384u + 4096u) >> 13) & 7u) * 16u;
-      if (b->shape == 4u) {sx = 512u + b->color * 16u; sy = 48u;}
-      sprite(&r, sx, sy, b->x / LN_Q - 8,
-             b->y / LN_Q - 8, 16, 16, a);
+      if (b->shape == 1u)
+        sx = 512u + (((b->angle + 16384u + 4096u) >> 13) & 7u) * 16u;
+      if (b->shape == 4u)
+        sx = 448u; /* legacy star IDs are circles */
+      sprite(&r, sx, sy, b->x / LN_Q - 8, b->y / LN_Q - 8, 16, 16, a);
     }
+#endif
   for (i = 0; i < LN_LASERS; i++)
     if (g->lasers[i].active)
-      laser(&r, &g->lasers[i], i % 3u);
+      laser(&r, &g->lasers[i]);
   for (i = 0; i < LN_SHOTS; i++)
     if (g->shots[i].active)
-      sprite(&r, 480, 32, g->shots[i].x / LN_Q - 8, g->shots[i].y / LN_Q - 8,
+      sprite(&r, 528, 64, g->shots[i].x / LN_Q - 8, g->shots[i].y / LN_Q - 8,
              16, 16, 255);
   if (g->state == LN_DEFEAT)
     boss_alpha = g->state_ms >= 400u ? 0u : 255u - g->state_ms * 255u / 400u;
@@ -206,6 +266,12 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
     f = (ln_emitter_angle(g) % 10923u) * 16u / 10923u;
   sprite(&r, f % 4u * 112u, f / 4u * 112u, g->boss_x - 56, g->boss_y - 56, 112,
          112, boss_alpha);
+  if (g->flash_ms)
+    sprite(&r, 448u + ((128u - g->flash_ms) / 32u) * 16u, 80, g->boss_x - 8,
+           g->boss_y + 16, 16, 16, 255);
+  if (g->state == LN_FIGHT && g->phase >= 3 && g->phase <= 5 &&
+      g->next_emit_ms > g->phase_ms && g->next_emit_ms - g->phase_ms < 240u)
+    sprite(&r, 448, 80, g->boss_x - 8, g->boss_y + 16, 16, 16, 180);
   for (i = 0; i < LN_EFFECTS; i++)
     if (g->effects[i].active) {
       const ln_effect_t *e = &g->effects[i];
@@ -232,8 +298,10 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
          g->hurt_ticks && g->hurt_ticks % 8u < 4u ? 90 : 255);
   command(&r, 0, 0, 0, ((uint32_t)(g->player_x / LN_Q)) & ~3u,
           (uint32_t)(g->player_y / LN_Q), 2, 2, 0x00ffffff);
-  if (g->state == LN_INTRO || g->state == LN_WARNING)
+  if (g->state == LN_INTRO || g->state == LN_WARNING) {
     art(&r, 448, 408, 224, 264, 192, 32);
+    text(&r, 260, 300, names[g->phase]);
+  }
   if (g->paused)
     text(&r, 284, 240, "PAUSED");
   return r.error;

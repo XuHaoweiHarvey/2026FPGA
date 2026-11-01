@@ -106,8 +106,10 @@ run([gcc, *flags, '-c', startup, '-o', out / 'start.o'])
 elf = out / (basename+'.elf')
 keep = ('g_game_required_caps', 'g_game_alpha_hardware_compatible',
         'g_game_scale2_compatible', 'g_game_showcase_available',
-        'g_lunaria_available', 'g_lunaria_asset_hashes',
+        'g_lunaria_available', 'g_lunaria_asset_hashes', 'g_lunaria_required_hardware',
         'g_game_build_config') if args.program == 'lunaria' else ()
+if args.program == 'lunaria' and 'LN_STRESS_TEST=1' in args.define:
+    keep += ('g_lunaria_stress_test',)
 run([gcc, *flags, '-nostdlib', '-nostartfiles', '-Wl,--gc-sections', '-T', linker,
      *['-Wl,--undefined='+name for name in keep],
      '-Wl,-Map,' + str(out / (basename+'.map')), *objects, '-lgcc', '-o', elf])

@@ -2,7 +2,15 @@
 #define LUNARIA_H
 #include "../interactive_demo/uart_keyboard_protocol.h"
 #include <stdint.h>
-#define LN_CAPACITY 512u
+#ifndef LN_STRESS_TEST
+#define LN_STRESS_TEST 0
+#endif
+#if LN_STRESS_TEST
+#define LN_CAPACITY 832u
+#define LN_STRESS_BULLET_SIZE 12u
+#else
+#define LN_CAPACITY 640u
+#endif
 #define LN_DEFAULT_LIMIT 256u
 #define LN_MIN_LIMIT 64u
 #define LN_SETTINGS_MAGIC UINT32_C(0x4c4e5331)
@@ -13,8 +21,12 @@ typedef struct {
 #define LN_SHOTS 16u
 #define LN_EFFECTS 8u
 #define LN_LASERS 3u
+#define LN_LASER_TILE 32u
+#define LN_LASER_STEP 12u
+#define LN_LASER_HIT_RADIUS 15
 #define LN_Q 256
 #define LN_TICK_MS 16u
+#define LN_WARNING_MS 1000u
 #define LN_PHASE_HP 28u
 enum {
   LN_TITLE,
@@ -27,8 +39,8 @@ enum {
 };
 typedef struct {
   int32_t x, y;
-  int16_t vx, vy, ox, oy, ux, uy;
-  uint16_t age, life, angle, initial_angle;
+  int16_t vx, ox, oy, ux, uy;
+  uint16_t age, life, angle;
   uint8_t active, color, shape, kind;
 } ln_bullet_t;
 typedef struct {
@@ -47,6 +59,10 @@ typedef struct {
 } ln_laser_t;
 typedef struct {
   ln_bullet_t bullets[LN_CAPACITY];
+#if LN_STRESS_TEST
+  uint32_t
+      stress_active; /* Packed prefix: all live stress bullets are visible. */
+#endif
   ln_shot_t shots[LN_SHOTS];
   ln_effect_t effects[LN_EFFECTS];
   ln_laser_t lasers[LN_LASERS];
@@ -56,7 +72,9 @@ typedef struct {
       next_shot_ms;
   uint32_t score, frames, dropped_ms, emissions, pool_drops, peak_bullets;
   uint32_t fps_x100, peak_visible_bullets, peak_elements, deferred_emissions;
-  uint32_t bullet_limit, spin_patterns;
+  uint32_t bullet_limit, spin_patterns, allocation_cursor;
+  uint32_t combat_ms, accent_due;
+  uint16_t flash_ms;
   uint16_t event, hp, hurt_ticks;
   uint8_t state, phase, lives, paused, previous_buttons, invincible,
       restart_armed, death_bursts;

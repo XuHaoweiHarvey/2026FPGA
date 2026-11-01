@@ -141,16 +141,19 @@ class LunariaBridge(DebugBridge):
             raise ValueError('ELF 与素材包不匹配，请使用同一次构建的 ELF 和 assets.json')
         with self.halted():
             version = self.read_words(APB+4,1)[0]
-            if version not in (0xA0000,0xB0000):
-                raise RuntimeError('本交付包要求现有 v10 或 v11 bit')
+            required = self.image.symbol_u32('g_lunaria_required_hardware') if 'g_lunaria_required_hardware' in self.image.symbols else 0
+            if (required and version != required) or version not in (0xA0000,0xB0000,0xC0000):
+                raise RuntimeError('ELF 与硬件不匹配：像素精确版须使用 v12 bit')
         self.progress('ELF 和素材本地校验完成，等待安全加载边界')
         super().load()
         self.upload_assets(assets)
 
     def configure(self, limit, spin=False, options=None):
         """Commit one frame-boundary settings request; never reset/load the board."""
-        if type(limit) is not int or not 64 <= limit <= 512 or spin not in (0, 1):
-            raise ValueError('敌弹上限须为 64–512 的整数')
+        maximum = (self.image.symbol_u32('g_lunaria_settings',10)
+                   if 'g_lunaria_stress_test' in self.image.symbols else 640)
+        if type(limit) is not int or not 64 <= limit <= maximum or spin not in (0, 1):
+            raise ValueError(f'敌弹上限须为 64–{maximum} 的整数')
         if options is not None:
             delay, interval, cap, invincible, alpha = options
             if not (delay == 0 and interval == 900 and cap == 1 and

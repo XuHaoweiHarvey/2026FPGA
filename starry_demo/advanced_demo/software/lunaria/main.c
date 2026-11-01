@@ -5,6 +5,10 @@
 #include "../interactive_demo/game_runtime.h"
 #include "../interactive_demo/uart_keyboard_input.h"
 #include "lunaria_asset_ids.h"
+#if LN_STRESS_TEST && defined(LN_STRESS_ATLAS_HASH)
+#undef LN_ATLAS_HASH
+#define LN_ATLAS_HASH LN_STRESS_ATLAS_HASH
+#endif
 #include "lunaria_render.h"
 #include "lunaria_upload.h"
 #include <stdint.h>
@@ -21,6 +25,10 @@ const volatile uint32_t g_game_alpha_hardware_compatible = 0x3000;
 const volatile uint32_t g_game_scale2_compatible = 0x4000;
 const volatile uint32_t g_game_showcase_available = 1;
 const volatile uint32_t g_lunaria_available = 1;
+#if LN_STRESS_TEST
+const volatile uint32_t g_lunaria_stress_test = 1;
+#endif
+const volatile uint32_t g_lunaria_required_hardware = 0x000c0000;
 const volatile uint32_t g_lunaria_asset_hashes[2] = {LN_BACKGROUND_HASH,
                                                      LN_ATLAS_HASH};
 const volatile game_build_config_t g_game_build_config = {
@@ -320,15 +328,16 @@ static void debug_command(uint32_t now) {
     game.last_ms = now;
     game.accumulator_ms = 0;
   } else if (c == 4) {
-    game.invincible = (uint8_t)(g_debug_control.flags & 1u);
+    game.invincible = LN_STRESS_TEST ? 1u : (uint8_t)(g_debug_control.flags & 1u);
     alpha = g_debug_control.projectile_alpha > 255u
                 ? 255u
                 : g_debug_control.projectile_alpha;
   } else if (c == 7 && game.invincible && !game.paused &&
              game.state == LN_FIGHT) {
     uint32_t i;
-    for (i = 0; i < LN_SHOTS; i++)
-      game.shots[i].active = 0;
+    if (!LN_STRESS_TEST)
+      for (i = 0; i < LN_SHOTS; i++)
+        game.shots[i].active = 0;
     measurement_ms = now;
     measure_frames = game.frames;
     measure_swap = accel_read(ACCEL_SWAP_COUNT);
@@ -409,7 +418,7 @@ int main(void) {
     settings_command();
     buttons = uart_keyboard_input_consume_buttons(&keyboard);
     if (g_debug_status.measurement_state == 1u)
-      buttons &= ~(UART_KEY_PAUSE | UART_KEY_FIRE);
+      buttons &= ~(UART_KEY_PAUSE | (LN_STRESS_TEST ? 0u : UART_KEY_FIRE));
     ln_step(&game, (uint8_t)buttons, now);
     ln_update_metrics(&game);
     render_start = ticks();
