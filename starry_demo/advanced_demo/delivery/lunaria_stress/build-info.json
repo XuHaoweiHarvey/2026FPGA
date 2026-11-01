@@ -1,0 +1,28 @@
+{
+  "variant": "stress",
+  "defines": [
+    "LN_STRESS_ATLAS_HASH=0x74c2ef67",
+    "GAME_DISPLAY_WINDOW=1",
+    "GAME_ALLOW_SCALE2=1",
+    "LUNARIA_PIXEL_X=1",
+    "LN_STRESS_TEST=1"
+  ],
+  "elf_sha256": "829643a384781f8a13412bd6afa14a293f25e4a034353924bb7d748ea2486f18",
+  "sources": {
+    "software/lunaria/lunaria.c": "8111e13723e0e4a59d826515d337c857ed4d3a12398f219f574626d12ad8bbfa",
+    "software/lunaria/lunaria_render.c": "8041e1af970680d1e4bd560381416e9720cf2fda0f4bad57839646c61da8525c",
+    "software/lunaria/main.c": "677ad8c3273da5261f21a1a38919e8ec2ee4ae24e45320db2d6961c6b2c1957c",
+    "software/lunaria/lunaria.h": "2a390dcb81920f65909507044791600b5528c2c3d4ae63eba3c57daf94eb554c",
+    "software/lunaria/lunaria_asset_ids.h": "bad76749aa886317818661c8b2b1d909118742abef2238f7c2de81aae1bac19b",
+    "software/lunaria/lunaria_render.h": "69c93d1c82eb4645897d0f12ef671c2c7ca5db53b753788a362a67309d9b86cb",
+    "software/lunaria/lunaria_tables.h": "24498a67df3792e2c42d2d43786f4bc8bbf31b2e48393859cd3afdaa361df89b",
+    "software/lunaria/lunaria_upload.h": "72c81d5c3d4cca8708124703a8f2ff45e9f5bcafbecba183dbc4bf6d943595db",
+    "scripts/build_lunaria_stress.py": "8e073186cc4c5cc8858166f1246f1d1d94ad97aa96f4e8d905a8840c7eccff10",
+    "scripts/build_apb_software.py": "78cedde2d87f5cb4a0f96d52ca73073365a4120ea4ddb3e4b2014aa4d53998f5"
+  },
+  "assets": {
+    "assets.json": "b4b2b4152397dbaba5e5c74c122ba4b6c445b703fca4bc83cd0417b7b594eed3",
+    "atlas.argb": "631630b8569c4dbac0b51bac68651ab6f4d324487bf0e9d618ea74533d06ecbd",
+    "background.argb": "6b8985a5164c4f9b85ad61d709eba4ded3553cc95cc985b05606c014e98e36a6"
+  }
+}

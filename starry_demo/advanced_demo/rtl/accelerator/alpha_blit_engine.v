@@ -11,7 +11,8 @@ module alpha_blit_engine #(
     parameter STREAM_ENABLE = 0,
     // Fixed immutable atlas tile: 16x16 ARGB enemy bullet at x=144,y=0.
     // Caller must enforce the platform sprite seal/source guard lifetime.
-    parameter SPRITE_CACHE_ENABLE = 0
+    parameter SPRITE_CACHE_ENABLE = 0,
+    parameter PIXEL_X_ENABLE = 0
 )(
     input wire clk, rst_n, enabled, start,
     input wire [31:0] src_addr, src_stride, back_base,
@@ -52,10 +53,34 @@ localparam [4:0] IDLE = 0, CHECK = 1, PREP = 2, RD_ADDR = 3,
     WR_RESP = 8, ADVANCE = 9, FAULT = 10,
     CHECK_SPAN = 11, CHECK_END = 12, CHECK_RANGE = 13,
     BG_ADDR = 14, BG_DATA = 15, MIX_LOAD = 16, MIX_START = 17, MIX_WAIT = 18,
-    DRAIN_R = 19, MIX_STREAM = 20;
+    DRAIN_R = 19, MIX_STREAM = 20, PAD_SOURCE = 21, CACHE_LOAD = 22, CACHE_DATA = 23;
 localparam [63:0] FRAME_BYTES = 64'd1 * FRAME_STRIDE * FRAME_HEIGHT;
 
 reg [4:0] state;
+reg [127:0] previous_source;
+// v12: 128 direct-mapped 64-byte source lines (8 KiB), immutable sealed atlas.
+// Hash row bits as well as column bits to avoid stride-2560 conflict chains.
+reg [127:0] line_cache [0:511];
+reg [25:0] line_tags [0:127];
+reg [127:0] line_valid;
+reg [127:0] line_data;
+wire [6:0] line_slot = src_cursor[12:6] ^ src_cursor[19:13];
+wire [8:0] planned_reads = segment_beats - ((pixel_shift != 0 && final_segment) ? 1 : 0);
+wire line_eligible = PIXEL_X_ENABLE && SPRITE_CACHE_ENABLE && source_stride == 2560 &&
+    src_cursor >= 32'h01384000 && src_cursor < 32'h014b0000 &&
+    planned_reads != 0 && planned_reads <= 4-src_cursor[5:4];
+wire line_hit = line_eligible && line_valid[line_slot] && line_tags[line_slot] == src_cursor[31:6];
+reg line_fill;
+wire [127:0] source_payload = state == CACHE_DATA ? line_data : rdata;
+wire source_received = state == CACHE_DATA || (state == RD_DATA && rvalid);
+
+wire [1:0] pixel_shift = PIXEL_X_ENABLE ? x[1:0] : 2'b0;
+wire [31:0] row_beats = (copy_width >> 2) + (pixel_shift != 0);
+wire final_segment = beats_left == segment_beats;
+wire [8:0] source_beats = burst_beats - ((pixel_shift != 0 && beats_left == burst_beats) ? 1'b1 : 1'b0);
+wire source_last = beat_index == source_beats - 1'b1;
+wire [255:0] shifted_pair = {source_payload,previous_source} >> ((4-pixel_shift)*32);
+
 reg [31:0] saved_back_base;
 reg [7:0] saved_alpha;
 reg [127:0] background_mem [0:MAX_BURST_BEATS-1];
@@ -99,10 +124,11 @@ always @* begin
             cache_address_match = 1; cache_address_row = cache_decode_row;
         end
 end
-wire cache_eligible = SPRITE_CACHE_ENABLE && cache_address_match &&
+wire cache_eligible = SPRITE_CACHE_ENABLE && pixel_shift == 0 && cache_address_match &&
     source_stride == 32'd2560 && segment_beats <= (32'd4 - {30'b0,src_cursor[5:4]});
 wire [8:0] mix_read_index = STREAM_ENABLE ? mix_issue_index : beat_index;
-wire [8:0] source_read_index = state == MIX_LOAD || state == MIX_STREAM ? mix_read_index : beat_index;
+wire [8:0] source_read_index = state == WR_DATA ? beat_index + 1'b1 :
+    state == MIX_LOAD || state == MIX_STREAM ? mix_read_index : beat_index;
 wire [5:0] cache_read_index = {cache_row,2'b00} + {4'b0,cache_offset} + mix_read_index[5:0];
 
 // Keep full precision for rejection of invalid, overflowing addresses. Register
@@ -110,14 +136,14 @@ wire [5:0] cache_read_index = {cache_row,2'b00} + {4'b0,cache_offset} + mix_read
 // the original combined expression reached 51 logic levels at 100 MHz.
 wire [63:0] row_bytes = {32'b0, copy_width} << 2;
 wire [63:0] destination_start = {32'b0, y} * FRAME_STRIDE +
-    ({32'b0, x} << 2);
+    ({32'b0, (x & 32'hfffffffc)} << 2);
 wire invalid_geometry = copy_width == 0 || copy_height == 0 ||
     {32'b0, x} + {32'b0, copy_width} > FRAME_WIDTH ||
     {32'b0, y} + {32'b0, copy_height} > FRAME_HEIGHT ||
     saved_back_base[11:0] != 0 ||
     {32'b0,saved_back_base}+FRAME_BYTES > 64'h100000000 ||
     source[3:0] != 0 || source_stride[3:0] != 0 ||
-    x[1:0] != 0 || copy_width[1:0] != 0 ||
+    (!PIXEL_X_ENABLE && x[1:0] != 0) || copy_width[1:0] != 0 ||
     {32'b0, source_stride} < row_bytes;
 
 wire [31:0] src_page_beats = (32'd4096 - {20'b0, src_cursor[11:0]}) >> 4;
@@ -137,7 +163,7 @@ wire timed_out = &watchdog;
 
 assign busy = state != IDLE;
 assign araddr = state==BG_ADDR ? saved_back_base+dst_cursor : src_cursor;
-assign arlen = burst_beats - 1'b1;
+assign arlen = (state == RD_ADDR ? source_beats : burst_beats) - 1'b1;
 assign arvalid = state == RD_ADDR || state == BG_ADDR;
 assign rready = state == RD_DATA || state == BG_DATA || state == DRAIN_R;
 assign awaddr = dst_cursor;
@@ -149,15 +175,19 @@ assign wvalid = state == WR_DATA;
 assign wlast = wvalid && last_beat;
 assign bready = state == WR_RESP;
 
-wire source_store = state == RD_DATA && rvalid && rready;
+wire source_store = source_received;
 wire mixed_store = mix_valid && (state == MIX_WAIT || (STREAM_ENABLE && state == MIX_STREAM));
-wire [8:0] store_index = STREAM_ENABLE && !source_store ? mix_return_index : beat_index;
-wire [127:0] store_data = source_store ? rdata : mix_result;
+wire [8:0] store_index = state == PAD_SOURCE ? burst_beats - 1'b1 : STREAM_ENABLE && !source_store ? mix_return_index : beat_index;
+wire [127:0] store_data = state == PAD_SOURCE ? previous_source >> ((4-pixel_shift)*32) : source_store ? (pixel_shift != 0 ? shifted_pair[127:0] : source_payload) : mix_result;
 
 // No reset on the storage array. Only entries received by a complete read
 // burst can be used. WR_LOAD below provides a synchronous memory read cycle.
 always @(posedge clk) begin
-    if (rst_n && (source_store || mixed_store))
+    if (state == CACHE_LOAD)
+        line_data <= line_cache[{line_slot,2'b00} + src_cursor[5:4] + beat_index];
+    if (state == RD_DATA && rvalid && line_fill)
+        line_cache[{line_slot,2'b00} + beat_index] <= rdata;
+    if (rst_n && (source_store || mixed_store || state == PAD_SOURCE))
         beat_mem[store_index] <= store_data;
     if (rst_n && state == BG_DATA && rvalid && rready)
         background_mem[beat_index] <= rdata;
@@ -168,7 +198,7 @@ always @(posedge clk) begin
     if (SPRITE_CACHE_ENABLE && (state == MIX_LOAD ||
         (state == MIX_STREAM && mix_issue_index < burst_beats)))
         cache_read_data <= sprite_cache[cache_read_index];
-    if (state == WR_LOAD || state == MIX_LOAD ||
+    if ((state == WR_DATA && wready && !last_beat) || state == WR_LOAD || state == MIX_LOAD ||
         (STREAM_ENABLE && state == MIX_STREAM && mix_issue_index < burst_beats))
         source_read_data <= beat_mem[source_read_index];
     if (state == MIX_LOAD ||
@@ -178,7 +208,7 @@ end
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        state <= IDLE;
+        state <= IDLE; previous_source <= 0; line_valid <= 0; line_fill <= 0;
         done <= 0; error_code <= 0; command_count <= 0;
         saved_back_base<=0;saved_alpha<=0;
         source <= 0; source_stride <= 0; x <= 0; y <= 0;
@@ -236,7 +266,7 @@ always @(posedge clk or negedge rst_n) begin
             end else begin
                 src_row <= source; src_cursor <= source;
                 dst_row <= destination_start_latched; dst_cursor <= destination_start_latched;
-                rows_left <= copy_height; beats_left <= copy_width >> 2;
+                rows_left <= copy_height; beats_left <= row_beats; previous_source <= 0;
                 state <= PREP;
             end
         end
@@ -246,41 +276,55 @@ always @(posedge clk or negedge rst_n) begin
             end else begin
                 burst_beats <= segment_beats[8:0]; beat_index <= 0;
                 segment_read_error <= 0;
+                line_fill <= line_eligible && !line_hit && src_cursor[5:4] == 0 && planned_reads == 4;
+                if (line_eligible && !line_hit && src_cursor[5:4] == 0 && planned_reads == 4)
+                    line_valid[line_slot] <= 0;
                 cache_row <= cache_address_row;
                 cache_offset <= src_cursor[5:4];
                 cache_use <= cache_eligible && sprite_cache_valid[cache_address_row];
                 cache_fill <= cache_eligible && !sprite_cache_valid[cache_address_row] &&
                     src_cursor[5:4] == 0 && segment_beats == 4;
-                state <= cache_eligible && sprite_cache_valid[cache_address_row] ? BG_ADDR : RD_ADDR;
+                state <= pixel_shift != 0 && final_segment && segment_beats == 1 ? PAD_SOURCE :
+                    cache_eligible && sprite_cache_valid[cache_address_row] ? BG_ADDR :
+                    line_hit ? CACHE_LOAD : RD_ADDR;
             end
         end
         RD_ADDR: if (arready) begin
             beat_index <= 0; state <= RD_DATA;
         end
-        RD_DATA: if (rvalid) begin
-            if (rlast != last_beat) begin
+        CACHE_LOAD: state <= CACHE_DATA;
+        CACHE_DATA, RD_DATA: if (source_received) begin
+            previous_source <= source_payload;
+            if (state == RD_DATA && rlast != source_last) begin
                 // An invalid length/termination cannot safely be repaired by
                 // this master. Keep BUSY, block commands, require platform reset.
                 error_code <= ERR_PROTOCOL;
                 if(rlast) begin done<=1;state<=IDLE;end
                 else state<=DRAIN_R;
             end else begin
-                if (bad_read && error_code == 0 && !timed_out)
+                if (state == RD_DATA && bad_read && error_code == 0 && !timed_out)
                     error_code <= ERR_READ;
-                if (bad_read)
+                if (state == RD_DATA && bad_read)
                     segment_read_error <= 1;
-                if (last_beat) begin
-                    if (bad_read || segment_read_error || error_code != 0 || timed_out) begin
+                if (source_last) begin
+                    if ((state == RD_DATA && bad_read) || segment_read_error || error_code != 0 || timed_out) begin
                         done <= 1; state <= IDLE;
                     end else begin
-                        if (SPRITE_CACHE_ENABLE && cache_fill)
+                        if (state == RD_DATA && line_fill) begin
+                            line_valid[line_slot] <= 1;
+                            line_tags[line_slot] <= src_cursor[31:6];
+                        end
+                        if (SPRITE_CACHE_ENABLE && cache_fill && state == RD_DATA)
                             sprite_cache_valid[cache_row] <= 1;
-                        beat_index <= 0; state <= BG_ADDR;
+                        beat_index <= 0; state <= pixel_shift != 0 && beats_left == burst_beats ? PAD_SOURCE : BG_ADDR;
                     end
-                end else
+                end else begin
                     beat_index <= beat_index + 1'b1;
+                    if (state == CACHE_DATA) state <= CACHE_LOAD;
+                end
             end
         end
+        PAD_SOURCE: begin beat_index <= 0; state <= BG_ADDR; end
         BG_ADDR: if(arready) begin
             beat_index<=0;state<=BG_DATA;
         end
@@ -341,7 +385,7 @@ always @(posedge clk or negedge rst_n) begin
             if (last_beat)
                 state <= WR_RESP;
             else begin
-                beat_index <= beat_index + 1'b1; state <= WR_LOAD;
+                beat_index <= beat_index + 1'b1; state <= WR_DATA;
             end
         end
         WR_RESP: if (bvalid) begin
@@ -362,7 +406,7 @@ always @(posedge clk or negedge rst_n) begin
                     dst_row <= dst_row + FRAME_STRIDE;
                     src_cursor <= src_row + source_stride;
                     dst_cursor <= dst_row + FRAME_STRIDE;
-                    beats_left <= copy_width >> 2; state <= PREP;
+                    beats_left <= row_beats; previous_source <= 0; state <= PREP;
                 end
             end else begin
                 src_cursor <= src_cursor + segment_bytes;

@@ -120,12 +120,12 @@ def prepare_hardware(variant):
     shutil.copy2(ROOT/'software/flash/jtag_wait.hex',target/'software/flash/jtag_wait.hex')
     top = target/'rtl/ti60f225_oob_top.v'
     text = top.read_text(encoding='utf8')
-    for key,value in {'DISPLAY_WINDOW_ENABLE':1,'DISPLAY_SCALE2_ENABLE':int(variant=='v11'),
-                      'ALPHA_STREAM_ENABLE':1,'ALPHA_SPRITE_CACHE_ENABLE':1}.items():
+    for key,value in {'DISPLAY_WINDOW_ENABLE':1,'DISPLAY_SCALE2_ENABLE':int(variant in ('v11','v12')),
+                      'ALPHA_PIXEL_X_ENABLE':int(variant=='v12'),'ALPHA_STREAM_ENABLE':1,'ALPHA_SPRITE_CACHE_ENABLE':1}.items():
         text,count = re.subn(r'(parameter '+key+r' = )\d+(,)',lambda m:m[1]+str(value)+m[2],text)
         assert count == 1,key
     text,count = re.subn(r'(parameter \[31:0\] HARDWARE_VERSION = )[^,]+,',
-                         lambda m:m[1]+"32'h000"+('b' if variant=='v11' else 'a')+'0000,',text)
+                         lambda m:m[1]+"32'h000"+('c' if variant=='v12' else 'b' if variant=='v11' else 'a')+'0000,',text)
     assert count == 1
     top.write_text(text,encoding='utf8')
     print('Prepared editable hardware project:',target/'ti60f225_oob.xml')
@@ -135,7 +135,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=('run','build','verify','loader-checks','hardware'))
     parser.add_argument('--prepare-assets',action='store_true')
-    parser.add_argument('--variant',choices=('v10','v11'),default='v11')
+    parser.add_argument('--variant',choices=('v10','v11','v12'),default='v11')
     args = parser.parse_args()
     if args.action == 'verify':
         verify()

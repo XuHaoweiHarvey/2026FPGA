@@ -86,15 +86,18 @@ static inline uint32_t accel_init(void) {
     accel_cached_command_count_valid=0u;
     accel_cached_descriptor_valid=0u;
     version=accel_read(ACCEL_VERSION);
+#ifdef LUNARIA_PIXEL_X
+    if(version!=UINT32_C(0x000c0000)) return UINT32_C(0xE000);
+#endif
 #if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
     if((version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000) &&
-        !(GAME_ALLOW_SCALE2 && version==UINT32_C(0x000b0000))) ||
+        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) || version==UINT32_C(0x000c0000)))) ||
        !(accel_read(ACCEL_CAPABILITIES)&ACCEL_CAP_DISPLAY_WINDOW)) return UINT32_C(0xE000);
 #endif
     if(accel_read(ACCEL_ID)!=ACCEL_ID_EXPECTED ||
 #if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
        (version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000) &&
-        !(GAME_ALLOW_SCALE2 && version==UINT32_C(0x000b0000)))) return UINT32_C(0xE000);
+        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) || version==UINT32_C(0x000c0000))))) return UINT32_C(0xE000);
 #else
        (version!=ACCEL_VERSION_EXPECTED && version!=UINT32_C(0x00070000))) return UINT32_C(0xE000);
 #endif
@@ -107,7 +110,7 @@ static inline uint32_t accel_init(void) {
     if(i==ACCEL_POLL_LIMIT) return UINT32_C(0xE001);
     caps=accel_read(ACCEL_CAPABILITIES);
 #if GAME_ALLOW_SCALE2
-    if((version==UINT32_C(0x000b0000)) != !!(caps&ACCEL_CAP_DISPLAY_SCALE2)) return UINT32_C(0xE003);
+    if(((version==UINT32_C(0x000b0000) || version==UINT32_C(0x000c0000))) != !!(caps&ACCEL_CAP_DISPLAY_SCALE2)) return UINT32_C(0xE003);
     caps &= ~ACCEL_CAP_DISPLAY_SCALE2;
 #endif
     if(accel_read(ACCEL_WIDTH)!=1920 || accel_read(ACCEL_HEIGHT)!=1080 ||

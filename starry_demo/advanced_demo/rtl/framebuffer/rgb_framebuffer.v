@@ -16,6 +16,7 @@ module rgb_framebuffer #(
     parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0, ALPHA_ENABLE=0,
     parameter COMMAND_QUEUE_ENABLE=0, COMMAND_QUEUE_DEPTH=8,
     parameter DISPLAY_WINDOW_ENABLE=0, DISPLAY_SCALE2_ENABLE=0,
+    parameter ALPHA_PIXEL_X_ENABLE = 0,
     parameter ALPHA_STREAM_ENABLE=0, ALPHA_SPRITE_CACHE_ENABLE=0
 )(
     input wire axi_clk, input wire rst_n,
@@ -323,7 +324,7 @@ generate if(C_MODE) begin: c_control
             .width(dispatch_width),.height(dispatch_height),.src_range_valid(source_valid));
         graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
             .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),
-            .ALPHA_ENABLE(ALPHA_ENABLE),.ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),
+            .ALPHA_ENABLE(ALPHA_ENABLE),.ALPHA_PIXEL_X_ENABLE(ALPHA_PIXEL_X_ENABLE),.ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),
             .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE)) engine (
             .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
             .op(dispatch_op),.x(dispatch_x),.y(dispatch_y),.width(dispatch_width),.height(dispatch_height),.color(dispatch_color),
