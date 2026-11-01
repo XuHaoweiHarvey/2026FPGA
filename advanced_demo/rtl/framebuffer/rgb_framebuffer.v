@@ -16,7 +16,8 @@ module rgb_framebuffer #(
     parameter COLOR_KEY_ENABLE=0, CPU_DDR_ENABLE=0, ALPHA_ENABLE=0,
     parameter COMMAND_QUEUE_ENABLE=0, COMMAND_QUEUE_DEPTH=8,
     parameter DISPLAY_WINDOW_ENABLE=0, DISPLAY_SCALE2_ENABLE=0,
-    parameter ALPHA_STREAM_ENABLE=0, ALPHA_SPRITE_CACHE_ENABLE=0
+    parameter ALPHA_STREAM_ENABLE=0, ALPHA_SPRITE_CACHE_ENABLE=0,
+    parameter ALPHA_WIDE_CACHE_ENABLE=0, BEAM_ENABLE=0, ALPHA_OVERLAP_ENABLE=0, ALPHA_READ_AHEAD_ENABLE=0, READ_OUTSTANDING=1, TILE_COMPOSITOR_ENABLE=0
 )(
     input wire axi_clk, input wire rst_n,
     input wire i_clk, input wire i_frame_start, input wire i_de,
@@ -52,6 +53,8 @@ module rgb_framebuffer #(
     output wire init_done, output wire [31:0] init_error,
     output wire engine_busy,engine_done,output wire [31:0] engine_error,command_count,
     output wire command_queue_ready,
+    output wire [511:0] alpha_perf_counters,
+    output wire [255:0] read_perf_counters,
     output wire [31:0] init_data_beats,init_aw_bursts,init_wlast_bursts,init_b_responses,init_aw_beats,
     input wire swap_request,clear_swap_done,
     output wire draw_ready,output wire [31:0] buffer_status,
@@ -86,9 +89,9 @@ wire queue_storage_ready,command_queue_valid;
 wire queue_push,queue_pop,queue_flush,queue_dispatch,queue_pop_event;
 wire [31:0] dispatch_op,dispatch_x,dispatch_y,dispatch_width,dispatch_height;
 wire [31:0] dispatch_color,dispatch_src_addr,dispatch_src_stride;
-wire engine_active_internal,engine_done_internal;
+wire engine_active_internal,engine_done_internal,tile_pending;
 wire [31:0] engine_error_internal,engine_command_count_internal;
-assign engine_busy=engine_active_internal || (COMMAND_QUEUE_ENABLE && command_queue_count!=0);
+assign engine_busy=engine_active_internal || tile_pending || (COMMAND_QUEUE_ENABLE && command_queue_count!=0);
 assign engine_done=engine_done_internal;
 assign engine_error=engine_error_internal;
 assign command_count=COMMAND_QUEUE_ENABLE ? command_accept_count : engine_command_count_internal;
@@ -321,22 +324,50 @@ generate if(C_MODE) begin: c_control
             .src_addr(dispatch_src_addr),.src_stride(dispatch_src_stride),
             .op(dispatch_op),.asset_ready(asset_ready),.sprite_ready(sprite_ready),
             .width(dispatch_width),.height(dispatch_height),.src_range_valid(source_valid));
-        graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
+        if(TILE_COMPOSITOR_ENABLE)begin: tiled
+        tiled_graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
             .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),
             .ALPHA_ENABLE(ALPHA_ENABLE),.ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),
-            .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE)) engine (
+            .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE),
+            .ALPHA_WIDE_CACHE_ENABLE(ALPHA_WIDE_CACHE_ENABLE),.BEAM_ENABLE(BEAM_ENABLE),
+            .ALPHA_OVERLAP_ENABLE(ALPHA_OVERLAP_ENABLE),.ALPHA_READ_AHEAD_ENABLE(ALPHA_READ_AHEAD_ENABLE)) engine (
+            .flush_request(command_queue_count==0 && (swap_request || d_pending || cpu_ddr_acquire)),.pending(tile_pending),
             .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
             .op(dispatch_op),.x(dispatch_x),.y(dispatch_y),.width(dispatch_width),.height(dispatch_height),.color(dispatch_color),
             .src_addr(dispatch_src_addr),.src_stride(dispatch_src_stride),.back_base(d_back_base),
             .src_range_valid(source_valid),.accept(),
             .busy(engine_active_internal),.done(engine_done_internal),
             .error_code(engine_error_internal),.command_count(engine_command_count_internal),
+            .alpha_perf_counters(alpha_perf_counters),.read_perf_counters(read_perf_counters),
             .araddr(b_araddr),.arlen(b_arlen),.arvalid(b_arvalid),.arready(b_arready),
             .rdata(b_rdata),.rid(b_rid),.rresp(b_rresp),.rlast(b_rlast),.rvalid(b_rvalid),.rready(b_rready),
             .awaddr(a_awaddr),.awlen(a_awlen),.awvalid(a_awvalid),.awready(a_awready),
             .wdata(a_wdata),.wstrb(a_wstrb),.wlast(a_wlast),.wvalid(a_wvalid),.wready(a_wready),
             .bid(bid),.bresp(bresp),.bvalid(a_bvalid),.bready(a_bready));
+        end else begin: immediate
+        assign tile_pending=0;
+        graphics_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
+            .FRAME_STRIDE(FRAME_WIDTH*4),.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),
+            .ALPHA_ENABLE(ALPHA_ENABLE),.ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),
+            .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE),
+            .ALPHA_WIDE_CACHE_ENABLE(ALPHA_WIDE_CACHE_ENABLE),.BEAM_ENABLE(BEAM_ENABLE),
+            .ALPHA_OVERLAP_ENABLE(ALPHA_OVERLAP_ENABLE),.ALPHA_READ_AHEAD_ENABLE(ALPHA_READ_AHEAD_ENABLE)) engine (
+            .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),.start(d_command_accept),
+            .op(dispatch_op),.x(dispatch_x),.y(dispatch_y),.width(dispatch_width),.height(dispatch_height),.color(dispatch_color),
+            .src_addr(dispatch_src_addr),.src_stride(dispatch_src_stride),.back_base(d_back_base),
+            .src_range_valid(source_valid),.accept(),
+            .busy(engine_active_internal),.done(engine_done_internal),
+            .error_code(engine_error_internal),.command_count(engine_command_count_internal),
+            .alpha_perf_counters(alpha_perf_counters),.read_perf_counters(read_perf_counters),
+            .araddr(b_araddr),.arlen(b_arlen),.arvalid(b_arvalid),.arready(b_arready),
+            .rdata(b_rdata),.rid(b_rid),.rresp(b_rresp),.rlast(b_rlast),.rvalid(b_rvalid),.rready(b_rready),
+            .awaddr(a_awaddr),.awlen(a_awlen),.awvalid(a_awvalid),.awready(a_awready),
+            .wdata(a_wdata),.wstrb(a_wstrb),.wlast(a_wlast),.wvalid(a_wvalid),.wready(a_wready),
+            .bid(bid),.bresp(bresp),.bvalid(a_bvalid),.bready(a_bready));
+        end
     end else begin: fill_only
+    assign tile_pending=0;
+    assign alpha_perf_counters=0;assign read_perf_counters=0;
     assign b_araddr=0;assign b_arlen=0;assign b_arvalid=0;assign b_rready=0;
     assign command_queue_ready=1'b1;
     assign queue_pop_event=d_command_accept;
@@ -352,12 +383,13 @@ generate if(C_MODE) begin: c_control
         .bid(bid),.bresp(bresp),.bvalid(a_bvalid),.bready(a_bready));
     end
 end else begin: legacy_mode
+    assign alpha_perf_counters=0;assign read_perf_counters=0;
     assign init_done=0;assign init_error=0;
     assign init_data_beats=0;assign init_aw_bursts=0;assign init_wlast_bursts=0;
     assign init_b_responses=0;assign init_aw_beats=0;
     assign engine_active_internal=0;assign engine_done_internal=0;
     assign engine_error_internal=0;assign engine_command_count_internal=0;
-    assign command_queue_ready=1'b0;assign queue_pop_event=0;
+    assign tile_pending=0;assign command_queue_ready=1'b0;assign queue_pop_event=0;
     assign a_awaddr=0;assign a_awlen=0;assign a_awvalid=0;
     assign a_wdata=0;assign a_wstrb=0;assign a_wlast=0;assign a_wvalid=0;assign a_bready=0;
     assign b_araddr=0;assign b_arlen=0;assign b_arvalid=0;assign b_rready=0;
@@ -397,7 +429,7 @@ ddr_rd_buffer #(.AXI_DATA_WIDTH(128), .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
 );
 end endgenerate
 generate if(BLIT_ENABLE) begin: shared_read
-    ddr_read_arbiter #(.FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH)) arbiter (
+    ddr_read_arbiter #(.FIFO_LOW(WRITE_FIFO_LOW),.FIFO_HIGH(WRITE_FIFO_HIGH),.OUTSTANDING(READ_OUTSTANDING)) arbiter (
         .clk(axi_clk),.rst_n(axi_rst_n),.enabled(init_done),
         .display_active(d_active),.display_launch(d_launch),.display_flush(d_flush),.display_fifo_level(reader_fifo_level),
         .display_araddr(display_araddr),.display_arlen(display_arlen),.display_arvalid(display_arvalid),.display_arready(display_arready),
@@ -424,7 +456,7 @@ end else begin: display_only
 end endgenerate
 generate if(D_MODE) begin: d_buffers
     assign reader_error=read_fault ? 32'h2004 : display_error;
-    assign draw_ready=manager_draw_ready && read_healthy && !cpu_owner &&
+    assign draw_ready=manager_draw_ready && !tile_pending && read_healthy && !cpu_owner &&
                       !(CPU_DDR_ENABLE && (cpu_ddr_error!=0 || cpu_session_fault)) &&
                       !(CPU_DDR_ENABLE && cpu_ddr_acquire);
     ddr_write_admission #(.ENABLE(WRITE_SERVICE_ENABLE),.READ_QUOTA(WRITE_READ_QUOTA),
@@ -455,11 +487,13 @@ generate if(D_MODE) begin: d_buffers
         .rlast(display_rlast),.rid(display_rid),.rresp(display_rresp),
         .safe(d_safe),.active(d_active),.outstanding(reader_outstanding),.data_beats(reader_data_beats),
         .reserved_beats(reader_reserved_beats),.error_code(display_error));
-    buffer_manager #(.BUFFER0_BASE(BUFFER0_BASE),.BUFFER1_BASE(BUFFER1_BASE)) manager (
+    buffer_manager #(.BUFFER0_BASE(BUFFER0_BASE),.BUFFER1_BASE(BUFFER1_BASE),
+                     .DEFERRED_WRITES(TILE_COMPOSITOR_ENABLE)) manager (
         .clk(axi_clk),.rst_n(axi_rst_n),.init_done(init_done),
         .cmd_request(queue_dispatch && read_healthy && !cpu_owner &&
                      !(CPU_DDR_ENABLE && cpu_ddr_acquire)),
         .writer_busy(engine_active_internal),.writer_done(engine_done_internal),.writer_error(engine_error_internal),
+        .writer_pending(tile_pending),
         .swap_request(swap_request && (!COMMAND_QUEUE_ENABLE || command_queue_count==0) && !cpu_owner &&
                       !(CPU_DDR_ENABLE && (cpu_ddr_error!=0 || cpu_session_fault)) &&
                       !(CPU_DDR_ENABLE && cpu_ddr_acquire)),.clear_done(clear_swap_done),

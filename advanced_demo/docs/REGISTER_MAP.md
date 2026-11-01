@@ -132,6 +132,13 @@ WRITE_OWNER是TPG是否永久交出写端口；WRITER_OWNED是当前命令是否
 
 ## Error Codes and Clear Semantics
 
+v14 DDR 诊断扩展（仅 capabilities bit17 开启时映射）：
+
+| Offset | 名称 | 行为 |
+|---|---|---|
+| E8 | PERF_SNAPSHOT | 写入任意值，在接受 APB 事务的同一 core_clk 边沿锁存 21 个计数；读取返回 21。不会清零计数或修改绘制状态。 |
+| 100–150 | PERF_DATA | 21 个只读 32 位快照字，每字间隔 4 字节，顺序见 LUNARIA_DDR_V14.md。平台计数按 2^32 回绕；旧版本不映射此窗口。 |
+
 本节错误码均为十六进制。错误访问会更新APB error，但不产生目标寄存器/命令副作用。
 
 | ERROR_CODE | 条件 | 行为 / 清除 |
@@ -170,4 +177,19 @@ WRITE_OWNER是TPG是否永久交出写端口；WRITER_OWNED是当前命令是否
 UNDERFLOW_COUNT是video underflow高电平**周期数**，不是软件自定义的“黑屏次数”；启动未供数时可非0。记录稳定baseline后检查新增delta0；MISSED同理。FIFO_LEVEL不是reserved-data，后者为尚欠的R beats。各CSR独立读不是原子快照，frame计数可能跨launch清零。
 
 当前软件`g_apb_test_result.diagnostics`保存原始值；`underflow_baseline/missed_baseline`与delta记录运行新增。硬件没有独立completed-command、rejected-command或AXI-error-total寄存器。软件commands_issued/completed、swaps_requested/completed、rejected_*和error_observations仅是本次CPU运行观测，不能写成额外硬件计数。
+
+
+### v15 读取细分快照
+
+能力位 bit18（0x40000）启用时，E8 返回 29，快照窗口扩展至 0x170（含）。原 21 项顺序不变，新增 8 项定义见 LUNARIA_DDR_V15.md。
+# LUNARIA v16 extension
+
+The isolated v16 build reports VERSION `0x00100000` and CAPABILITIES
+`0x000ffffb`. Bit 19 indicates deferred tile composition. Register offsets and
+the 29-word atomic performance snapshot remain compatible with v15.
+BUSY includes buffered tile work through the final DDR B response, even when
+the command queue is ready. Firmware must drain BUSY before swap or CPU DDR
+acquisition. Alpha performance `commands` counts clipped core subcommands;
+destination read/write and wait counters include tile load/store traffic.
+See [LUNARIA_DDR_V16.md](LUNARIA_DDR_V16.md) for the complete contract.
 

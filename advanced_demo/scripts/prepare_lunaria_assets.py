@@ -38,14 +38,15 @@ def main():
     CODE.mkdir(parents=True, exist_ok=True)
     atlas = Image.new('RGBA', (640, 480))
     for name, xy in [('boss-atlas-112px-16frames.png',(0,0)),
-                     ('player-atlas-32px-8frames.png',(448,96)),
-                     ('hit-atlas-32px-8frames.png',(448,160))]:
+                     ('player-atlas-32px-8frames.png',(448,224)),
+                     ('hit-atlas-32px-8frames.png',(448,288))]:
         atlas.paste(Image.open(SOURCE/name).convert('RGBA'), xy)
     original = Image.open(SOURCE/'bullet-atlas-32px.png').convert('RGBA')
     for row in range(3):
         for col in range(4):
             tile = original.crop((col*32,row*32,col*32+32,row*32+32))
-            atlas.paste(tile.resize((16,16), Image.Resampling.LANCZOS), (448+col*16,row*16))
+            index = row*4+col
+            atlas.paste(tile, (448+index%6*32,index//6*32))
     # Directional rice sprites and true five-point stars occupy previously
     # unused atlas cells, without changing the protected hardware windows.
     stars = Image.open(SOURCE/'star-bullet-atlas-32px.png').convert('RGBA')
@@ -53,20 +54,21 @@ def main():
         rice = original.crop((32,row*32,64,row*32+32))
         for angle in range(8):
             tile = rice.rotate(-angle*45,resample=Image.Resampling.BICUBIC)
-            atlas.paste(tile.resize((16,16),Image.Resampling.LANCZOS),(512+angle*16,row*16))
+            index = row*8+angle
+            atlas.paste(tile,(448+index%6*32,64+index//6*32))
         tile = stars.crop((row*32,0,row*32+32,32))
-        atlas.paste(tile.resize((16,16),Image.Resampling.LANCZOS),(512+row*16,48))
+        atlas.paste(tile,(576+row%2*32,224+row//2*32))
     f = ImageFont.truetype('C:/Windows/Fonts/segoeui.ttf', 17)
     draw = ImageDraw.Draw(atlas)
     for index in range(64):
         char = chr(32+index)
-        x, y = 448+index%12*16, 224+index//12*24
+        x, y = 448+index%16*12, 352+index//16*24
         bounds = draw.textbbox((0,0),char,font=f)
-        draw.text((x+(16-bounds[2]+bounds[0])/2-bounds[0],y+1),char,font=f,fill='#f4eafa')
+        glyph = Image.new('RGBA',(12,24))
+        ImageDraw.Draw(glyph).text(((12-bounds[2]+bounds[0])/2-bounds[0],1),char,font=f,fill='#f4eafa')
+        atlas.paste(glyph,(x,y))
     label(atlas,'L U N A R I A',(0,448,256,32),25,'#f5eaff')
     label(atlas,'星 海 梦 境',(256,448,192,32),20,'#d7bfe9',True)
-    label(atlas,'VICTORY',(448,368,192,40),31,'#ffe6ae')
-    label(atlas,'WARNING',(448,408,192,32),23,'#ffc1ee')
     atlas.save(OUT/'atlas.png')
     background = Image.open(SOURCE/'starfield-640x480.png').convert('RGBA')
     background.save(OUT/'background.png')
@@ -93,8 +95,10 @@ def main():
     manifest = {'version':1,'format':'little-endian ARGB8888','assets':files,
                 'sprite_window':{'base':0x01384000,'stride':2560,'bytes':1228800},
                 'render':{'x':640,'y':300,'width':640,'height':480},
-                'bullet_size':16,'board_tested':False,'art_source':'Original procedural LUNARIA preview'}
+                'bullet_size':32,'board_tested':False,'art_source':'Original procedural LUNARIA preview'}
     (OUT/'assets.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf8')
+    from prepare_lunaria_trim import main as prepare_trim
+    prepare_trim()
     print('PASS packed LUNARIA assets into existing 640 x 480 atlas; '+str(sum(v['bytes'] for v in files.values()))+' transfer bytes')
 
 if __name__ == '__main__':

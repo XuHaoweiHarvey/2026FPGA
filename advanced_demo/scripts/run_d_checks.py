@@ -1,6 +1,6 @@
 """D manager/CDC and full RGB pipeline checks; no CPU or encrypted IP simulation."""
 from pathlib import Path
-import argparse,subprocess,sys,tempfile
+import argparse,subprocess,sys,tempfile,hashlib,json
 ROOT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--apb-waits',type=int,nargs='+',default=[0,1,3])
@@ -10,11 +10,19 @@ parser.add_argument('--cpu-ddr',action='store_true',help='Run M1a CPU session in
 parser.add_argument('--alpha',action='store_true',help='Run shared display/Alpha sprite read-modify-write integration')
 parser.add_argument('--alpha-stream',action='store_true',help='Enable continuous Alpha pipeline feeding (implies --alpha)')
 parser.add_argument('--alpha-cache',action='store_true',help='Enable enemy-bullet source BRAM cache (implies --alpha-stream)')
+parser.add_argument('--tile-compositor',action='store_true')
+parser.add_argument('--read-outstanding',type=int,default=1)
+parser.add_argument('--alpha-read-ahead',action='store_true')
+parser.add_argument('--alpha-overlap',action='store_true',help='Overlap Alpha read/mix and result-bank writes')
 parser.add_argument('--queue',action='store_true',help='Enable v7 queued commands and exercise full/backpressure/drain in the DMA integration')
 parser.add_argument('--output',type=Path,help='Artifact directory; default is a new temporary directory')
 parser.add_argument('--negative-control',choices=['display-data','display-quota','color-key-mask'],
                     help='With --graphics, intentionally miswire a temporary copy and require the matching checker to fail')
 args=parser.parse_args()
+if args.alpha_read_ahead:
+ args.alpha_overlap=True
+if args.alpha_overlap:
+ args.alpha_stream=True
 if args.alpha_cache:
  args.alpha_stream=True
 if args.alpha_stream:
@@ -39,7 +47,7 @@ print('Artifacts:',out,flush=True)
 def run(cmd):subprocess.run([str(x) for x in cmd],cwd=ROOT,check=True)
 def sim(top,files,overrides=(),plusargs=()):
  binary=out/(top+str(len(list(out.glob('*.vvp'))))+'.vvp')
- run(['iverilog','-g2005-sv','-s',top,*overrides,'-o',binary,*files]);run(['vvp',binary,*plusargs])
+ run(['iverilog','-g2005-sv','-s',top,*overrides,'-o',binary,*files]);run(['vvp','-i',binary,*plusargs])
 d_modules=['rtl/framebuffer/buffer_manager.v','rtl/framebuffer/video_frame_cdc.v','rtl/framebuffer/read_frame_guard.v','rtl/framebuffer/ddr_write_admission.v','rtl/framebuffer/display_underflow_counter.v']
 sim('tb_ddr_write_admission',['sim/tb_ddr_write_admission.v',*d_modules])
 sim('tb_buffer_manager',['sim/tb_buffer_manager.v',*d_modules])
@@ -51,7 +59,7 @@ sources=['sim/tb_checkpoint_d.v','rtl/test_pattern/rgb_tpg.v','rtl/framebuffer/r
  out/'DC_FIFO.v','rtl/frame_buffer_V4/bank_switch.v','rtl/frame_buffer_V4/rst_n_piple.v',
  'rtl/user_cvo_axi_v2/cvo_axi_v2.v',*d_modules]
 if args.graphics:
- sources.extend(['rtl/accelerator/alpha_pixel_pipeline.v','rtl/accelerator/alpha_blit_engine.v','rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
+ sources.extend(['rtl/accelerator/tiled_graphics_engine.v','rtl/accelerator/alpha_pixel_pipeline.v','rtl/accelerator/alpha_blit_engine.v','rtl/accelerator/graphics_engine.v','rtl/accelerator/blit_engine.v',
                  'rtl/framebuffer/blit_source_guard.v','rtl/framebuffer/ddr_read_arbiter.v'])
 if args.negative_control:
  target='rtl/accelerator/graphics_engine.v' if args.negative_control=='color-key-mask' else 'rtl/framebuffer/rgb_framebuffer.v'
@@ -72,11 +80,17 @@ if args.negative_control:
  broken=out/('broken_'+Path(target).name)
  broken.write_text(text.replace(original,replacement),encoding='utf8')
  sources[sources.index(target)]=broken
+check_sources=[ROOT/str(p) for p in sources if not Path(p).is_absolute()]+[ROOT/'scripts/run_d_checks.py']
+source_hashes={p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in check_sources}
 for waits in args.apb_waits:
  overrides=[f'-Ptb_checkpoint_d.APB_WAITS={waits}',f'-Ptb_checkpoint_d.GRAPHICS={int(args.graphics)}',
             f'-Ptb_checkpoint_d.COLOR_KEY={int(args.color_key)}',f'-Ptb_checkpoint_d.CPU_DDR={int(args.cpu_ddr)}',
             f'-Ptb_checkpoint_d.ALPHA_ENABLE={int(args.alpha)}',f'-Ptb_checkpoint_d.QUEUE_ENABLE={int(args.queue)}',
             f'-Ptb_checkpoint_d.ALPHA_STREAM_ENABLE={int(args.alpha_stream)}',
+            f'-Ptb_checkpoint_d.ALPHA_OVERLAP_ENABLE={int(args.alpha_overlap)}',
+            f'-Ptb_checkpoint_d.ALPHA_READ_AHEAD_ENABLE={int(args.alpha_read_ahead)}',
+            f'-Ptb_checkpoint_d.READ_OUTSTANDING={args.read_outstanding}',
+            f'-Ptb_checkpoint_d.TILE_COMPOSITOR_ENABLE={int(args.tile_compositor)}',
             f'-Ptb_checkpoint_d.ALPHA_SPRITE_CACHE_ENABLE={int(args.alpha_cache)}',
             f'-Ptb_checkpoint_d.QUEUE_STRESS_ONLY={int(args.queue)}']
  if args.negative_control:
@@ -89,7 +103,10 @@ for waits in args.apb_waits:
   preview_dir=out/f'wait{waits}'
   if args.color_key:
    preview_dir.mkdir(parents=True,exist_ok=True)
-  sim('tb_checkpoint_d',sources,overrides,[f'+PREVIEW_DIR={preview_dir}'] if args.color_key else [])
+  sim('tb_checkpoint_d',sources,overrides,['+PROGRESS',*([f'+PREVIEW_DIR={preview_dir}'] if args.color_key else [])])
   if args.color_key and not args.queue:
    run([sys.executable,'scripts/render_blit_preview.py',preview_dir,'--names','color_key_source','color_key_scene'])
 print('PASS D simulations; board evidence is recorded separately.',flush=True)
+for name,digest in source_hashes.items():assert hashlib.sha256((ROOT/name).read_bytes()).hexdigest()==digest,name
+(out/'checks.json').write_text(json.dumps(dict(status='passed',board_tested=False,
+ tile_compositor=args.tile_compositor,queue=args.queue,apb_waits=args.apb_waits,sources=source_hashes),indent=2))

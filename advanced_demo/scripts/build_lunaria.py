@@ -1,4 +1,4 @@
-"""Build independent LUNARIA firmware using the existing v10/v11 interface."""
+"""Build independent LUNARIA firmware for the v10/v11/v12 interface."""
 import argparse
 import hashlib
 import json
@@ -15,9 +15,12 @@ if args.prepare_assets:
     subprocess.run([sys.executable,str(ROOT/'scripts/prepare_lunaria_assets.py')],cwd=ROOT,check=True)
 subprocess.run([sys.executable,str(ROOT/'scripts/build_apb_software.py'),
                 '--program','lunaria','--ide-root',str(args.ide_root),'--opt','O2',
-                '--define','GAME_DISPLAY_WINDOW=1','--define','GAME_ALLOW_SCALE2=1'],
+                '--define','GAME_DISPLAY_WINDOW=1','--define','GAME_ALLOW_SCALE2=1',
+                '--define','GAME_ALLOW_WIDE_CACHE=1','--define','GAME_ALLOW_BEAM=1'],
                cwd=ROOT,check=True)
 source_files = sorted((ROOT/'software/lunaria').glob('*.c')) + sorted((ROOT/'software/lunaria').glob('*.h'))
+source_files += [ROOT/name for name in ('software/apb_reg_test/accel_api.h',
+    'software/apb_reg_test/accel_regs.h','scripts/build_lunaria.py','scripts/build_apb_software.py')]
 sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
 build = {'elf_sha256':sha(ROOT/'software/lunaria/build/lunaria.elf'),
          'sources':{p.relative_to(ROOT).as_posix():sha(p) for p in source_files},

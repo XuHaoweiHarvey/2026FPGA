@@ -23,6 +23,12 @@ module ti60f225_oob_top #(
     parameter DISPLAY_SCALE2_ENABLE = 0,
     parameter ALPHA_STREAM_ENABLE = 0,
     parameter ALPHA_SPRITE_CACHE_ENABLE = 0,
+    parameter ALPHA_WIDE_CACHE_ENABLE = 0,
+    parameter BEAM_ENABLE = 0,
+    parameter ALPHA_OVERLAP_ENABLE = 0,
+    parameter ALPHA_READ_AHEAD_ENABLE = 0,
+    parameter READ_OUTSTANDING = 1,
+    parameter TILE_COMPOSITOR_ENABLE = 0,
     parameter [31:0] HARDWARE_VERSION = 0,
 	parameter                       RANK_RATIO         = 1,       // # of unique CS outputs per rank
 	parameter                       ASYN_AXI_CLK       = `ASYN_AXI_CLK, 
@@ -475,6 +481,8 @@ wire asset_begin,asset_seal;
 wire [31:0] asset_status;
 wire sprite_begin,sprite_seal;
 wire [31:0] sprite_status;
+wire [511:0] alpha_perf_counters;
+wire [255:0] read_perf_counters;
 wire [31:0] cpu_ddr_session_status,cpu_ddr_error,cpu_awaddr,cpu_araddr;
 wire cpu_awvalid,cpu_awready,cpu_wlast,cpu_wvalid,cpu_wready;
 wire [127:0] cpu_wdata,cpu_rdata;
@@ -488,9 +496,13 @@ rgb_framebuffer #(
     .WR_FIFO_DEPTH(1024), .RD_FIFO_DEPTH(1024), .BURST_LEN(127), .C_MODE(1), .D_MODE(1), .BLIT_ENABLE(1),
     .COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),.ALPHA_ENABLE(ALPHA_ENABLE),
     .ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),.ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE),
+    .ALPHA_WIDE_CACHE_ENABLE(ALPHA_WIDE_CACHE_ENABLE),
+    .BEAM_ENABLE(BEAM_ENABLE),.ALPHA_OVERLAP_ENABLE(ALPHA_OVERLAP_ENABLE),
+    .ALPHA_READ_AHEAD_ENABLE(ALPHA_READ_AHEAD_ENABLE),.READ_OUTSTANDING(READ_OUTSTANDING),.TILE_COMPOSITOR_ENABLE(TILE_COMPOSITOR_ENABLE),
     .COMMAND_QUEUE_ENABLE(1),.COMMAND_QUEUE_DEPTH(8),.DISPLAY_WINDOW_ENABLE(DISPLAY_WINDOW_ENABLE),
     .DISPLAY_SCALE2_ENABLE(DISPLAY_SCALE2_ENABLE)
 ) checker0(
+    .alpha_perf_counters(alpha_perf_counters),.read_perf_counters(read_perf_counters),
     .diag_wr_fifo_full(wr_fifo_full),
     .diag_wr_bank(wr_buffer_index), .diag_rd_bank(rd_buffer_index),
     .diag_wr_base(wr_buffer_base), .diag_rd_base(rd_buffer_base),
@@ -958,9 +970,15 @@ assign tmds_tx_data2_TX_DATA = ~tmds_data2;
 sapphire_control #(.COLOR_KEY_ENABLE(COLOR_KEY_ENABLE),.CPU_DDR_ENABLE(1),
                     .ALPHA_ENABLE(ALPHA_ENABLE),.COMMAND_QUEUE_ENABLE(1),
                     .DISPLAY_WINDOW_ENABLE(DISPLAY_WINDOW_ENABLE),.HARDWARE_VERSION(HARDWARE_VERSION),
-                    .EXTRA_CAPABILITIES((ALPHA_STREAM_ENABLE ? 32'h1000 : 0) |
+                    .EXTRA_CAPABILITIES((TILE_COMPOSITOR_ENABLE ? 32'h80000 : 0) |
+                                       (ALPHA_READ_AHEAD_ENABLE ? 32'h40000 : 0) |
+                                       (ALPHA_OVERLAP_ENABLE ? 32'h20000 : 0) |
+                                       (BEAM_ENABLE ? 32'h10000 : 0) |
+                                       (ALPHA_WIDE_CACHE_ENABLE ? 32'h8000 : 0) |
+                                       (ALPHA_STREAM_ENABLE ? 32'h1000 : 0) |
                         (ALPHA_SPRITE_CACHE_ENABLE ? 32'h2000 : 0) |
                         (DISPLAY_SCALE2_ENABLE ? 32'h4000 : 0))) u_control (
+    .alpha_perf_counters(alpha_perf_counters),.read_perf_counters(read_perf_counters),
     .core_clk(core_clk), .platform_rst_n(i_arstn && w_arstn),
     .uart_rx(uart_rx), .uart_tx(uart_tx),
     .flash_cs_n(flash_cs_n), .flash_sck(flash_sck),

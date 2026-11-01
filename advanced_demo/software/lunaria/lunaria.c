@@ -44,8 +44,8 @@ uint16_t ln_aim(int32_t x, int32_t y) {
 }
 static void clear_actors(lunaria_t *g) {
   uint32_t i;
-  for (i = 0; i < LN_CAPACITY; i++)
-    g->bullets[i].active = 0;
+  ln_clear_bullets(g);
+  g->allocation_cursor = 0;
   for (i = 0; i < LN_SHOTS; i++)
     g->shots[i].active = 0;
   for (i = 0; i < LN_LASERS; i++)
@@ -77,6 +77,7 @@ void ln_reset(lunaria_t *g, uint32_t now) {
   uint8_t *p = (uint8_t *)g;
   for (i = 0; i < sizeof(*g); i++)
     p[i] = 0;
+  ln_clear_bullets(g);
   g->last_ms = now;
   g->lives = 3;
   g->hp = LN_PHASE_HP;
@@ -97,6 +98,7 @@ void ln_begin(lunaria_t *g) {
   g->spin_patterns = spin;
   g->state = LN_INTRO;
   g->previous_buttons = UART_KEY_FIRE;
+  g->current_elements = 2; /* Empty introduction: player and Boss. */
 }
 uint32_t ln_configure(lunaria_t *g, uint32_t limit, uint32_t spin) {
   if (limit < LN_MIN_LIMIT || limit > LN_CAPACITY || spin > 1u)
@@ -106,8 +108,9 @@ uint32_t ln_configure(lunaria_t *g, uint32_t limit, uint32_t spin) {
   g->spin_patterns = spin;
   g->phase_ms = g->next_emit_ms = g->next_shot_ms = 0;
   g->event = 0;
-  g->peak_bullets = g->peak_visible_bullets = g->peak_elements = 0;
   g->deferred_emissions = 0;
+  ln_update_metrics(g);
+  g->peak_bullets = g->peak_visible_bullets = g->peak_elements = 0;
   return 1;
 }
 static void enter_phase(lunaria_t *g) {
@@ -122,8 +125,8 @@ static void enter_phase(lunaria_t *g) {
 }
 uint32_t ln_active(const lunaria_t *g) {
   uint32_t n = 0, i;
-  for (i = 0; i < LN_CAPACITY; i++)
-    n += g->bullets[i].active != 0;
+  for (i = 0; i < g->bullet_limit; i++)
+    n += ln_bullet_read(g, i)->active != 0;
   return n;
 }
 static uint32_t visible(int32_t x, int32_t y) {
@@ -131,12 +134,14 @@ static uint32_t visible(int32_t x, int32_t y) {
 }
 uint32_t ln_visible(const lunaria_t *g) {
   uint32_t n = 0, i;
-  for (i = 0; i < LN_CAPACITY; i++)
-    n += g->bullets[i].active && visible(g->bullets[i].x, g->bullets[i].y);
+  for (i = 0; i < g->bullet_limit; i++) {
+    const ln_bullet_t *b = ln_bullet_read(g, i);
+    n += b->active && visible(b->x, b->y);
+  }
   return n;
 }
-uint32_t ln_elements(const lunaria_t *g) {
-  uint32_t n = ln_visible(g), i;
+static uint32_t elements(const lunaria_t *g, uint32_t n) {
+  uint32_t i;
   if (g->state < LN_INTRO || g->state > LN_DEFEAT)
     return 0;
   for (i = 0; i < LN_SHOTS; i++)
@@ -148,8 +153,13 @@ uint32_t ln_elements(const lunaria_t *g) {
     n += g->lasers[i].active != 0;
   return n + 1u + (g->state != LN_DEFEAT || g->state_ms < 400u);
 }
+uint32_t ln_elements(const lunaria_t *g) {
+  return elements(g, ln_visible(g));
+}
 void ln_update_metrics(lunaria_t *g) {
-  uint32_t n = ln_visible(g), a = ln_elements(g);
+  uint32_t n = ln_visible(g), a = elements(g, n);
+  g->current_visible = n;
+  g->current_elements = a;
   if (n > g->peak_visible_bullets)
     g->peak_visible_bullets = n;
   if (a > g->peak_elements)
@@ -183,16 +193,19 @@ void ln_hit(lunaria_t *g, int16_t x, int16_t y) {
 }
 static ln_bullet_t *allocate(lunaria_t *g) {
   uint32_t i;
-  for (i = 0; i < LN_CAPACITY; i++)
-    if (!g->bullets[i].active) {
-      ln_bullet_t *b = &g->bullets[i];
+  for (i = 0; i < g->bullet_limit; i++) {
+    uint32_t index = (g->allocation_cursor + i) % g->bullet_limit;
+    if (!ln_bullet_read(g, index)->active) {
+      ln_bullet_t *b = ln_bullet(g, index);
       uint8_t *p = (uint8_t *)b;
       uint32_t j;
       for (j = 0; j < sizeof(*b); j++)
         p[j] = 0;
       b->active = 1;
+      g->allocation_cursor = index + 1u;
       return b;
     }
+  }
   g->pool_drops++;
   return 0;
 }
@@ -226,7 +239,7 @@ static void star_vector(uint32_t lane, uint32_t count, uint8_t six, int16_t *x,
                  256);
 }
 static uint32_t emit(lunaria_t *g) {
-  uint32_t i, p = g->phase, count = lanes[p];
+  uint32_t i, p = g->phase, count = lanes[p], active = ln_active(g);
   uint32_t petals = 4u + g->event % 3u;
   uint32_t variant = g->phase_ms / 2800u;
   uint32_t fractional = p == 3 && g->event % 5u == 4u;
@@ -247,10 +260,13 @@ static uint32_t emit(lunaria_t *g) {
     uint32_t unit = p == 3 ? petals : p == 4 ? 10u : p == 5 ? 6u : 1u;
     count = count * g->bullet_limit / LN_DEFAULT_LIMIT / unit * unit;
   }
-  if (ln_active(g) + count > g->bullet_limit) {
+  if (active + count > g->bullet_limit) {
     g->deferred_emissions++;
     return 0; /* Admit an entire pattern; never cut off half a flower. */
   }
+  /* Reuse low holes once per burst so a small live set stays in resident RAM,
+   * even when the configured ceiling is 4096. Advance within the burst. */
+  g->allocation_cursor = 0;
   for (i = 0; i < count; i++) {
     ln_bullet_t *b = allocate(g);
     uint16_t a = 0;
@@ -269,7 +285,7 @@ static uint32_t emit(lunaria_t *g) {
         a = (uint16_t)(ln_aim(g->player_x / LN_Q - b->ox,
                               g->player_y / LN_Q - b->oy) +
                        ((int32_t)(i % 3u) - 1) * 1800);
-        speed = 80 + (int32_t)(i / 3u) * 8;
+        speed = 80 + (int32_t)(i * 8u / count) * 8;
         b->shape = 1;
       }
       if (variant % 3u == 2u) {
@@ -287,12 +303,12 @@ static uint32_t emit(lunaria_t *g) {
       b->shape = 1;
     }
     if (p == 2) {
-      a = (uint16_t)(g->event * 25033u + 49152u);
+      a = (uint16_t)((g->event * count + i) * 25033u + 49152u);
       speed = 70;
       b->color = (uint8_t)(g->event % 9u < 6u ? 2u : g->event % 2u);
       b->kind = 2;
       if (variant % 2u) {
-        a = (uint16_t)(g->event * 25033u);
+        a = (uint16_t)((g->event * count + i) * 25033u);
         b->color = (uint8_t)(g->event % 3u);
       }
     }
@@ -339,7 +355,7 @@ static uint32_t emit(lunaria_t *g) {
     if (p == 6) {
       b->ox += (int16_t)(i < count / 2u ? -20 : 20);
       b->oy += 23;
-      a = (uint16_t)(16384 + (2 * (int32_t)i - (int32_t)count + 1) * 886);
+      a = (uint16_t)(16384 + (2 * (int32_t)i - (int32_t)count + 1) * 886 * 12 / (int32_t)count);
       speed = 42;
       b->kind = 6;
       if (g->event % 3u == 1u)
@@ -349,7 +365,7 @@ static uint32_t emit(lunaria_t *g) {
       b->shape = (uint8_t)(i % 3u == 1u ? 0u : 1u);
     }
     if (p == 7) {
-      a = (uint16_t)(16384 + (2 * (int32_t)i - 5) * 1460);
+      a = (uint16_t)(16384 + (2 * (int32_t)i - (int32_t)count + 1) * 1460 * 6 / (int32_t)count);
       speed = 80;
       b->kind = 7;
       b->shape = 3;
@@ -418,7 +434,7 @@ static uint32_t emit(lunaria_t *g) {
   }
   g->event++;
   {
-    uint32_t n = ln_active(g);
+    uint32_t n = active + count;
     if (n > g->peak_bullets)
       g->peak_bullets = n;
   }
@@ -573,9 +589,9 @@ static void tick(lunaria_t *g, uint8_t buttons) {
   }
   if (g->hurt_ticks)
     g->hurt_ticks--;
-  for (i = 0; i < LN_CAPACITY; i++)
-    if (g->bullets[i].active) {
-      ln_bullet_t *b = &g->bullets[i];
+  for (i = 0; i < g->bullet_limit; i++)
+    if (ln_bullet_read(g, i)->active) {
+      ln_bullet_t *b = ln_bullet(g, i);
       int32_t dx, dy;
       move_bullet(g, b);
       if (!b->active)

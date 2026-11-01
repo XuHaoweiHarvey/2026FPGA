@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 module tb_alpha_blit_engine;
 parameter INJECT_RRESP=0,INJECT_BRESP=0,MALFORMED_RLAST=0,TIMEOUT_READ=0;
-parameter STREAM_ENABLE=0;
+parameter STREAM_ENABLE=0, OVERLAP=0;
 localparam [31:0] SRC=32'h00100000,BACK=32'h00200000;
 reg clk=0,rst_n=0,start=0;
 reg [31:0] src_addr=SRC,src_stride=64,back_base=BACK;
@@ -27,7 +27,7 @@ reg [31:0] shadow_x=4,shadow_y=1,shadow_width=8,shadow_height=2;
 always #5 clk=~clk;
 
 alpha_blit_engine #(.FRAME_WIDTH(32),.FRAME_HEIGHT(8),.FRAME_STRIDE(128),
-    .MAX_BURST_BEATS(2),.WATCHDOG_BITS(12),.STREAM_ENABLE(STREAM_ENABLE)) dut(
+    .MAX_BURST_BEATS(2),.WATCHDOG_BITS(12),.STREAM_ENABLE(STREAM_ENABLE),.OVERLAP_ENABLE(OVERLAP)) dut(
     .clk(clk),.rst_n(rst_n),.enabled(1'b1),.start(start),
     .src_addr(src_addr),.src_stride(src_stride),.back_base(back_base),
     .global_alpha(global_alpha),.dst_x(x),.dst_y(y),.width(width),.height(height),

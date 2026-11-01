@@ -88,6 +88,19 @@ initial begin
     repeat(3) @(posedge clk);@(negedge clk);rst_n=1;
     for(i=0;i<4;i=i+1)
         write_case(32'h00801000+i*4,16'h000f << (i*4),0,32'h00800000,8'h81+i);
+    // LUNARIA pager: aligned first/last scratch words, both slot directions.
+    write_case(32'h00811000,16'h000f,0,32'h00810000,8'he0);
+    write_case(32'h00830ffc,16'hf000,0,32'h0082fff0,8'he1);
+    read_case(32'h00811004,0,32'h00810000,8'he2);
+    front_base=32'h00800000;back_base=0;
+    read_case(32'h00830ffc,0,32'h0082fff0,8'he3);
+    write_case(32'h00011000,16'h000f,0,32'h00010000,8'he4);
+    write_case(32'h00030ffc,16'hf000,0,32'h0002fff0,8'he5);
+    write_case(32'h00811000,16'h000f,3,0,8'he6); // front is read-only
+    session_active=0;
+    read_case(32'h00011000,3,0,8'he7);
+    write_case(32'h00011000,16'h000f,3,0,8'he8);
+    session_active=1;front_base=0;back_base=32'h00800000;
     write_case(32'h00001000,16'h000f,3,0,8'h91); // Front write
     write_case(32'h00801000+32'h007e9000,16'h000f,3,0,8'h92); // padding
     write_case(32'h00801004,16'h000f,3,0,8'h93); // wrong lane

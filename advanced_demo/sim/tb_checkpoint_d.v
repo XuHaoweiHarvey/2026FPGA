@@ -3,7 +3,7 @@
 // accelerator, CVO and serializer. No CPU or encrypted-controller simulation.
 module tb_checkpoint_d;
 parameter WIDTH=512, HEIGHT=64, APB_WAITS=1, GRAPHICS=0, COLOR_KEY=0, CPU_DDR=0, ALPHA_ENABLE=0, QUEUE_ENABLE=0, QUEUE_STRESS_ONLY=0;
-parameter ALPHA_STREAM_ENABLE=0,ALPHA_SPRITE_CACHE_ENABLE=0;
+parameter ALPHA_STREAM_ENABLE=0,ALPHA_SPRITE_CACHE_ENABLE=0,ALPHA_OVERLAP_ENABLE=0,ALPHA_READ_AHEAD_ENABLE=0,READ_OUTSTANDING=1,TILE_COMPOSITOR_ENABLE=0;
 localparam INIT_ONLY=0;
 localparam BEATS=WIDTH*HEIGHT/4;
 reg axi_clk=0, i_clk=0, o_clk=0, rst_n=0;
@@ -95,7 +95,9 @@ reg expect_engine_error=0,expect_read_error=0;
 wire routed_bvalid=bvalid && !hold_b;
 wire awready=!write_active && !bvalid && !stall_aw && ticks%5!=0;
 wire wready=write_active && (!read_active || ticks%2==0);
-wire arready=!read_active && !rvalid && !stall_read && ticks%3!=0;
+integer rq_head=0,rq_tail=0;
+reg [31:0] rq_addr[0:7];reg [7:0] rq_len[0:7];
+wire arready=(ALPHA_READ_AHEAD_ENABLE ? rq_tail-rq_head<4 : !read_active && !rvalid) && !stall_read && ticks%3!=0;
 wire [63:0] axis_data;
 wire axis_valid,axis_last,axis_user,full;
 wire axis_ready;
@@ -104,7 +106,7 @@ rgb_framebuffer #(.FRAME_WIDTH(WIDTH),.FRAME_HEIGHT(HEIGHT),.WR_FIFO_DEPTH(INIT_
  .RD_FIFO_DEPTH(INIT_ONLY?1024:256),.C_MODE(1),.D_MODE(1),.BLIT_ENABLE(GRAPHICS),
  .COLOR_KEY_ENABLE(COLOR_KEY),.CPU_DDR_ENABLE(CPU_DDR),.ALPHA_ENABLE(ALPHA_ENABLE),
  .COMMAND_QUEUE_ENABLE(QUEUE_ENABLE),.ALPHA_STREAM_ENABLE(ALPHA_STREAM_ENABLE),
- .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE)) dut (
+ .ALPHA_SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE),.ALPHA_OVERLAP_ENABLE(ALPHA_OVERLAP_ENABLE),.ALPHA_READ_AHEAD_ENABLE(ALPHA_READ_AHEAD_ENABLE),.READ_OUTSTANDING(READ_OUTSTANDING),.TILE_COMPOSITOR_ENABLE(TILE_COMPOSITOR_ENABLE)) dut (
     .axi_clk(axi_clk),.rst_n(rst_n),.i_clk(i_clk),.i_frame_start(frame_start),
     .i_de(source_de),.vin(vin),.o_clk(o_clk),.fifo_rd_period(period),
     .display_underflow(underflow),
@@ -269,16 +271,24 @@ always @(posedge axi_clk) begin
             if(araddr>=32'h01384000 && araddr<32'h014b0000) begin
                 if(!ALPHA_ENABLE || !sprite_status[1]) $fatal(1,"Read from unsealed sprite");
                 alpha_source_reads=alpha_source_reads+1;
-            end else if(read_owner_blit &&
+            end else if((ALPHA_READ_AHEAD_ENABLE ? dut.b_arvalid && dut.b_arready : read_owner_blit) &&
                         araddr>=back_base && araddr+(arlen+1)*16<=back_base+BEATS*16) begin
                 // Only the Alpha BLIT's registered arbiter owner may read Back.
             end else if(cpu_session_active && cpu_arvalid && cpu_arready) begin
                 if(araddr!==cpu_araddr) $fatal(1,"CPU read routed to wrong address");
             end else if((araddr>=32'h00800000)!=buffer_status[0] || reader_frame_base!=front_base)
                 $fatal(1,"Reader accessed Back");
+            if(ALPHA_READ_AHEAD_ENABLE) begin
+                rq_addr[rq_tail%8]<=araddr;rq_len[rq_tail%8]<=arlen;rq_tail<=rq_tail+1;
+            end else begin
             read_active<=1; read_sprite<=(araddr>=32'h01384000 && araddr<32'h014b0000);
             r_index<=mem_index(araddr); r_left<=arlen+1;
+            end
             ar_count<=ar_count+1;
+        end
+        if(ALPHA_READ_AHEAD_ENABLE && !read_active && !rvalid && rq_head<rq_tail) begin
+            read_active<=1;read_sprite<=rq_addr[rq_head%8]>=32'h01384000 && rq_addr[rq_head%8]<32'h014b0000;
+            r_index<=mem_index(rq_addr[rq_head%8]);r_left<=rq_len[rq_head%8]+1;rq_head<=rq_head+1;
         end
         if(rvalid && rready) begin rvalid<=0; r_beats<=r_beats+1; end
         if(read_active && r_left==1 && r_index%BEATS==BEATS-1 && inject_late) begin
@@ -438,6 +448,28 @@ initial begin
      memory[mem_index(back_base+(16*WIDTH+64)*4)][31:0]!==32'h00110008)
    $fatal(1,"Queued descriptors were lost, reordered, or failed to drain");
   $display("PASS v7 queue: nine ordered DMA fills, full/backpressure, readiness recovery while busy, final memory value and drain");
+  if(TILE_COMPOSITOR_ENABLE && ALPHA_ENABLE)begin
+   skip_pixels=1;
+   access('hD8,1,1,0);access('hD8,1,2,0);
+   access('hE0,1,1,0);access('hE0,1,2,0);
+   hold_b=1;
+   for(round_no=0;round_no<8;round_no=round_no+1)
+    start_copy(3,32'h01384240,2560,64,16,16,16,0);
+   wait(bvalid);
+   if(!busy || !dut.tile_pending || command_queue_ready==0)
+    $fatal(1,"Queued tile did not retain pending work with ready queue");
+   access('hCC,1,1,1);access('h60,1,1,1);access(8,1,2,0);
+   if(cpu_session_active || cpu_session_status[2])$fatal(1,"CPU acquired pending tile");
+   @(negedge axi_clk);apb_reset=0;repeat(10)@(negedge axi_clk);apb_reset=1;
+   if(!busy || !dut.tile_pending)$fatal(1,"CPU reset lost queued tile");
+   hold_b=0;wait_fill;
+   if(memory[mem_index(back_base+(16*WIDTH+64)*4)][31:0]!==32'h00110008)
+    $fatal(1,"Zero Alpha tile changed existing image");
+   access('hCC,1,1,0);wait(cpu_session_active);
+   access('hCC,1,2,0);wait(!cpu_session_active);
+   old_sw=swap_count;request_swap;wait_swap(old_sw);
+   $display("PASS queued tiles: pending drain, CPU/swap exclusion, CPU reset preservation, later DDR acquisition and swap");
+  end
   $finish;
  end
  for(round_no=0;round_no<(GRAPHICS?1:4);round_no=round_no+1) begin
@@ -755,16 +787,21 @@ begin
  start_rect(0,0,WIDTH,HEIGHT,'h00182838);wait_fill;
  before_ar=ar_count;before_aw=aw_count;display_before=display_during_blit;
  wait(dut.d_active && reader_fifo_level>=128);
- stall_read=1;copy_in_progress=1;
+ // Let scanout continue during deferred admission. Inject the shared-read
+ // stall only when the Alpha DMA actually requests a read, as for immediate
+ // mode; otherwise the fixture starves display for the idle-flush interval.
+ stall_read=!TILE_COMPOSITOR_ENABLE;copy_in_progress=1;
  start_copy(3,ALPHA_SPRITE_CACHE_ENABLE?32'h01384240:32'h01384000,2560,64,16,
             ALPHA_SPRITE_CACHE_ENABLE?16:32,ALPHA_SPRITE_CACHE_ENABLE?16:32,173);
+ if(TILE_COMPOSITOR_ENABLE)begin wait(dut.b_arvalid);stall_read=1;end
  wait(dut.b_arvalid && dut.display_arvalid);repeat(3)@(negedge axi_clk);stall_read=0;
  access('h20,1,255,0);access('hC0,1,back_base,0);access('hC4,1,16,0);
  wait(wvalid && wlast && wready && w_index%BEATS==
       (ALPHA_SPRITE_CACHE_ENABLE?(31*WIDTH/4+19):(47*WIDTH/4+23)));
  @(negedge axi_clk);hold_b=1;
  wait(bvalid);repeat(5)@(negedge axi_clk);
- if(done || !busy || !buffer_status[5]) $fatal(1,"Alpha finished before final B");
+ if(!busy || (!TILE_COMPOSITOR_ENABLE && (done || !buffer_status[5])))
+  $fatal(1,"Alpha finished before final B");
  if(ar_count-before_ar<4 || aw_count-before_aw<4)
   $fatal(1,"Alpha transaction counts AR=%0d AW=%0d",ar_count-before_ar,aw_count-before_aw);
  request_swap;
@@ -826,4 +863,8 @@ initial begin
  repeat(20) @(negedge i_clk);rst_n=1;apb_reset=1;
 end
 initial begin #60000000; $fatal(1,"pipeline timeout tpg=%0d checked=%0d",tpg_frames,frames);end
+initial if($test$plusargs("PROGRESS"))forever begin
+ #1000000;
+ $display("PROGRESS t=%0t init=%b commands=%0d frames=%0d swaps=%0d busy=%b error=%h",$time,init_done,commands,frames,swap_count,busy,engine_error);
+end
 endmodule

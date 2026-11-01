@@ -1,10 +1,11 @@
 // Platform-owned state: CPU/APB debug reset must not reset this module.
 module buffer_manager #(
     parameter [31:0] BUFFER0_BASE=32'h00000000,BUFFER1_BASE=32'h00800000,
-    parameter FLUSH_CYCLES=8
+    parameter FLUSH_CYCLES=8, DEFERRED_WRITES=0
 )(
     input wire clk,rst_n,init_done,
     input wire cmd_request,writer_busy,writer_done,input wire [31:0] writer_error,
+    input wire writer_pending,
     input wire swap_request,clear_done,boundary_tick,blank_active,reader_safe,reader_fifo_empty,
     output wire command_accept,draw_ready,
     output reg writer_owned,front_index,back_index,front_valid,swap_pending,swap_done,
@@ -43,7 +44,8 @@ always @(posedge clk or negedge rst_n) begin
         IDLE: if(boundary_tick && blank_active && front_valid && reader_safe && !reader_launch) begin
             // Snapshot the swap decision only at the boundary. A writer that
             // finishes later in this VS must wait for the next boundary.
-            commit_swap<=swap_pending && !writer_busy && !writer_owned && !cmd_request && writer_error==0;
+            commit_swap<=swap_pending && !writer_busy && !(DEFERRED_WRITES && writer_pending) &&
+                         !writer_owned && !cmd_request && writer_error==0;
             flush_left<=FLUSH_CYCLES-1;state<=FLUSH;
         end
         FLUSH: if(flush_left==0) state<=RELEASE;else flush_left<=flush_left-1'b1;

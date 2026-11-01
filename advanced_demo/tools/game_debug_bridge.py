@@ -71,6 +71,10 @@ def tcl_word(value):
                          for c in text) + '"'
 
 
+class CodeMismatchError(RuntimeError):
+    """Code identity failed; diagnostics must never authorize RAM writes."""
+
+
 class ElfImage:
     """Read ELF32 sections/symbols without relying on stale map addresses."""
 
@@ -261,7 +265,19 @@ class DebugBridge:
                 actual = struct.pack("<" + "I"*count, *self.read_words(address+start, count))
                 if actual[:len(chunk)] != chunk:
                     self.matched = False
-                    raise RuntimeError("板上运行程序与所选 ELF 不一致。请选择已加载的 ELF，或显式点击“加载并运行”。")
+                    first=next(i for i,(a,b) in enumerate(zip(actual,chunk)) if a!=b)
+                    word=first//4
+                    location=address+start+word*4
+                    expected=int.from_bytes(chunk[word*4:word*4+4],"little")
+                    observed=int.from_bytes(actual[word*4:word*4+4],"little")
+                    try:
+                        reread=f"0x{self.read_words(location,1)[0]:08X}"
+                    except Exception as exc:
+                        reread=f"failed: {exc}"
+                    raise CodeMismatchError(
+                        "板上运行程序与所选 ELF 不一致。写操作仍被阻止。"
+                        f" first_address=0x{location:08X}, expected=0x{expected:08X},"
+                        f" observed=0x{observed:08X}, single_word_reread={reread}")
         self.matched = True
 
     def snapshot(self, verify=False):
@@ -330,9 +346,15 @@ class DebugBridge:
             hardware = self.read_words(APB, 2)
             status["hardware_id"], status["hardware_version"] = hardware
             status["hardware_optimizations"] = {
-                "alpha_stream": hardware[1] in (0x00090000, 0x000A0000, 0x000B0000),
-                "enemy_bullet_source_cache": hardware[1] in (0x000A0000, 0x000B0000),
-                "display_scale2": hardware[1] == 0x000B0000,
+                "alpha_stream": hardware[1] in (0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000),
+                "enemy_bullet_source_cache": hardware[1] in (0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000),
+                "display_scale2": hardware[1] in (0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000),
+                "procedural_beam": hardware[1] in (0x000D0000, 0x000E0000, 0x000F0000, 0x00100000),
+                "overlapped_alpha_dma": hardware[1] in (0x000E0000,0x000F0000, 0x00100000),
+                "read_ahead": hardware[1] in (0x000F0000,0x00100000),
+                "tile_compositor": hardware[1] == 0x00100000,
+                "wide_sprite_cache": hardware[1] in (0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000),
+                "fast_alpha_writes": hardware[1] in (0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000),
             }
             status["cpu_was_running"] = running
             status["jtag_halts"] = self.halts
@@ -422,21 +444,49 @@ class DebugBridge:
             retry_after_running = False
             with self.halted() as was_running:
                 hardware = self.read_words(APB, 2)
-                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000, 0x00080000, 0x00090000, 0x000A0000, 0x000B0000):
-                    raise RuntimeError("硬件 ID/版本不匹配，需要配套 advanced v6/v7/v8/v9/v10/v11 位流")
+                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000, 0x00080000, 0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000):
+                    raise RuntimeError("硬件 ID/版本不匹配，需要配套 advanced v6/v7/v8/v9/v10/v11/v12/v13/v14/v15/v16 位流")
+                if hardware[1] in (0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000):
+                    if ("g_lunaria_available" not in self.image.symbols or
+                            self.image.symbol_u32("g_lunaria_available") != 1):
+                        raise RuntimeError("v12 目前只接受配套 LUNARIA ELF。")
+                    if ("g_lunaria_v12_compatible" not in self.image.symbols or
+                            self.image.symbol_u32("g_lunaria_v12_compatible") != 0x8000):
+                        raise RuntimeError("所选 ELF 缺少 v12 启动兼容修复，请选择更新交付包中的 lunaria.elf。")
+                    if not self.read_words(APB+0x40,1)[0] & 0x8000:
+                        raise RuntimeError("v12 缺少宽精灵缓存能力，停止加载。")
+                if hardware[1] == 0x00100000 and (
+                        "g_lunaria_v16_compatible" not in self.image.symbols or
+                        self.image.symbol_u32("g_lunaria_v16_compatible") != 0x80000):
+                    raise RuntimeError("v16 requires the matching v16-compatible ELF")
+                if hardware[1] in (0x000F0000,0x00100000) and (
+                        "g_lunaria_v15_compatible" not in self.image.symbols or
+                        self.image.symbol_u32("g_lunaria_v15_compatible") != 0x40000):
+                    raise RuntimeError("v15 requires the matching v15-compatible ELF")
+                if hardware[1] in (0x000E0000,0x000F0000, 0x00100000) and (
+                        "g_lunaria_v14_compatible" not in self.image.symbols or
+                        self.image.symbol_u32("g_lunaria_v14_compatible") != 0x20000):
+                    raise RuntimeError("v14 需要新版启动兼容 ELF，停止加载。")
                 required = (self.image.symbol_u32("g_game_required_caps")
                             if "g_game_required_caps" in self.image.symbols else 0)
-                if bool(self.read_words(APB+0x40, 1)[0] & 0x4000) != (hardware[1] == 0x000B0000):
+                if required & 0x10000 and hardware[1] not in (0x000D0000, 0x000E0000, 0x000F0000, 0x00100000):
+                    raise RuntimeError("连续激光版 ELF 需要 v13/v14/v15/v16 bit；推荐交付包 hardware/v16 的位流。")
+                if hardware[1] in (0x000D0000, 0x000E0000, 0x000F0000, 0x00100000):
+                    if ("g_game_beam_compatible" not in self.image.symbols or
+                            self.image.symbol_u32("g_game_beam_compatible") != 0x10000 or
+                            self.read_words(APB+0x40,1)[0] != (0xFFFFB if hardware[1]==0x00100000 else 0x7FFFB if hardware[1]==0x000F0000 else 0x3FFFB if hardware[1]==0x000E0000 else 0x1FFFB)):
+                        raise RuntimeError("v13/v14/v15/v16 硬件能力或配套 ELF 不匹配，停止加载。")
+                if bool(self.read_words(APB+0x40, 1)[0] & 0x4000) != (hardware[1] in (0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000)):
                     raise RuntimeError("硬件版本与两倍显示能力位不一致，停止加载。")
-                if bool(required & 0x800) != (hardware[1] in (0x00080000, 0x00090000, 0x000A0000, 0x000B0000)):
+                if bool(required & 0x800) != (hardware[1] in (0x00080000, 0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000)):
                     raise RuntimeError("窗口读取 v8 bit 与专用窗口 ELF 必须配套；全屏/旧居中 ELF 使用原 v7 bit。")
-                if hardware[1] == 0x000B0000:
+                if hardware[1] in (0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000):
                     if ("g_game_scale2_compatible" not in self.image.symbols or
                             self.image.symbol_u32("g_game_scale2_compatible") != 0x4000):
                         raise RuntimeError("v11 两倍显示需要兼容的新展示/压力 ELF；旧 ELF 使用原 v10 bit。")
                     if not self.read_words(APB+0x40, 1)[0] & 0x4000:
                         raise RuntimeError("v11 缺少两倍显示能力，停止加载。")
-                if hardware[1] in (0x00090000, 0x000A0000, 0x000B0000):
+                if hardware[1] in (0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000, 0x000E0000, 0x000F0000, 0x00100000):
                     if ("g_game_alpha_hardware_compatible" not in self.image.symbols or
                             self.image.symbol_u32("g_game_alpha_hardware_compatible") != 0x3000):
                         raise RuntimeError("v9/v10 硬件需加载修正 SPR 后的新优化 ELF；旧窗口 ELF 请配原 v8 bit。")

@@ -4,6 +4,12 @@
 #ifndef GAME_ALLOW_SCALE2
 #define GAME_ALLOW_SCALE2 0
 #endif
+#ifndef GAME_ALLOW_WIDE_CACHE
+#define GAME_ALLOW_WIDE_CACHE 0
+#endif
+#ifndef GAME_ALLOW_BEAM
+#define GAME_ALLOW_BEAM 0
+#endif
 
 /* Polling-only API. CPU accesses only APB; src_addr is a DDR address for DMA.
  * Returns 0 on success, hardware ERROR_CODE or an E0xx/E1xx software error otherwise.
@@ -88,13 +94,17 @@ static inline uint32_t accel_init(void) {
     version=accel_read(ACCEL_VERSION);
 #if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
     if((version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000) &&
-        !(GAME_ALLOW_SCALE2 && version==UINT32_C(0x000b0000))) ||
+        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) ||
+          (GAME_ALLOW_WIDE_CACHE && (version==UINT32_C(0x000c0000) ||
+           (GAME_ALLOW_BEAM && (version==UINT32_C(0x000d0000) || (version==UINT32_C(0x000e0000) || (version==UINT32_C(0x000f0000) || version==UINT32_C(0x00100000)))))))))) ||
        !(accel_read(ACCEL_CAPABILITIES)&ACCEL_CAP_DISPLAY_WINDOW)) return UINT32_C(0xE000);
 #endif
     if(accel_read(ACCEL_ID)!=ACCEL_ID_EXPECTED ||
 #if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
        (version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000) &&
-        !(GAME_ALLOW_SCALE2 && version==UINT32_C(0x000b0000)))) return UINT32_C(0xE000);
+        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) ||
+          (GAME_ALLOW_WIDE_CACHE && (version==UINT32_C(0x000c0000) ||
+           (GAME_ALLOW_BEAM && (version==UINT32_C(0x000d0000) || (version==UINT32_C(0x000e0000) || (version==UINT32_C(0x000f0000) || version==UINT32_C(0x00100000))))))))))) return UINT32_C(0xE000);
 #else
        (version!=ACCEL_VERSION_EXPECTED && version!=UINT32_C(0x00070000))) return UINT32_C(0xE000);
 #endif
@@ -107,8 +117,23 @@ static inline uint32_t accel_init(void) {
     if(i==ACCEL_POLL_LIMIT) return UINT32_C(0xE001);
     caps=accel_read(ACCEL_CAPABILITIES);
 #if GAME_ALLOW_SCALE2
-    if((version==UINT32_C(0x000b0000)) != !!(caps&ACCEL_CAP_DISPLAY_SCALE2)) return UINT32_C(0xE003);
+    if((version==UINT32_C(0x000b0000) || version==UINT32_C(0x000c0000) || (version==UINT32_C(0x000d0000) || (version==UINT32_C(0x000e0000) || (version==UINT32_C(0x000f0000) || version==UINT32_C(0x00100000))))) !=
+       !!(caps&ACCEL_CAP_DISPLAY_SCALE2)) return UINT32_C(0xE003);
     caps &= ~ACCEL_CAP_DISPLAY_SCALE2;
+#endif
+#if GAME_ALLOW_WIDE_CACHE
+    if((version==UINT32_C(0x000c0000) || (version==UINT32_C(0x000d0000) || (version==UINT32_C(0x000e0000) || (version==UINT32_C(0x000f0000) || version==UINT32_C(0x00100000))))) != !!(caps&ACCEL_CAP_ALPHA_WIDE_CACHE)) return UINT32_C(0xE003);
+    caps &= ~ACCEL_CAP_ALPHA_WIDE_CACHE;
+#endif
+#if GAME_ALLOW_BEAM
+    if(((version==UINT32_C(0x000d0000) || (version==UINT32_C(0x000e0000) || (version==UINT32_C(0x000f0000) || version==UINT32_C(0x00100000))))) != !!(caps&ACCEL_CAP_BEAM)) return UINT32_C(0xE003);
+    caps &= ~ACCEL_CAP_BEAM;
+    if(((version==UINT32_C(0x000e0000) || (version==UINT32_C(0x000f0000) || version==UINT32_C(0x00100000)))) != !!(caps&ACCEL_CAP_ALPHA_OVERLAP)) return UINT32_C(0xE003);
+    caps &= ~ACCEL_CAP_ALPHA_OVERLAP;
+    if(((version==UINT32_C(0x000f0000) || version==UINT32_C(0x00100000))) != !!(caps&ACCEL_CAP_READ_AHEAD)) return UINT32_C(0xE003);
+    caps &= ~ACCEL_CAP_READ_AHEAD;
+    if((version==UINT32_C(0x00100000)) != !!(caps&ACCEL_CAP_TILE_COMPOSITOR)) return UINT32_C(0xE003);
+    caps &= ~ACCEL_CAP_TILE_COMPOSITOR;
 #endif
     if(accel_read(ACCEL_WIDTH)!=1920 || accel_read(ACCEL_HEIGHT)!=1080 ||
        accel_read(ACCEL_STRIDE)!=7680 ||

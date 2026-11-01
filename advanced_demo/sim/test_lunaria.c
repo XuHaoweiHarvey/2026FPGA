@@ -34,8 +34,13 @@ static uint32_t validate(void *context, const ln_command_t *c) {
   FILE *output = (FILE *)context;
   CHECK(c->w && c->h && c->x >= LN_VIEW_X && c->y >= LN_VIEW_Y);
   CHECK(c->x + c->w <= LN_VIEW_X + 640u && c->y + c->h <= LN_VIEW_Y + 480u);
-  CHECK(c->op == 0 || c->op == 1 || c->op == 3);
-  if (c->op) {
+  CHECK(c->op == 0 || c->op == 1 || c->op == 3 || c->op == 4);
+  if (c->op==4) {
+    int32_t nx=(int16_t)c->src,ny=(int16_t)(c->src>>16);
+    CHECK(!(c->x&3u) && !(c->w&3u) && c->y>=LN_VIEW_Y+72u);
+    CHECK(nx>=-16384 && nx<=16384 && ny>=-16384 && ny<=16384 && (nx||ny));
+    CHECK((c->color>>24)==70u || (c->color>>24)==245u);
+  } else if (c->op) {
     CHECK(!(c->x & 3u) && !(c->w & 3u) && !(c->src & 15u));
     if (c->op == 1) {
       CHECK(c->stride == 7680u);
@@ -206,6 +211,7 @@ static void collisions(void) {
   step(0);
   CHECK(game.state == LN_FIGHT && game.hp == LN_PHASE_HP);
   fight(0);
+  CHECK(ln_configure(&game, LN_CAPACITY, 0));
   for (i = 0; i < LN_CAPACITY; i++) {
     game.bullets[i].active = 1;
     game.bullets[i].life = 10000;
@@ -383,11 +389,11 @@ static void timing_and_endurance(void) {
   printf("PASS 600064 ms simulated endurance across all eight patterns\n");
 }
 static void settings_and_capacity(void) {
-  const uint32_t limits[] = {64, 65, 128, 256, 384, 512};
+  const uint32_t limits[] = {64, 65, 128, 256, 384, 512, 999, 1024, 2048, 3072, 4096};
   uint32_t n, p, i;
   fight(3);
   step(0);
-  CHECK(!ln_configure(&game, 0, 0) && !ln_configure(&game, 513, 0));
+  CHECK(!ln_configure(&game, 0, 0) && !ln_configure(&game, LN_CAPACITY + 1u, 0));
   CHECK(!ln_configure(&game, 64, 2));
   CHECK(ln_active(&game) && game.bullet_limit == 256);
   CHECK(ln_configure(&game, 128, 1));
@@ -433,6 +439,14 @@ static void settings_and_capacity(void) {
   CHECK(ln_configure(&game,512,1));
   advance(370,0);
   render("fusion-512");
+  for (p = 0; p < 8; p++) {
+    char label[32];
+    fight((uint8_t)p);
+    CHECK(ln_configure(&game,4096,1));
+    advance(370,0);
+    snprintf(label,sizeof(label),"phase%u-4096",p);
+    render(label);
+  }
 }
 int main(int argc, char **argv) {
   if (argc > 1) {

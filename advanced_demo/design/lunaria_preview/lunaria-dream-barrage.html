@@ -27,7 +27,7 @@
     <button class="btn" type="button" data-ln-phase="15" aria-pressed="false">组合符卡</button>
   </div>
   <div class="viz-controls">
-    <label class="form-label" for="ln-dream-density">预览模式<select class="form-select" id="ln-dream-density"><option value="reference">电脑参考效果 · 最高 4096</option><option value="board">板端负载预览 · 最高 512</option></select></label>
+    <label class="form-label" for="ln-dream-density">预览模式<select class="form-select" id="ln-dream-density"><option value="reference">设计参考效果 · 最高 4096</option><option value="board">低密度设计参考 · 最高 512</option></select></label>
     <label class="form-label" for="ln-dream-limit">同时存活敌弹上限<input class="form-control" id="ln-dream-limit" type="number" min="64" max="4096" step="1" value="4096" required aria-describedby="ln-dream-limit-note"></label>
     <button class="btn" type="button" data-ln-apply>应用数量</button>
     <label class="form-label" for="ln-dream-petals" data-ln-flower-controls hidden>花瓣<select class="form-select" id="ln-dream-petals"><option value="auto">4 → 5 → 6 瓣轮换</option><option value="3">3 瓣</option><option value="4">4 瓣</option><option value="5">5 瓣</option><option value="6">6 瓣</option><option value="7/3">分数玫瑰 k = 7/3</option></select></label>
@@ -513,7 +513,7 @@
     if(p!==phase) {
       phase=p;spellIndex.textContent=`SPELL ${String(p+1).padStart(2,'0')} / ${names.length}`;
       phaseButtons.forEach((button,i)=>button.setAttribute('aria-pressed',String(i===p)));
-      stateText.textContent=names[p]+'。电脑视觉预览；浏览器帧率不代表板端帧率。';
+      stateText.textContent=names[p]+'。设计参考；板端同源预览请运行交付包 start_preview.cmd。';
     }
     play.textContent=playing?'暂停':time>=DURATION?'重播':'播放';
     play.setAttribute('aria-label',playing?'暂停预览':time>=DURATION?'重播预览':'播放预览');

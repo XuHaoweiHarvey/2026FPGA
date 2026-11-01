@@ -1,4 +1,18 @@
 #include "lunaria_render.h"
+#include "lunaria_beam.h"
+#ifndef LN_FULL_SPRITE_RECTS
+#include "lunaria_trim.h"
+static const uint8_t *bounds(uint32_t sx, uint32_t sy, uint32_t w, uint32_t h) {
+  if (w==32u && h==32u && sx>=448u && sy<352u)
+    return ln_bounds32[sy/32u*6u+(sx-448u)/32u];
+  if (w==112u && h==112u) return ln_bounds_boss[sy/112u*4u+sx/112u];
+  if (w==12u && h==24u && sx>=448u && sy>=352u)
+    return ln_bounds_glyph[(sy-352u)/24u*16u+(sx-448u)/12u];
+  if (sy==448u && sx==0u && w==256u) return ln_bounds_title[0];
+  if (sy==448u && sx==256u && w==192u) return ln_bounds_title[1];
+  return 0;
+}
+#endif
 typedef struct {
   ln_submit_fn submit;
   void *context;
@@ -27,6 +41,16 @@ static void sprite(renderer_t *r, uint32_t sx, uint32_t sy, int32_t x,
   uint32_t trim;
   if (!alpha)
     return;
+  x &= ~3;
+#ifndef LN_FULL_SPRITE_RECTS
+  {
+    const uint8_t *b = bounds(sx,sy,w,h);
+    if (b) {
+      sx+=b[0]; sy+=b[1]; x+=b[0]; y+=b[1]; w=b[2]; h=b[3];
+      if (!w || !h) return;
+    }
+  }
+#endif
   if (x < 0) {
     trim = ((uint32_t)(-x) + 3u) & ~3u;
     if (trim >= w)
@@ -58,14 +82,21 @@ static void sprite(renderer_t *r, uint32_t sx, uint32_t sy, int32_t x,
 }
 static void art(renderer_t *r, uint32_t sx, uint32_t sy, uint32_t x, uint32_t y,
                 uint32_t w, uint32_t h) {
+#ifndef LN_FULL_SPRITE_RECTS
+  const uint8_t *b = bounds(sx,sy,w,h);
+  if (b) {
+    sx+=b[0]; sy+=b[1]; x+=b[0]; y+=b[1]; w=b[2]; h=b[3];
+    if (!w || !h) return;
+  }
+#endif
   command(r, 3, LN_SPRITE_BASE + sy * 2560u + sx * 4u, 2560u, x, y, w, h, 255);
   r->stats->sprite_pixels += w * h;
 }
 static void text(renderer_t *r, uint32_t x, uint32_t y, const char *s) {
   while (*s) {
     uint32_t n = (uint8_t)*s++ - 32u;
-    if (n < 64u && x + 16u <= 640u) {
-      art(r, 448u + n % 12u * 16u, 224u + n / 12u * 24u, x, y, 16u, 24u);
+    if (n < 64u && x + 12u <= 640u) {
+      art(r, 448u + n % 16u * 12u, 352u + n / 16u * 24u, x, y, 12u, 24u);
       r->stats->glyphs++;
     }
     x += 12u;
@@ -81,20 +112,20 @@ static void score(renderer_t *r, uint32_t value) {
   }
   text(r, 520, 448, s);
 }
-static void number3(char *s, uint32_t n) {
-  if (n > 999u)
-    n = 999u;
-  s[0] = (char)('0' + n / 100u);
-  s[1] = (char)('0' + n / 10u % 10u);
-  s[2] = (char)('0' + n % 10u);
+static void number4(char *s, uint32_t n) {
+  if (n > 9999u) n = 9999u;
+  s[0] = (char)('0' + n / 1000u);
+  s[1] = (char)('0' + n / 100u % 10u);
+  s[2] = (char)('0' + n / 10u % 10u);
+  s[3] = (char)('0' + n % 10u);
 }
 static void metrics(renderer_t *r, const lunaria_t *g) {
-  char b[] = "B 000/000", a[] = "A 000/000", f[] = "FPS --.-", l[] = "MAX 000";
-  number3(b + 2, ln_visible(g));
-  number3(b + 6, g->peak_visible_bullets);
-  number3(a + 2, ln_elements(g));
-  number3(a + 6, g->peak_elements);
-  number3(l + 4, g->bullet_limit);
+  char b[] = "B0000/0000", a[] = "A0000/0000", f[] = "FPS --.-", l[] = "MAX0000";
+  number4(b + 1, g->current_visible);
+  number4(b + 6, g->peak_visible_bullets);
+  number4(a + 1, g->current_elements);
+  number4(a + 6, g->peak_elements);
+  number4(l + 3, g->bullet_limit);
   if (g->fps_x100) {
     uint32_t fps = g->fps_x100 > 9999u ? 9999u : g->fps_x100;
     f[4] = (char)('0' + fps / 1000u);
@@ -103,12 +134,13 @@ static void metrics(renderer_t *r, const lunaria_t *g) {
   }
   text(r, 280, 12, f);
   text(r, 20, 44, b);
-  text(r, 160, 44, a);
+  text(r, 156, 44, a);
   text(r, 292, 44, l);
   if (g->spin_patterns)
     text(r, 292, 68, "SPIN");
 }
 static void laser(renderer_t *r, const ln_laser_t *l, uint32_t color) {
+#ifdef LN_LEGACY_LASERS
   uint32_t d;
   int32_t ux = ln_cos(l->angle), uy = ln_sin(l->angle);
   for (d = 20; d < 820; d += l->age < 700u ? 16u : 3u) {
@@ -116,9 +148,28 @@ static void laser(renderer_t *r, const ln_laser_t *l, uint32_t color) {
     int32_t y = l->y + uy * (int32_t)d / 16384;
     if (x < -16 || x > 656 || y < 56 || y > 496)
       break;
-    sprite(r, 448, color * 16u, x - 8, y - 8, 16, 16,
+    uint32_t index = color * 4u;
+    sprite(r, 456u + index % 6u * 32u, 8u + index / 6u * 32u, x - 8, y - 8, 16, 16,
            l->age < 700u ? 70u : 245u);
   }
+#else
+  static const uint32_t colors[3] = {0xff78d6u,0x72d9ffu,0xc39bffu};
+  int32_t ux=ln_cos(l->angle), uy=ln_sin(l->angle), nx=-uy, ny=ux;
+  int32_t ax=l->x+ux*20/16384, ay=l->y+uy*20/16384;
+  int32_t bx=l->x+ux*820/16384, by=l->y+uy*820/16384;
+  int32_t left=(ax<bx?ax:bx)-8, right=(ax>bx?ax:bx)+9;
+  int32_t top=(ay<by?ay:by)-8, bottom=(ay>by?ay:by)+9;
+  if (left<0) left=0;
+  if (right>640) right=640;
+  if (top<72) top=72;
+  if (bottom>480) bottom=480;
+  left &= ~3; right=(right+3)&~3;
+  if (left>=right || top>=bottom) return;
+  command(r,LN_OP_BEAM,(uint32_t)(uint16_t)nx|((uint32_t)(uint16_t)ny<<16),
+          (uint32_t)((left-l->x)*nx+(top-l->y)*ny),
+          (uint32_t)left,(uint32_t)top,(uint32_t)(right-left),(uint32_t)(bottom-top),
+          (l->age<700u ? 70u : 245u)<<24|colors[color%3u]);
+#endif
 }
 uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
                    void *context, ln_render_stats_t *stats) {
@@ -146,7 +197,7 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
   }
   if (g->state == LN_VICTORY || g->state == LN_FAILURE) {
     if (g->state == LN_VICTORY)
-      art(&r, 448, 368, 224, 190, 192, 40);
+      text(&r, 276, 190, "VICTORY");
     else
       text(&r, 260, 192, "GAME OVER");
     text(&r, 260, 250, "SCORE");
@@ -176,28 +227,32 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
     command(&r, 0, 0, 0, 420, 52, width ? width : 1u, 3, 0x00edbadf);
   }
   for (i = 0; i < g->lives; i++)
-    sprite(&r, 480, 32, (int32_t)(20 + i * 20u), 445, 16, 16, 220);
+    sprite(&r, 584, 40, (int32_t)(20 + i * 20u), 445, 16, 16, 220);
   if (g->invincible)
     text(&r, 96, 445, "INV");
   score(&r, g->score);
-  for (i = 0; i < LN_CAPACITY; i++)
-    if (g->bullets[i].active) {
-      const ln_bullet_t *b = &g->bullets[i];
+  for (i = 0; i < g->bullet_limit; i++)
+    if (ln_bullet_read(g, i)->active) {
+      const ln_bullet_t *b = ln_bullet_read(g, i);
       uint32_t a = alpha;
       if (b->age < 5u)
         a = a * b->age / 5u;
-      uint32_t sx = 448u + b->shape * 16u, sy = b->color * 16u;
-      if (b->shape == 1u) sx = 512u + (((b->angle + 16384u + 4096u) >> 13) & 7u) * 16u;
-      if (b->shape == 4u) {sx = 512u + b->color * 16u; sy = 48u;}
-      sprite(&r, sx, sy, b->x / LN_Q - 8,
-             b->y / LN_Q - 8, 16, 16, a);
+      uint32_t index = b->color * 4u + b->shape;
+      uint32_t sx = 448u + index % 6u * 32u, sy = index / 6u * 32u;
+      if (b->shape == 1u) {
+        index = b->color * 8u + (((b->angle + 16384u + 4096u) >> 13) & 7u);
+        sx = 448u + index % 6u * 32u; sy = 64u + index / 6u * 32u;
+      }
+      if (b->shape == 4u) {sx = 576u + b->color % 2u * 32u; sy = 224u + b->color / 2u * 32u;}
+      sprite(&r, sx, sy, b->x / LN_Q - 16,
+             b->y / LN_Q - 16, 32, 32, a);
     }
   for (i = 0; i < LN_LASERS; i++)
     if (g->lasers[i].active)
       laser(&r, &g->lasers[i], i % 3u);
   for (i = 0; i < LN_SHOTS; i++)
     if (g->shots[i].active)
-      sprite(&r, 480, 32, g->shots[i].x / LN_Q - 8, g->shots[i].y / LN_Q - 8,
+      sprite(&r, 584, 40, g->shots[i].x / LN_Q - 8, g->shots[i].y / LN_Q - 8,
              16, 16, 255);
   if (g->state == LN_DEFEAT)
     boss_alpha = g->state_ms >= 400u ? 0u : 255u - g->state_ms * 255u / 400u;
@@ -212,7 +267,7 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
       f = (uint32_t)e->age * 8u / (e->fatal ? 400u : 120u);
       if (f > 7u)
         f = 7u;
-      sprite(&r, 448u + f % 4u * 32u, 160u + f / 4u * 32u, e->x - 16, e->y - 16,
+      sprite(&r, 448u + f % 4u * 32u, 288u + f / 4u * 32u, e->x - 16, e->y - 16,
              32, 32, 255);
       if (e->fatal) {
         uint32_t j;
@@ -221,19 +276,19 @@ uint32_t ln_render(const lunaria_t *g, uint32_t alpha, ln_submit_fn submit,
           int32_t radius = e->age / 10;
           int32_t x = e->x + radius * ln_cos(a) / 16384,
                   y = e->y + radius * ln_sin(a) / 16384;
-          sprite(&r, 448u + f % 4u * 32u, 160u + f / 4u * 32u, x - 16, y - 16,
+          sprite(&r, 448u + f % 4u * 32u, 288u + f / 4u * 32u, x - 16, y - 16,
                  32, 32, 210);
         }
       }
     }
   f = (g->sim_ms / 100u) % 8u;
-  sprite(&r, 448u + f % 4u * 32u, 96u + f / 4u * 32u, g->player_x / LN_Q - 16,
+  sprite(&r, 448u + f % 4u * 32u, 224u + f / 4u * 32u, g->player_x / LN_Q - 16,
          g->player_y / LN_Q - 16, 32, 32,
          g->hurt_ticks && g->hurt_ticks % 8u < 4u ? 90 : 255);
   command(&r, 0, 0, 0, ((uint32_t)(g->player_x / LN_Q)) & ~3u,
           (uint32_t)(g->player_y / LN_Q), 2, 2, 0x00ffffff);
   if (g->state == LN_INTRO || g->state == LN_WARNING)
-    art(&r, 448, 408, 224, 264, 192, 32);
+    text(&r, 276, 264, "WARNING");
   if (g->paused)
     text(&r, 284, 240, "PAUSED");
   return r.error;

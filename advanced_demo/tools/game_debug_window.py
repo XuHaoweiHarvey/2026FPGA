@@ -137,7 +137,9 @@ class DebugWindow:
                 elif kind == "error":
                     self.busy = False
                     self.log(value)
-                    if self.bridge and not self.bridge.matched and "板上运行程序与所选 ELF 不一致" in value:
+                    if '硬件 ID 也读成零' in value:
+                        self.summary.set("JTAG 已连接，但目标读取异常；不要将其判断为 ELF 选错。详见诊断日志。")
+                    elif self.bridge and not self.bridge.matched and "板上运行程序与所选 ELF 不一致" in value:
                         self.summary.set("JTAG 已连接；新 ELF 尚未加载。请点击“加载并运行 ELF”。")
                     else:
                         self.summary.set("操作未完成，详情见日志")
@@ -325,7 +327,7 @@ class DebugWindow:
                 if diagnostics & 2:
                     self.log(f'命令耗时累计：提交/队列背压 {runtime["measurement_command_submit_us"]/1000:.1f} ms，'
                              f'等待绘图完成 {runtime["measurement_command_wait_us"]/1000:.1f} ms；'
-                             '提交/背压占大头说明命令入队跟不上或队列太浅；帧末等待占大头再结合写节流/读停顿判断 DDR 服务瓶颈。')
+                             '提交时间含队列满时等待硬件绘制的时间，也可能含分页等待；不能据此认定队列太浅，需结合 DDR 读写等待计数判断。')
                 elif diagnostics & 1:
                     self.log(f'逐命令提交计时已关闭以减少测量干扰；帧末等待绘图完成累计 '
                              f'{runtime["measurement_command_wait_us"]/1000:.1f} ms，'

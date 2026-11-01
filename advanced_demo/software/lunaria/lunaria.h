@@ -2,7 +2,10 @@
 #define LUNARIA_H
 #include "../interactive_demo/uart_keyboard_protocol.h"
 #include <stdint.h>
-#define LN_CAPACITY 512u
+#define LN_CAPACITY 4096u
+#if defined(__riscv) && !defined(LN_EXTERNAL_POOL)
+#define LN_EXTERNAL_POOL 1
+#endif
 #define LN_DEFAULT_LIMIT 256u
 #define LN_MIN_LIMIT 64u
 #define LN_SETTINGS_MAGIC UINT32_C(0x4c4e5331)
@@ -46,7 +49,9 @@ typedef struct {
   uint8_t active;
 } ln_laser_t;
 typedef struct {
+#ifndef LN_EXTERNAL_POOL
   ln_bullet_t bullets[LN_CAPACITY];
+#endif
   ln_shot_t shots[LN_SHOTS];
   ln_effect_t effects[LN_EFFECTS];
   ln_laser_t lasers[LN_LASERS];
@@ -57,10 +62,29 @@ typedef struct {
   uint32_t score, frames, dropped_ms, emissions, pool_drops, peak_bullets;
   uint32_t fps_x100, peak_visible_bullets, peak_elements, deferred_emissions;
   uint32_t bullet_limit, spin_patterns;
+  uint32_t allocation_cursor, current_visible, current_elements;
   uint16_t event, hp, hurt_ticks;
   uint8_t state, phase, lives, paused, previous_buttons, invincible,
       restart_armed, death_bursts;
 } lunaria_t;
+#ifdef LN_EXTERNAL_POOL
+/* One game owns the external pool. A returned pointer lasts until the next
+ * access to a different page. Only the pager transfers aligned 32-bit words. */
+ln_bullet_t *ln_bullet(lunaria_t *g, uint32_t index);
+const ln_bullet_t *ln_bullet_read(const lunaria_t *g, uint32_t index);
+void ln_clear_bullets(lunaria_t *g);
+#else
+static inline ln_bullet_t *ln_bullet(lunaria_t *g, uint32_t index) {
+  return &g->bullets[index];
+}
+static inline const ln_bullet_t *ln_bullet_read(const lunaria_t *g, uint32_t index) {
+  return &g->bullets[index];
+}
+static inline void ln_clear_bullets(lunaria_t *g) {
+  uint32_t i;
+  for (i = 0; i < LN_CAPACITY; ++i) g->bullets[i].active = 0;
+}
+#endif
 void ln_reset(lunaria_t *g, uint32_t now);
 void ln_begin(lunaria_t *g);
 uint32_t ln_configure(lunaria_t *g, uint32_t limit, uint32_t spin);

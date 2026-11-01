@@ -132,6 +132,11 @@ offsets = {int(value, 16) for _, value in re.findall(
     r"^#define\s+(ACCEL_\w+)\s+0x([0-9A-Fa-f]+)u\s*$", header, re.M)}
 documented = {int(value, 16) for value in re.findall(
     r"^\| ([0-9A-Fa-f]{2}) \|", doc, re.M)}
+# v14 has a read-only indexed snapshot window in addition to case offsets.
+assert "PADDR>=32'h100" in rtl and "32'h174" in rtl and "32'h154" in rtl
+assert '| 100–150 |' in doc
+cases.add(0x100)
+documented.add(0x100)
 assert cases == offsets == documented, "RTL/header/REGISTER_MAP offsets disagree"
 assert '0x00060000' in header and "32'h00070000" in rtl
 assert '0x000001FB' in header and "32'h000003FB" in rtl

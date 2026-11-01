@@ -59,6 +59,7 @@
         <efx:design_file name="rtl/accelerator/blit_engine.v" version="default" library="default" />
         <efx:design_file name="rtl/accelerator/alpha_pixel_pipeline.v" version="default" library="default" />
         <efx:design_file name="rtl/accelerator/alpha_blit_engine.v" version="default" library="default" />
+        <efx:design_file name="rtl/accelerator/tiled_graphics_engine.v" version="default" library="default" />
         <efx:design_file name="rtl/accelerator/graphics_engine.v" version="default" library="default" />
         <efx:design_file name="rtl/accelerator/graphics_command_queue.v" version="default" library="default" />
         <efx:design_file name="rtl/framebuffer/blit_source_guard.v" version="default" library="default" />

@@ -1,6 +1,8 @@
 """Dedicated LUNARIA UI; no connection/load occurs until the user clicks."""
 import argparse
 import json
+import subprocess
+import sys
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
@@ -18,7 +20,7 @@ class LunariaWindow(DebugWindow):
             return LunariaBridge(elf, ide, assets,
                                  lambda message: self.events.put(('progress',message)))
         super().__init__(root,elf,bridge_factory=factory)
-        root.title('LUNARIA 星海梦境 — v10 / v11')
+        root.title('LUNARIA 星海梦境 — v16 分块合成')
         self.alpha.set('255'); self.cap.set('1'); self.delay.set('0')
         self.bullet_limit = tk.StringVar(value='256')
         self.spin_patterns = tk.BooleanVar(value=False)
@@ -27,6 +29,7 @@ class LunariaWindow(DebugWindow):
             if isinstance(frame,ttk.LabelFrame):
                 title = frame.cget('text')
                 if title.startswith('板上操作'):
+                    ttk.Button(frame,text='DDR 诊断 5 秒',command=self.measure_ddr).pack(side='left',padx=3)
                     for widget in frame.winfo_children():
                         if isinstance(widget,ttk.Button) and widget.cget('text') in ('一键自测','满负载场景'):
                             widget.pack_forget()
@@ -38,24 +41,34 @@ class LunariaWindow(DebugWindow):
                         info = widget.grid_info()
                         if info and (int(info['row']) >= 2 or int(info['column']) < 3):
                             widget.grid_remove()
-                    ttk.Label(frame,text='敌弹上限 64–512').grid(row=0,column=0)
+                    ttk.Label(frame,text='敌弹上限 64–4096').grid(row=0,column=0)
                     ttk.Combobox(frame,textvariable=self.bullet_limit,
-                                 values=(64,128,256,384,512),width=16).grid(row=1,column=0,padx=5)
+                                 values=(64,128,256,512,1024,2048,3072,4096),width=16).grid(row=1,column=0,padx=5)
                     ttk.Checkbutton(frame,text='扩张时旋转花瓣 / 星形',variable=self.spin_patterns).grid(
                         row=1,column=1,columnspan=2,padx=5)
                     ttk.Label(frame,text='应用会重启当前弹幕、重置峰值；实际数量随图案变化。测量期间锁定设置。').grid(
                         row=2,column=0,columnspan=6,sticky='w',pady=(6,0))
+                    ttk.Button(frame,text='打开电脑同源预览',command=self.preview).grid(
+                        row=3,column=0,columnspan=2,sticky='w',pady=(6,0))
         self.notice.set('素材通过 4 KiB 邮箱上传，首次约 2.46 MB。更换已封存素材须先重新配置现有 bit。')
         self.summary.set('先结束 IDE Debug，点击连接，然后点击加载；窗口不会自动连接板卡。')
         self.log('素材清单：'+str(Path(assets).resolve()))
+        self.preview_folder = Path(assets).resolve().parent
+
+    def preview(self):
+        if not (self.preview_folder/'lunaria_pc.dll').is_file():
+            return self.log('缺少电脑预览 DLL，请使用完整的新版交付包。')
+        subprocess.Popen([sys.executable,'-B',str(Path(__file__).with_name('lunaria_pc.py')),
+                          '--folder',str(self.preview_folder)],
+                         creationflags=subprocess.CREATE_NO_WINDOW if sys.platform=='win32' else 0)
 
     def apply(self):
         try:
             limit, alpha = int(self.bullet_limit.get()), int(self.alpha.get())
-            if not 64 <= limit <= 512 or not 0 <= alpha <= 255:
+            if not 64 <= limit <= 4096 or not 0 <= alpha <= 255:
                 raise ValueError
         except ValueError:
-            return self.log('敌弹上限须为 64–512 的整数，Alpha 须为 0–255 的整数')
+            return self.log('敌弹上限须为 64–4096 的整数，Alpha 须为 0–255 的整数')
         options = (0,900,1,int(self.invincible.get()),alpha)
         spin = int(self.spin_patterns.get())
         def done(sequence):
@@ -78,15 +91,47 @@ class LunariaWindow(DebugWindow):
             self.root.after(62000,lambda:self.finish_measure(sequence))
         self.run(lambda:self.require_bridge().command(7),done)
 
+    def measure_ddr(self):
+        def done(report):
+            rate=report['alpha_MB_per_second']; wait=report['wall_time_percent']
+            hit=report['cache_hit_percent']
+            hit_label=f'{hit:.1f}%' if hit is not None else '无请求'
+            self.log(f'DDR {report["seconds"]:.2f} 秒：贴图读取 {rate["source_beats"]:.1f} MB/s，'
+                     f'目标读取 {rate["destination_beats"]:.1f} MB/s，写回 {rate["write_beats"]:.1f} MB/s；'
+                     f'缓存命中 {hit_label}',report)
+            self.log('等待占总时间：'+', '.join(f'{k}={v:.1f}%' for k,v in wait.items()))
+            if 'source_bursts' in report['counters']:
+                counters=report['counters']
+                self.log('读取细分（100 MHz 周期；目标首拍等待包含排在贴图之后的时间）：'+
+                         ', '.join(f'{key}={counters[key]}' for key in
+                         ('source_address_wait','target_address_wait','source_first_wait','target_first_wait',
+                          'source_interbeat_wait','target_interbeat_wait','source_bursts','target_bursts')))
+            self.log(report['note'])
+        self.run(lambda:self.require_bridge().measure_ddr(),done)
+
     def show_status(self, status):
         self.last_status = status
         runtime, presentation = status.get('runtime',{}),status.get('presentation',{})
         state = presentation.get('state',0)
         phase = max(0,min(7,presentation.get('boss_phase',1)-1))
         label = STATES[state] if state < len(STATES) else str(state)
+        if status.get('phase') == 255:
+            label = '固件故障'
+        elif status.get('phase') in (1,2,3):
+            label = '初始化 / 等待素材'
         self.summary.set(f'{label} | {NAMES[phase]} | 生命 {status.get("lives",0)} | '
                          f'分数 {status.get("score",0)} | FPS {status.get("fps_x100",0)/100:.2f} | '
                          f'绘制 {runtime.get("render_us",0)/1000:.2f} ms | 错误 0x{status.get("error",0):04X}')
+        version = status.get('hardware_version',0) >> 16
+        self.summary.set(self.summary.get()+f' | 硬件 v{version}')
+        timing=status.get('lunaria_timing',{})
+        if timing and not status.get('partial_lunaria_timing'):
+            self.log(f'本帧：逻辑/分页 {timing["update_us"]/1000:.3f} ms，'
+                     f'提交/背压 {timing["submit_us"]/1000:.3f} ms，'
+                     f'末尾排空 {timing["drain_us"]/1000:.3f} ms，'
+                     f'等待换帧 {timing["swap_us"]/1000:.3f} ms。提交时间含硬件队列背压和渲染期间分页等待。')
+        if version in (10,11,12):
+            self.log('请升级到交付包 hardware/v16 的 bit，启用连续激光和 DDR 读写优化。')
         metrics = status.get('lunaria_metrics',{})
         if metrics and not status.get('partial_lunaria_metrics'):
             self.summary.set(self.summary.get()+f' | 子弹 {metrics["bullets"]} / 峰值 {metrics["peak_bullets"]}'

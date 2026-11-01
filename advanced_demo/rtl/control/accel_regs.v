@@ -42,6 +42,8 @@ module accel_regs #(
     input wire [31:0] reader_r_max_stall,display_underflow_count,reader_frame_completions,
     input wire [31:0] reader_fifo_level,writer_max_cycles,service_read_quota,
     input wire [31:0] service_watermarks,
+    input wire [511:0] alpha_perf_counters,
+    input wire [255:0] read_perf_counters,
     output reg swap_request,clear_swap_done,
     output reg start_pulse,
     input wire [31:0] cpu_ddr_status,
@@ -65,6 +67,16 @@ reg [31:0] error_code;
 reg mapped, writable;
 reg [31:0] transaction_error;
 wire accept = PSEL && PENABLE && PREADY;
+localparam PERF_ENABLE = (EXTRA_CAPABILITIES & 32'h20000) != 0;
+localparam READ_PERF_ENABLE=(EXTRA_CAPABILITIES & 32'h40000)!=0;
+reg [927:0] perf_snapshot;
+// A single accepted APB write atomically captures all counters on core_clk.
+// Readback never clears counters or modifies the running renderer.
+always @(posedge PCLK or negedge PRESETn)
+    if(!PRESETn) perf_snapshot<=0;
+    else if(PERF_ENABLE && accept && PWRITE && PADDR==32'hE8 && transaction_error==0)
+        perf_snapshot<={READ_PERF_ENABLE ? read_perf_counters : 256'b0,missed_boundary_count,display_underflow_count,writer_throttle_cycles,
+                        reader_data_beats,swap_count,alpha_perf_counters};
 
 always @(*) begin
     PRDATA = 0;
@@ -136,7 +148,11 @@ always @(*) begin
         32'hDC: begin PRDATA=asset_status;if(!CPU_DDR_ENABLE) mapped=0;end
         32'hE0: begin PRDATA=0;writable=1;if(!ALPHA_ENABLE) mapped=0;end
         32'hE4: begin PRDATA=sprite_status;if(!ALPHA_ENABLE) mapped=0;end
-        default: mapped = 0;
+        32'hE8: begin PRDATA=READ_PERF_ENABLE ? 29 : 21;writable=1;if(!PERF_ENABLE) mapped=0;end
+        default: begin
+            mapped = PERF_ENABLE && PADDR>=32'h100 && PADDR<(READ_PERF_ENABLE ? 32'h174 : 32'h154);
+            if(mapped) PRDATA=perf_snapshot[PADDR[6:2]*32+:32];
+        end
     endcase
     if (|PADDR[1:0]) transaction_error = 1;
     else if (!mapped) transaction_error = 2;

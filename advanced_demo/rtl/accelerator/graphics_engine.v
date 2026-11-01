@@ -14,6 +14,10 @@ module graphics_engine #(
     parameter [31:0] OP_COLOR_KEY = 32'd2,
     parameter ALPHA_ENABLE = 0,
     parameter ALPHA_STREAM_ENABLE = 0, ALPHA_SPRITE_CACHE_ENABLE = 0,
+    parameter ALPHA_WIDE_CACHE_ENABLE = 0,
+    parameter BEAM_ENABLE = 0,
+    parameter ALPHA_OVERLAP_ENABLE = 0,
+    parameter ALPHA_READ_AHEAD_ENABLE = 0, TILE_PORT_ENABLE=0,
     parameter [31:0] OP_ALPHA_BLEND = 32'd3
 )(
     input wire clk, rst_n, enabled, start,
@@ -21,10 +25,17 @@ module graphics_engine #(
     input wire [31:0] src_addr, src_stride,
     input wire [31:0] back_base,
     input wire src_range_valid,
+    input wire tile_local,
+    input wire [127:0] tile_read_data,
+    output wire [31:0] tile_read_address,tile_write_address,
+    output wire [127:0] tile_write_data,
+    output wire tile_write_enable,
     output wire accept,
     output wire busy,
     output reg done,
     output reg [31:0] error_code, command_count,
+    output wire [511:0] alpha_perf_counters,
+    output wire [255:0] read_perf_counters,
 
     output wire [31:0] araddr,
     output wire [7:0] arlen,
@@ -53,6 +64,7 @@ localparam IDLE = 0, CHECK_SOURCE = 1, LAUNCH = 2, RUN = 3;
 localparam [31:0] ERR_BLIT_PARAM = 32'h21;
 reg [1:0] state;
 reg selected_blit, selected_color_key, selected_alpha, source_range_checked;
+reg selected_beam;
 reg [31:0] saved_x, saved_y, saved_width, saved_height, saved_color;
 reg [31:0] source, source_stride, saved_back_base;
 wire alpha_busy,alpha_done;
@@ -80,7 +92,8 @@ wire selected_done = selected_alpha ? alpha_done : selected_blit ? blit_done : f
 wire selected_busy = selected_alpha ? alpha_busy : selected_blit ? blit_busy : fill_busy;
 wire [31:0] selected_error = selected_alpha ? alpha_error : selected_blit ? blit_error : fill_error;
 wire requested_color_key = COLOR_KEY_ENABLE && op == OP_COLOR_KEY;
-wire requested_alpha = ALPHA_ENABLE && op == OP_ALPHA_BLEND;
+wire requested_beam = BEAM_ENABLE && ALPHA_ENABLE && op == 32'd4;
+wire requested_alpha = ALPHA_ENABLE && op == OP_ALPHA_BLEND || requested_beam;
 wire requested_copy = op == OP_BLIT || requested_color_key || requested_alpha;
 
 // Ordinary and color-key copies share blit_unit, its burst buffer and all
@@ -155,13 +168,19 @@ generate if(ALPHA_ENABLE) begin: alpha_path
     alpha_blit_engine #(.FRAME_WIDTH(FRAME_WIDTH),.FRAME_HEIGHT(FRAME_HEIGHT),
         .FRAME_STRIDE(FRAME_STRIDE),.MAX_BURST_BEATS(MAX_BURST_BEATS),
         .WATCHDOG_BITS(WATCHDOG_BITS),.STREAM_ENABLE(ALPHA_STREAM_ENABLE),
-        .SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE)) alpha_unit (
+        .SPRITE_CACHE_ENABLE(ALPHA_SPRITE_CACHE_ENABLE),
+        .WIDE_CACHE_ENABLE(ALPHA_WIDE_CACHE_ENABLE),
+        .FAST_WRITE_ENABLE(ALPHA_WIDE_CACHE_ENABLE),.BEAM_ENABLE(BEAM_ENABLE),
+        .TILE_PORT_ENABLE(TILE_PORT_ENABLE),.OVERLAP_ENABLE(ALPHA_OVERLAP_ENABLE),.READ_AHEAD_ENABLE(ALPHA_READ_AHEAD_ENABLE)) alpha_unit (
         .clk(clk),.rst_n(rst_n),.enabled(1'b1),
         .start(state==LAUNCH && selected_alpha && source_range_checked),
         .src_addr(source),.src_stride(source_stride),.back_base(saved_back_base),
-        .global_alpha(saved_color[7:0]),.dst_x(saved_x),.dst_y(saved_y),
+        .global_alpha(selected_beam ? saved_color[31:24] : saved_color[7:0]),
+        .tile_local(tile_local),.tile_read_data(tile_read_data),.tile_read_address(tile_read_address),
+        .tile_write_address(tile_write_address),.tile_write_data(tile_write_data),.tile_write_enable(tile_write_enable),
+        .beam_mode(selected_beam),.beam_rgb(saved_color[23:0]),.dst_x(saved_x),.dst_y(saved_y),
         .width(saved_width),.height(saved_height),.busy(alpha_busy),.done(alpha_done),
-        .error_code(alpha_error),.command_count(),
+        .error_code(alpha_error),.command_count(),.perf_counters(alpha_perf_counters),.read_perf_counters(read_perf_counters),
         .araddr(alpha_araddr),.arlen(alpha_arlen),.arvalid(alpha_arvalid),
         .arready(alpha_active && arready),.rdata(rdata),.rid(rid),.rresp(rresp),
         .rlast(rlast),.rvalid(alpha_active && rvalid),.rready(alpha_rready),
@@ -170,6 +189,8 @@ generate if(ALPHA_ENABLE) begin: alpha_path
         .wlast(alpha_wlast),.wvalid(alpha_wvalid),.wready(alpha_active && wready),
         .bid(bid),.bresp(bresp),.bvalid(alpha_active && bvalid),.bready(alpha_bready));
 end else begin: no_alpha
+    assign tile_read_address=0;assign tile_write_address=0;assign tile_write_data=0;assign tile_write_enable=0;
+    assign alpha_perf_counters=0;assign read_perf_counters=0;
     assign alpha_busy=0;assign alpha_done=0;assign alpha_error=0;
     assign alpha_araddr=0;assign alpha_arlen=0;assign alpha_arvalid=0;assign alpha_rready=0;
     assign alpha_awaddr=0;assign alpha_awlen=0;assign alpha_awvalid=0;
@@ -180,6 +201,7 @@ end endgenerate
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         state <= IDLE; selected_blit <= 0; selected_color_key <= 0; selected_alpha<=0; source_range_checked <= 0;
+        selected_beam<=0;
         saved_x <= 0; saved_y <= 0; saved_width <= 0; saved_height <= 0; saved_color <= 0;
         source <= 0; source_stride <= 0; saved_back_base<=0;
         done <= 0; error_code <= 0; command_count <= 0;
@@ -196,6 +218,7 @@ always @(posedge clk or negedge rst_n) begin
                 selected_blit <= requested_copy;
                 selected_color_key <= requested_color_key;
                 selected_alpha <= requested_alpha;
+                selected_beam <= requested_beam;
                 state <= requested_copy ? CHECK_SOURCE : LAUNCH;
             end
         end
@@ -203,8 +226,10 @@ always @(posedge clk or negedge rst_n) begin
             // C latches its result on ACCEPT, using the same parameters/Front.
             // Sample that registered result here, never the previous command's
             // value on the acceptance edge. No child/AXI can start yet.
-            source_range_checked <= src_range_valid;
-            if (!src_range_valid) begin
+            // Beam src/stride are a normal vector and distance, never a DMA
+            // source. Destination geometry is still checked by alpha_unit.
+            source_range_checked <= src_range_valid || selected_beam;
+            if (!src_range_valid && !selected_beam) begin
                 error_code <= ERR_BLIT_PARAM;
                 done <= 1;
                 state <= IDLE;

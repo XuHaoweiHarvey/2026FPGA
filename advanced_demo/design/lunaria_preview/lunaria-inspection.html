@@ -1815,7 +1815,7 @@ html&gt;body{padding:0}&lt;/style&gt;
     &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-ln-phase=&quot;15&quot; aria-pressed=&quot;false&quot;&gt;组合符卡&lt;/button&gt;
   &lt;/div&gt;
   &lt;div class=&quot;viz-controls&quot;&gt;
-    &lt;label class=&quot;form-label&quot; for=&quot;ln-dream-density&quot;&gt;预览模式&lt;select class=&quot;form-select&quot; id=&quot;ln-dream-density&quot;&gt;&lt;option value=&quot;reference&quot;&gt;电脑参考效果 · 最高 4096&lt;/option&gt;&lt;option value=&quot;board&quot;&gt;板端负载预览 · 最高 512&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;
+    &lt;label class=&quot;form-label&quot; for=&quot;ln-dream-density&quot;&gt;预览模式&lt;select class=&quot;form-select&quot; id=&quot;ln-dream-density&quot;&gt;&lt;option value=&quot;reference&quot;&gt;设计参考效果 · 最高 4096&lt;/option&gt;&lt;option value=&quot;board&quot;&gt;低密度设计参考 · 最高 512&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;
     &lt;label class=&quot;form-label&quot; for=&quot;ln-dream-limit&quot;&gt;同时存活敌弹上限&lt;input class=&quot;form-control&quot; id=&quot;ln-dream-limit&quot; type=&quot;number&quot; min=&quot;64&quot; max=&quot;4096&quot; step=&quot;1&quot; value=&quot;4096&quot; required aria-describedby=&quot;ln-dream-limit-note&quot;&gt;&lt;/label&gt;
     &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-ln-apply&gt;应用数量&lt;/button&gt;
     &lt;label class=&quot;form-label&quot; for=&quot;ln-dream-petals&quot; data-ln-flower-controls hidden&gt;花瓣&lt;select class=&quot;form-select&quot; id=&quot;ln-dream-petals&quot;&gt;&lt;option value=&quot;auto&quot;&gt;4 → 5 → 6 瓣轮换&lt;/option&gt;&lt;option value=&quot;3&quot;&gt;3 瓣&lt;/option&gt;&lt;option value=&quot;4&quot;&gt;4 瓣&lt;/option&gt;&lt;option value=&quot;5&quot;&gt;5 瓣&lt;/option&gt;&lt;option value=&quot;6&quot;&gt;6 瓣&lt;/option&gt;&lt;option value=&quot;7/3&quot;&gt;分数玫瑰 k = 7/3&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;
@@ -2301,7 +2301,7 @@ html&gt;body{padding:0}&lt;/style&gt;
     if(p!==phase) {
       phase=p;spellIndex.textContent=`SPELL ${String(p+1).padStart(2,&#x27;0&#x27;)} / ${names.length}`;
       phaseButtons.forEach((button,i)=&gt;button.setAttribute(&#x27;aria-pressed&#x27;,String(i===p)));
-      stateText.textContent=names[p]+&#x27;。电脑视觉预览；浏览器帧率不代表板端帧率。&#x27;;
+      stateText.textContent=names[p]+&#x27;。设计参考；板端同源预览请运行交付包 start_preview.cmd。&#x27;;
     }
     play.textContent=playing?&#x27;暂停&#x27;:time&gt;=DURATION?&#x27;重播&#x27;:&#x27;播放&#x27;;
     play.setAttribute(&#x27;aria-label&#x27;,playing?&#x27;暂停预览&#x27;:time&gt;=DURATION?&#x27;重播预览&#x27;:&#x27;播放预览&#x27;);

@@ -2,23 +2,56 @@
 import hashlib
 import json
 from pathlib import Path
+import os
 import struct
 import tempfile
 import time
 
-from game_debug_bridge import (APB, DebugBridge, DEFAULT_IDE, ROOT, STATUS_FIELDS,
+from game_debug_bridge import (APB, CodeMismatchError, DebugBridge, DEFAULT_IDE, ROOT, STATUS_FIELDS,
                                CONTROL_MAGIC, tcl_word)
 
 DEFAULT_ELF = ROOT / 'software/lunaria/build/lunaria.elf'
-DEFAULT_ASSETS = ROOT / 'output/lunaria/assets.json'
+DEFAULT_ASSETS = Path(os.environ.get('LUNARIA_OUTPUT_DIR', str(ROOT/'output/lunaria')))/'assets.json'
 MAGIC, WAIT, PROCESS, READY, FAULT = 0x4C4E5531, 1, 2, 3, 255
 WORDS, CHUNK_WORDS = 307200, 1024
 SETTINGS_MAGIC = 0x4c4e5331
 SETTINGS_FIELDS = ('magic version sequence ack result requested_limit requested_spin '
                    'limit spin min_limit capacity').split()
+DDR_FIELDS = ('cycles commands busy_cycles source_beats destination_beats write_beats '
+              'cache_hits cache_misses read_address_wait read_data_wait write_address_wait '
+              'write_data_wait write_response_wait mixed_beats bank_wait overlap_cycles '
+              'swaps reader_frame_beats writer_throttle underflows missed').split()
+
+
+READ_DDR_FIELDS = ('source_address_wait target_address_wait source_first_wait target_first_wait '
+                   'source_interbeat_wait target_interbeat_wait source_bursts target_bursts').split()
+
+
+def ddr_interval(before, after):
+    if len(before) not in (21,29) or len(after) != len(before):
+        raise ValueError('DDR 快照长度错误')
+    delta = {key: (b-a)&0xffffffff for key,a,b in zip(DDR_FIELDS+READ_DDR_FIELDS,before,after)}
+    seconds = delta['cycles']/100000000
+    # 32-bit clock wraps after 42.95 s; the UI uses a 5 s interval.
+    if not 0 < seconds < 40:
+        raise ValueError('DDR 采样区间无效，请重新进行 5 秒测量')
+    attempts = delta['cache_hits']+delta['cache_misses']
+    rates = {key: delta[key]*16/seconds/1e6 for key in
+             ('source_beats','destination_beats','write_beats')}
+    waits = {key: 100*delta[key]/delta['cycles'] for key in
+             ('read_address_wait','read_data_wait','write_address_wait',
+              'write_data_wait','write_response_wait','bank_wait','overlap_cycles')}
+    return dict(seconds=seconds, counters=delta, alpha_MB_per_second=rates,
+                cache_hit_percent=100*delta['cache_hits']/attempts if attempts else None,
+                wall_time_percent=waits,
+                note='Alpha/激光引擎计数；等待项可重叠。不含背景复制流量；reader_frame_beats 是帧内状态，不用于带宽。起止 JTAG 暂停会扰动 FPS，60 秒验收另测。')
 FIELDS = ('magic version state sequence ack window offset count expected_hash '
           'actual_hash error received_background received_atlas background_hash atlas_hash').split()
-ERRORS = {0xEA01:'素材窗口已开始或部分封存，需要重新配置现有 bit',
+ERRORS = {0xE000:'固件启动时拒绝硬件 ID/版本；请核对所选 ELF 和配套 bit（支持 v13/v14/v15/v16，推荐 hardware/v16）',
+          0xE001:'硬件初始化或绘制结束等待超时',
+          0xE003:'硬件能力位、显示参数或 DDR 服务配置不匹配',
+          0xEE00:'硬件缺少 LUNARIA 所需能力',
+          0xEA01:'素材窗口已开始或部分封存，需要重新配置现有 bit',
           0xEA03:'素材分块序号、窗口或边界不匹配',0xEA04:'上传块校验失败',
           0xEA05:'DDR 回读校验失败',0xEA06:'完整素材哈希不匹配',
           0xEA08:'DDR 中封存的是另一套素材，需要重新配置现有 bit 后重新加载'}
@@ -52,6 +85,25 @@ def read_assets(path):
 
 
 class LunariaBridge(DebugBridge):
+    def capture_ddr(self):
+        with self.halted() as running:
+            if not running:
+                raise RuntimeError('CPU 原本已暂停，请先继续运行')
+            if not self.matched:
+                self.verify_code()
+            if self.read_words(APB+4,1)[0] not in (0xE0000,0xF0000,0x100000) or not self.read_words(APB+0x40,1)[0]&0x20000:
+                raise RuntimeError('DDR 计数需要 hardware/v16 位流和新版 ELF')
+            words=self.read_words(APB+0xe8,1)[0]
+            if words not in (21,29):
+                raise RuntimeError('Unexpected DDR snapshot length')
+            self.rpc(f'mww {APB+0xe8:#x} 0x1')
+            return self.read_words(APB+0x100,words)
+
+    def measure_ddr(self):
+        before = self.capture_ddr()
+        time.sleep(5)  # Worker thread only; no JTAG access during the interval.
+        return ddr_interval(before,self.capture_ddr())
+
     def __init__(self, elf=DEFAULT_ELF, ide=DEFAULT_IDE, assets=DEFAULT_ASSETS, progress=None):
         super().__init__(elf,ide)
         self.assets = Path(assets)
@@ -73,10 +125,17 @@ class LunariaBridge(DebugBridge):
         deadline = time.monotonic()+seconds
         while True:
             status = self._mailbox()
+            # Earlier firmware can fail accel_init before upload() sets magic.
+            # A fresh, verified ELF was loaded; report that boot fault directly.
+            early_fault = (status['magic'] == 0 and status['version'] == 0 and
+                           status['state'] == FAULT and status['error'])
+            if early_fault:
+                error = status['error']
+                raise RuntimeError(f'LUNARIA 启动故障 0x{error:04X}: '+ERRORS.get(error,'请导出日志检查'))
             if status['magic'] == MAGIC and status['version'] == 1:
                 if status['state'] == FAULT or status['error']:
                     error = status['error']
-                    raise RuntimeError(f'LUNARIA 故障 0x{error:04X}: '+ERRORS.get(error,'请导出日志检查'))
+                    raise RuntimeError(f'LUNARIA 故障 0x{error:04X}: '+ERRORS.get(error,'请导出日志检查')+'; upload='+json.dumps(status,ensure_ascii=False))
                 if predicate(status): return status
             if time.monotonic() >= deadline:
                 raise TimeoutError('LUNARIA 素材上传等待确认超时；不自动重试。'+str(status))
@@ -141,16 +200,16 @@ class LunariaBridge(DebugBridge):
             raise ValueError('ELF 与素材包不匹配，请使用同一次构建的 ELF 和 assets.json')
         with self.halted():
             version = self.read_words(APB+4,1)[0]
-            if version not in (0xA0000,0xB0000):
-                raise RuntimeError('本交付包要求现有 v10 或 v11 bit')
+            if version not in (0xD0000,0xE0000,0xF0000,0x100000):
+                raise RuntimeError('本交付包需要 v13/v14/v15/v16 bit，DDR 优化请配置 hardware/v16 的位流')
         self.progress('ELF 和素材本地校验完成，等待安全加载边界')
         super().load()
         self.upload_assets(assets)
 
     def configure(self, limit, spin=False, options=None):
         """Commit one frame-boundary settings request; never reset/load the board."""
-        if type(limit) is not int or not 64 <= limit <= 512 or spin not in (0, 1):
-            raise ValueError('敌弹上限须为 64–512 的整数')
+        if type(limit) is not int or not 64 <= limit <= 4096 or spin not in (0, 1):
+            raise ValueError('敌弹上限须为 64–4096 的整数')
         if options is not None:
             delay, interval, cap, invincible, alpha = options
             if not (delay == 0 and interval == 900 and cap == 1 and
@@ -191,8 +250,42 @@ class LunariaBridge(DebugBridge):
         return sequence
 
     def snapshot(self, verify=False):
+        try:
+            return self._verified_snapshot(verify)
+        except CodeMismatchError as exc:
+            # Diagnostic evidence only. These symbol-derived RAM values are
+            # unverified and cannot enable upload, settings, or game commands.
+            evidence={'code_verified':False,'symbol_layout_verified':False}
+            try:
+                with self.halted():
+                    evidence['hardware']={hex(offset):self.read_words(APB+offset,1)[0]
+                        for offset in (0,4,0x24,0x40,0x78,0xD0,0xD4,0xDC,0xE4)}
+                    address=self.image.symbol('g_lunaria_upload',4*len(FIELDS))
+                    evidence['upload_address']=hex(address)
+                    evidence['unverified_upload']=dict(zip(FIELDS,self.read_words(address,len(FIELDS))))
+            except Exception as diagnostic_error:
+                evidence['diagnostic_error']=str(diagnostic_error)
+            if evidence.get('hardware',{}).get('0x0')==0:
+                evidence['interpretation']='硬件 ID 也读成零，当前目标读取不可用；不能据此认定 ELF 版本不匹配。请重新配置配套 bit 后恢复，保留原始故障记录。'
+            raise CodeMismatchError(str(exc)+'; raw_diagnostics='+
+                                    json.dumps(evidence,ensure_ascii=False)) from exc
+
+    def _verified_snapshot(self, verify=False):
         status = super().snapshot(verify)
         status['lunaria'] = True
+        # Read-only: preserve the failed upload's block/sequence for export.
+        with self.halted():
+            upload=self.read_words(self.upload_address,len(FIELDS))
+        if upload[:2]==[MAGIC,1]:
+            status['lunaria_upload']=dict(zip(FIELDS,upload))
+        if 'g_lunaria_timing' in self.image.symbols:
+            address=self.image.symbol('g_lunaria_timing',28)
+            with self.halted():
+                values=self.read_words(address,7)
+            if values[:2]==[0x4c4e5431,1]:
+                status['lunaria_timing']=dict(zip(
+                    ('publication','update_us','submit_us','drain_us','swap_us'),values[2:]))
+                status['partial_lunaria_timing']=bool(values[2]&1)
         if 'g_lunaria_metrics' in self.image.symbols:
             address = self.image.symbol('g_lunaria_metrics',36)
             with self.halted():

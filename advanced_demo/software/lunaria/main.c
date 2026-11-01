@@ -6,6 +6,7 @@
 #include "../interactive_demo/uart_keyboard_input.h"
 #include "lunaria_asset_ids.h"
 #include "lunaria_render.h"
+#include "lunaria_pool.h"
 #include "lunaria_upload.h"
 #include <stdint.h>
 #define FENCE() __asm__ volatile("fence iorw,iorw" ::: "memory")
@@ -16,11 +17,17 @@ volatile game_presentation_t g_game_presentation;
 volatile uint32_t g_game_measurement_complete;
 volatile ln_upload_t g_lunaria_upload;
 volatile uint32_t g_lunaria_chunk[LN_UPLOAD_WORDS] __attribute__((aligned(16)));
-const volatile uint32_t g_game_required_caps = 0xE00;
+const volatile uint32_t g_game_required_caps = 0x10E00;
+const volatile uint32_t g_game_beam_compatible = GAME_ALLOW_BEAM ? 0x10000 : 0;
 const volatile uint32_t g_game_alpha_hardware_compatible = 0x3000;
 const volatile uint32_t g_game_scale2_compatible = 0x4000;
 const volatile uint32_t g_game_showcase_available = 1;
 const volatile uint32_t g_lunaria_available = 1;
+const volatile uint32_t g_lunaria_v14_compatible = 0x20000;
+const volatile uint32_t g_lunaria_v16_compatible = 0x80000;
+const volatile uint32_t g_lunaria_v15_compatible = 0x40000;
+const volatile uint32_t g_lunaria_v12_compatible =
+    (GAME_ALLOW_SCALE2 && GAME_ALLOW_WIDE_CACHE) ? ACCEL_CAP_ALPHA_WIDE_CACHE : 0;
 const volatile uint32_t g_lunaria_asset_hashes[2] = {LN_BACKGROUND_HASH,
                                                      LN_ATLAS_HASH};
 const volatile game_build_config_t g_game_build_config = {
@@ -35,7 +42,7 @@ const volatile game_build_config_t g_game_build_config = {
     0,
     0,
     1,
-    0,
+    1, /* submission timing enabled */
     1,
     1,
     LN_CAPACITY,
@@ -46,6 +53,8 @@ static lunaria_t game;
  * Odd publication means an in-progress snapshot. Peaks reset with a campaign.
  */
 volatile uint32_t g_lunaria_metrics[9] = {0x4c4e4d31u, 1u, 0u};
+/* Same frame, microseconds: logic+page flush, submit/backpressure, drain, swap. */
+volatile uint32_t g_lunaria_timing[7] = {0x4c4e5431u, 1u, 0u};
 /* Independent request mailbox. The host commits sequence last; firmware
  * changes settings between frames and commits acknowledgement last. */
 volatile ln_settings_t g_lunaria_settings = {
@@ -58,13 +67,15 @@ static uint32_t previous_boundary, measurement_ms, measure_frames, measure_swap,
     measure_bound;
 static uint32_t measure_command, measure_underflow, measure_missed,
     measure_window_ms, measure_window_frames, measure_first_boundary;
-static uint32_t active_sprites(void) { return ln_elements(&game); }
+static uint32_t rendering;
+static uint32_t active_sprites(void) { return game.current_elements; }
 static uint32_t read32(uintptr_t a) { return *(volatile uint32_t *)a; }
 static uint64_t ticks(void) { return benchmark_clock_read(read32); }
 static uint32_t ms(void) {
   return (uint32_t)(ticks() / (SYSTEM_CLINT_HZ / 1000u));
 }
-static uint32_t us_delta(uint64_t start) {
+/* Share the 64-bit clock conversion across the five timing boundaries. */
+static __attribute__((noinline)) uint32_t us_delta(uint64_t start) {
   return (uint32_t)((ticks() - start) / (SYSTEM_CLINT_HZ / 1000000u));
 }
 static uint32_t fnv(uint32_t h, uint32_t word) {
@@ -87,9 +98,9 @@ static void publish(void) {
   g_lunaria_metrics[2]++;
   FENCE();
   g_lunaria_metrics[3] = game.fps_x100;
-  g_lunaria_metrics[4] = ln_visible(&game);
+  g_lunaria_metrics[4] = game.current_visible;
   g_lunaria_metrics[5] = game.peak_visible_bullets;
-  g_lunaria_metrics[6] = ln_elements(&game);
+  g_lunaria_metrics[6] = game.current_elements;
   g_lunaria_metrics[7] = game.peak_elements;
   g_lunaria_metrics[8] = game.deferred_emissions;
   FENCE();
@@ -141,8 +152,11 @@ static void publish(void) {
 static void fail(uint32_t e) {
   g_debug_status.error = e;
   g_debug_status.phase = 255;
-  g_lunaria_upload.state = 255;
+  g_lunaria_upload.magic = LN_UPLOAD_MAGIC;
+  g_lunaria_upload.version = 1;
   g_lunaria_upload.error = e;
+  FENCE();
+  g_lunaria_upload.state = LN_UPLOAD_FAULT;
   publish();
   g_debug_first_fault = g_debug_status;
   for (;;) {
@@ -189,6 +203,23 @@ static void session_end(void) {
       return;
   fail(0xEE04);
 }
+/* Draw queues and CPU DDR sessions never overlap. Every page switch during
+ * rendering drains the previous batch, then starts a fresh counted batch. */
+void ln_pool_io_begin(void) {
+  if (rendering) require(accel_command_batch_end());
+  session_begin();
+}
+void ln_pool_io_end(void) {
+  session_end();
+  if (rendering) require(accel_command_batch_begin());
+}
+uint32_t ln_pool_io_back(void) {
+  uint32_t base = display_get_back_buffer();
+  if (base != 0 && base != LN_POOL_SLOT1) fail(0xEE05);
+  return base;
+}
+uint32_t ln_pool_io_read(uint32_t physical) { return *ddr(physical); }
+void ln_pool_io_write(uint32_t physical, uint32_t word) { *ddr(physical) = word; }
 static volatile uint32_t *asset_word(uint32_t window, uint32_t n) {
   if (window)
     return ddr(LN_SPRITE_BASE) + n;
@@ -352,6 +383,9 @@ static void debug_command(uint32_t now) {
     g_game_runtime.measurement_max_render_us = 0;
     g_game_runtime.measurement_max_frame_us = 0;
     g_game_runtime.measurement_over_budget_frames = 0;
+    g_game_runtime.measurement_command_submit_us = 0;
+    g_game_runtime.measurement_command_wait_us = 0;
+    g_game_runtime.measurement_path_diagnostics = 2;
     g_game_presentation.first_boundary = 0;
     g_game_presentation.last_boundary = 0;
     g_game_presentation.presentation_intervals = 0;
@@ -400,9 +434,9 @@ int main(void) {
   command_base = accel_read(ACCEL_COMMAND_COUNT);
   swap_base = accel_read(ACCEL_SWAP_COUNT);
   for (;;) {
-    uint64_t start = ticks(), render_start;
+    uint64_t start = ticks(), render_start, part_start;
     ln_render_stats_t stats;
-    uint32_t render_us, frame_us, boundary, buttons;
+    uint32_t render_us, frame_us, boundary, buttons, update_us, submit_us, drain_us, swap_us;
     now = ms();
     uart_keyboard_input_poll(&keyboard, now);
     debug_command(now);
@@ -410,16 +444,27 @@ int main(void) {
     buttons = uart_keyboard_input_consume_buttons(&keyboard);
     if (g_debug_status.measurement_state == 1u)
       buttons &= ~(UART_KEY_PAUSE | UART_KEY_FIRE);
-    ln_step(&game, (uint8_t)buttons, now);
-    ln_update_metrics(&game);
+    /* Preserve every simulation frame at high density, even if presentation
+     * is slow. The desktop viewer uses this same 16 ms step per drawn frame. */
+    part_start = ticks();
+    ln_step(&game, (uint8_t)buttons, game.last_ms + LN_TICK_MS);
+    ln_pool_flush();
+    update_us = us_delta(part_start);
     render_start = ticks();
     require(accel_command_batch_begin());
+    rendering = 1;
     require(ln_render(&game, alpha, submit, 0, &stats));
+    submit_us = us_delta(render_start);
+    part_start = ticks();
     require(accel_command_batch_end());
+    drain_us = us_delta(part_start);
+    rendering = 0;
     render_us = us_delta(render_start);
     health();
+    part_start = ticks();
     require(display_swap_request(&ticket));
     require(display_wait_swap_done(ticket));
+    swap_us = us_delta(part_start);
     health();
     game.frames++;
     boundary = accel_read(ACCEL_BOUNDARY_COUNT);
@@ -455,6 +500,14 @@ int main(void) {
     FENCE();
     g_game_runtime.render_us = render_us;
     g_game_runtime.frame_us = frame_us;
+    g_game_runtime.command_submit_us = submit_us;
+    g_game_runtime.command_wait_us = drain_us;
+    g_lunaria_timing[2]++;
+    FENCE();
+    g_lunaria_timing[3]=update_us;g_lunaria_timing[4]=submit_us;
+    g_lunaria_timing[5]=drain_us;g_lunaria_timing[6]=swap_us;
+    FENCE();
+    g_lunaria_timing[2]++;
     if (render_us > g_game_runtime.max_render_us)
       g_game_runtime.max_render_us = render_us;
     if (frame_us > g_game_runtime.max_frame_us)
@@ -467,6 +520,8 @@ int main(void) {
     g_game_runtime.glyph_blits = stats.glyphs;
     if (g_debug_status.measurement_state == 1u) {
       uint32_t elapsed = ms() - measurement_ms;
+      g_game_runtime.measurement_command_submit_us += submit_us;
+      g_game_runtime.measurement_command_wait_us += drain_us;
       g_debug_status.measurement_elapsed_ms = elapsed;
       g_debug_status.measurement_frames = game.frames - measure_frames;
       g_debug_status.measurement_swaps =

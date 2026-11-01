@@ -62,6 +62,7 @@ nm = Path(tool_prefix+'nm.exe')
 flags = ['-march=rv32im_zicsr_zifencei', '-mabi=ilp32', '-'+args.opt, '-g3', '-ffreestanding',
          '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror',
          '-DUSE_GP', '-DNO_LIBC_INIT_ARRAY', '-I' + str(bsp / 'include')]
+if args.program == 'lunaria': flags.append('-fstack-usage')
 for define in args.define:
     assert re.fullmatch(r'[A-Z][A-Z0-9_]*=[A-Za-z0-9_xX()+-]+',define), define
     flags.append('-D'+define)
@@ -93,7 +94,7 @@ if args.program == 'game':
     run([gcc, *flags, '-c', game_logic, '-o', out / 'game_logic.o'])
     objects.append(out / 'game_logic.o')
 if args.program == 'lunaria':
-    for unit in ('lunaria', 'lunaria_render'):
+    for unit in ('lunaria', 'lunaria_render', 'lunaria_pool'):
         run([gcc, *flags, '-c', ROOT / ('software/lunaria/'+unit+'.c'), '-o', out/(unit+'.o')])
         objects.append(out/(unit+'.o'))
 if args.program == 'game' or args.program.startswith('flash-'):
@@ -106,7 +107,7 @@ run([gcc, *flags, '-c', startup, '-o', out / 'start.o'])
 elf = out / (basename+'.elf')
 keep = ('g_game_required_caps', 'g_game_alpha_hardware_compatible',
         'g_game_scale2_compatible', 'g_game_showcase_available',
-        'g_lunaria_available', 'g_lunaria_asset_hashes',
+        'g_lunaria_available', 'g_lunaria_v12_compatible', 'g_game_beam_compatible', 'g_lunaria_v14_compatible', 'g_lunaria_v15_compatible', 'g_lunaria_v16_compatible', 'g_lunaria_asset_hashes',
         'g_game_build_config') if args.program == 'lunaria' else ()
 run([gcc, *flags, '-nostdlib', '-nostartfiles', '-Wl,--gc-sections', '-T', linker,
      *['-Wl,--undefined='+name for name in keep],
