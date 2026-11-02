@@ -2,7 +2,7 @@
 // Exact reference pixels plus DDR stalls, clipped cache hits, page splitting,
 // cache read-error validity, reset lifetime and measured command cycle counts.
 module tb_alpha_stream_cache;
-parameter STREAM=1, CACHE=1, PIXEL_X=0;
+parameter STREAM=1, CACHE=1, PIXEL_X=0, SOURCE_LATENCY=0;
 localparam TILE=32'h01384240, STRIDE=1024, FRAME_WORDS=256*48;
 reg clk=0,rst_n=0,start=0;
 always #5 clk=~clk;
@@ -15,7 +15,8 @@ reg [127:0] rdata;wire rvalid,rlast;wire [1:0] rresp;
 reg bvalid=0;reg [1:0] bresp=0;
 reg read_active=0,write_active=0,read_hold=0;
 reg [31:0] ra,wa;
-integer ri=0,rl=0,wi=0,wl=0,bd=0;
+integer ri=0,rl=0,wi=0,wl=0,bd=0,source_wait=0;
+integer narrow_cold,narrow_warm,narrow_reads,source_error_beat=0;
 integer cycle=0,source_reads=0,bg_reads=0,writes=0,checked=0;
 reg [31:0] memory[0:FRAME_WORDS-1],expected[0:FRAME_WORDS-1];
 reg inject_source_error=0,inject_bg_error=0,inject_write_error=0;
@@ -26,9 +27,9 @@ reg [127:0] held_w;reg held_last;
 assign arready=(cycle%7 != 0 && cycle%7 != 1);
 assign awready=(cycle%6 != 0 && cycle%6 != 1);
 assign wready=(cycle%5 != 0 && cycle%5 != 1);
-assign rvalid=read_active && (read_hold || cycle%4!=0);
+assign rvalid=read_active && source_wait==0 && (read_hold || cycle%4!=0);
 assign rlast=ri==rl;
-assign rresp=((ra>=32'h01000000 ? inject_source_error : inject_bg_error) && ri==0) ? 2'b10 : 0;
+assign rresp=((ra>=32'h01000000 ? inject_source_error && ri==source_error_beat : inject_bg_error && ri==0)) ? 2'b10 : 0;
 function [31:0] foreground;
 input [31:0] a;
 begin foreground={(a[9:2]*8'd47+8'd13),(a[11:4]*8'd29),(a[8:1]*8'd17),(a[10:3]*8'd7)};end
@@ -63,7 +64,7 @@ end
 always @(posedge clk) begin
     cycle<=cycle+1;
     if(!rst_n) begin
-        read_active<=0;write_active<=0;bvalid<=0;bd<=0;read_hold<=0;
+        read_active<=0;write_active<=0;bvalid<=0;bd<=0;read_hold<=0;source_wait<=0;
         stalled_ar<=0;stalled_aw<=0;stalled_w<=0;
     end else begin
         if(stalled_ar && (!arvalid || araddr!==held_ar || arlen!==held_arlen)) $fatal(1,"AR changed under stall");
@@ -73,10 +74,12 @@ always @(posedge clk) begin
         stalled_aw<=awvalid&&!awready;held_aw<=awaddr;held_awlen<=awlen;
         stalled_w<=wvalid&&!wready;held_w<=wdata;held_last<=wlast;
         read_hold<=rvalid&&!rready;
+        if(source_wait>0) source_wait<=source_wait-1;
         if(arvalid&&arready) begin
             if(read_active) $fatal(1,"overlapping read");
             if({1'b0,araddr[11:0]}+(arlen+1)*16>4096) $fatal(1,"AR crossed page");
             read_active<=1;ra<=araddr;rl<=arlen;ri<=0;
+            source_wait<=araddr>=32'h01000000 ? SOURCE_LATENCY : 0;
             if(araddr>=32'h01000000) source_reads<=source_reads+1;
             else bg_reads<=bg_reads+1;
         end
@@ -125,6 +128,74 @@ end endtask
 initial begin
     for(i=0;i<FRAME_WORDS;i=i+1) begin memory[i]=32'ha52b4671^(i*32'h010307);expected[i]=memory[i];end
     repeat(3)@(negedge clk);rst_n=1;
+    // v13 narrow tiles must self-warm; deliberately run before any 16x16 draw.
+    if (PIXEL_X) begin
+        reads_before=source_reads;
+        command(32'h013ac700,2560,33,4,8,8,255,0);narrow_cold=elapsed;
+        if(source_reads-reads_before!=8)$fatal(1,"cold 8x8 source transaction count");
+        reads_before=source_reads;
+        command(32'h013ac700,2560,33,4,8,8,255,0);narrow_warm=elapsed;
+        narrow_reads=source_reads-reads_before;
+        if(CACHE && narrow_reads!=0)$fatal(1,"8x8 did not self-warm");
+        $display("PASS narrow8 cache=%0d source_latency=%0d cold=%0d warm=%0d cycles warm_source_reads=%0d",CACHE,SOURCE_LATENCY,narrow_cold,narrow_warm,narrow_reads);
+        for(i=0;i<4;i=i+1) begin
+            command(32'h013ac700,2560,32+i,4,8,8,255,0);
+            command(32'h013ac700,2560,36+i,17,8,8,127,0);
+        end
+        if(CACHE && source_reads!=reads_before)$fatal(1,"shifted 8x8 cache miss");
+        @(negedge clk);rst_n=0;repeat(3)@(negedge clk);rst_n=1;
+        reads_before=source_reads;
+        command(32'h013ac700,2560,33,4,12,12,255,0);narrow_cold=elapsed;
+        if(source_reads-reads_before!=12)$fatal(1,"cold 12x12 source transaction count");
+        reads_before=source_reads;
+        command(32'h013ac700,2560,33,4,12,12,255,0);narrow_warm=elapsed;
+        narrow_reads=source_reads-reads_before;
+        if(CACHE && narrow_reads!=0)$fatal(1,"12x12 did not self-warm");
+        $display("PASS narrow12 cache=%0d source_latency=%0d cold=%0d warm=%0d cycles warm_source_reads=%0d",CACHE,SOURCE_LATENCY,narrow_cold,narrow_warm,narrow_reads);
+        for(i=0;i<4;i=i+1) begin
+            command(32'h013ac700,2560,32+i,4,12,12,255,0);
+            command(32'h013ac700,2560,36+i,17,12,12,127,0);
+        end
+        if(CACHE && source_reads!=reads_before)$fatal(1,"shifted 12x12 cache miss");
+        // Read the missing fourth beat, merge validity, then hit every offset.
+        reads_before=source_reads;
+        command(32'h013ac730,2560,32,4,4,1,255,0);
+        if(source_reads-reads_before!=1)$fatal(1,"unfilled beat falsely hit");
+        reads_before=source_reads;
+        command(32'h013ac700,2560,33,4,16,1,255,0);
+        command(32'h013ac710,2560,34,5,12,1,127,0);
+        command(32'h013ac720,2560,35,6,8,1,0,0);
+        command(32'h013ac730,2560,36,7,4,1,255,0);
+        if(CACHE && source_reads!=reads_before)$fatal(1,"partial line mask merge/offset");
+        // These two lines hash to the same slot; tag changes must evict old data.
+        command(32'h01384200,2560,32,4,8,1,255,0);
+        reads_before=source_reads;
+        command(32'h013ac700,2560,33,4,8,1,255,0);
+        if(source_reads-reads_before!=1)$fatal(1,"conflicting tag falsely hit");
+        reads_before=source_reads;
+        command(32'h013ac700,2560,34,4,8,1,127,0);
+        if(CACHE && source_reads!=reads_before)$fatal(1,"evicted line did not refill");
+        // Two partial lines spanning a 4 KiB boundary, with shifted destination.
+        command(32'h013acff0,2560,33,4,8,1,255,0);
+        reads_before=source_reads;
+        command(32'h013acff0,2560,34,4,8,1,127,0);
+        if(CACHE && source_reads!=reads_before)$fatal(1,"page-split partial lines missed");
+        // Failure during a merge invalidates the whole line before any commit.
+        @(negedge clk);rst_n=0;repeat(3)@(negedge clk);rst_n=1;
+        command(32'h013ac700,2560,33,4,4,1,255,0);
+        inject_source_error=1;source_error_beat=1;
+        command(32'h013ac710,2560,34,4,8,1,255,32'h22);
+        if(CACHE && dut.line_valid!=0)$fatal(1,"failed partial fill retained validity");
+        inject_source_error=0;source_error_beat=0;
+        reads_before=source_reads;
+        command(32'h013ac700,2560,35,4,8,1,255,0);
+        if(source_reads-reads_before!=1)$fatal(1,"error line falsely hit");
+        reads_before=source_reads;
+        command(32'h013ac700,2560,36,4,8,1,255,0);
+        if(CACHE && source_reads!=reads_before)$fatal(1,"error line did not recover");
+        @(negedge clk);rst_n=0;repeat(3)@(negedge clk);rst_n=1;
+        if(dut.line_valid!=0)$fatal(1,"reset left line validity");
+    end
     command(TILE,2560,4,1,16,16,225,0);cold_cycles=elapsed;
     reads_before=source_reads;bg_before=bg_reads;
     command(TILE,2560,24,2,16,16,225,0);warm_cycles=elapsed;

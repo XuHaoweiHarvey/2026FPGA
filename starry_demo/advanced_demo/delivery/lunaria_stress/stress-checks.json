@@ -1,18 +1,93 @@
 {
   "status": "passed",
   "board_tested": false,
-  "elf_sha256": "829643a384781f8a13412bd6afa14a293f25e4a034353924bb7d748ea2486f18",
-  "output": "PASS limit 64: visible 64, continuous fire score 8100\nPASS limit 65: visible 65, continuous fire score 16200\nPASS limit 128: visible 128, continuous fire score 24300\nPASS limit 256: visible 256, continuous fire score 32400\nPASS limit 384: visible 384, continuous fire score 40500\nPASS limit 512: visible 512, continuous fire score 48600\nPASS limit 610: visible 610, continuous fire score 56700\nPASS limit 640: visible 640, continuous fire score 64800\nFRAME stress-640-firing: B=640 A=645 commands=698 pixels=132736\nFRAME stress-640-steady: B=640 A=642 commands=695 pixels=131968\nPASS limit 704: visible 704, continuous fire score 73200\nPASS limit 768: visible 768, continuous fire score 81300\nPASS limit 832: visible 832, continuous fire score 89400\nFRAME stress-832-steady: B=832 A=834 commands=887 pixels=159616\nPASS 28959586 stress checks; 600000 ms steady 832 visible bullets; no board FPS claim\n",
-  "rtl_output": "PASS stress RTL warm same-source: 16x16=721 cycles, 12x12=478 cycles\nPASS Alpha stream=1 cache=1: cold=615 warm=514 cycles; source_reads=78 background_reads=299 exact_pixels=5932; stalls/pages/clipping/errors/reset\nC:\\Users\\HUIPU\\AppData\\Local\\Temp\\stress-alpha-wwe7ppag\\stress.v:184: $finish called at 131580000 (1ps)\n",
+  "elf_sha256": "4458e8185a752149865a49c6073e2b686ea705f054f1b4272da6568be3ba625f",
+  "bit_sha256": "61d2c1a5d785ba0d6a4cf4d390cfa3a905616255d70b484081762f237ff4f9b1",
+  "output": "PASS limit 64: visible 64, continuous fire score 8100\nPASS limit 65: visible 65, continuous fire score 16200\nPASS limit 128: visible 128, continuous fire score 24300\nPASS limit 256: visible 256, continuous fire score 32400\nPASS limit 384: visible 384, continuous fire score 40500\nPASS limit 512: visible 512, continuous fire score 48600\nPASS limit 610: visible 610, continuous fire score 56700\nPASS limit 640: visible 640, continuous fire score 64800\nFRAME stress-640-firing: B=640 A=645 commands=703 pixels=83456\nFRAME stress-640-steady: B=640 A=642 commands=700 pixels=82688\nPASS limit 704: visible 704, continuous fire score 73200\nPASS limit 768: visible 768, continuous fire score 81300\nPASS limit 832: visible 832, continuous fire score 89400\nPASS limit 1000: visible 1000, continuous fire score 97500\nPASS limit 1024: visible 1024, continuous fire score 105600\nPASS limit 1152: visible 1152, continuous fire score 113700\nPASS limit 1280: visible 1280, continuous fire score 121800\nPASS limit 1536: visible 1536, continuous fire score 129900\nPASS limit 1792: visible 1792, continuous fire score 138000\nPASS limit 2048: visible 2048, continuous fire score 146100\nFRAME stress-2048-steady: B=2048 A=2050 commands=2108 pixels=172800\nPASS 63169350 stress checks; 600000 ms steady 2048 visible bullets; no board FPS claim\n",
+  "rtl_output": "PASS narrow8 cache=1 source_latency=0 cold=262 warm=254 cycles warm_source_reads=0\nPASS narrow12 cache=1 source_latency=0 cold=454 warm=443 cycles warm_source_reads=0\nPASS Alpha stream=1 cache=1: cold=615 warm=503 cycles; source_reads=86 background_reads=374 exact_pixels=6520; stalls/pages/clipping/errors/reset\nC:\\Users\\HUIPU\\AppData\\Local\\Temp\\stress-alpha-ixlzuwjn\\stress.v:244: $finish called at 146630000 (1ps)\n\nPASS narrow8 cache=1 source_latency=20 cold=425 warm=251 cycles warm_source_reads=0\nPASS narrow12 cache=1 source_latency=20 cold=723 warm=441 cycles warm_source_reads=0\nPASS Alpha stream=1 cache=1: cold=964 warm=504 cycles; source_reads=86 background_reads=374 exact_pixels=6520; stalls/pages/clipping/errors/reset\nC:\\Users\\HUIPU\\AppData\\Local\\Temp\\stress-alpha-ixlzuwjn\\stress.v:244: $finish called at 165230000 (1ps)\n\nPASS narrow8 cache=0 source_latency=20 cold=425 warm=425 cycles warm_source_reads=8\nPASS narrow12 cache=0 source_latency=20 cold=708 warm=719 cycles warm_source_reads=12\nPASS Alpha stream=1 cache=0: cold=964 warm=959 cycles; source_reads=373 background_reads=374 exact_pixels=6520; stalls/pages/clipping/errors/reset\nC:\\Users\\HUIPU\\AppData\\Local\\Temp\\stress-alpha-ixlzuwjn\\stress.v:244: $finish called at 229080000 (1ps)\n",
+  "rv32_initialization": {
+    "unicorn": "2.1.4",
+    "cases": [
+      {
+        "firmware": "0xc0000",
+        "hardware": "0xc0000",
+        "capabilities": "0x7ffb",
+        "result": "0x0"
+      },
+      {
+        "firmware": "0xc0000",
+        "hardware": "0xd0000",
+        "capabilities": "0x7ffb",
+        "result": "0xe000"
+      },
+      {
+        "firmware": "0xc0000",
+        "hardware": "0xc0000",
+        "capabilities": "0x3ffb",
+        "result": "0xe003"
+      },
+      {
+        "firmware": "0xc0000",
+        "hardware": "0xc0000",
+        "capabilities": "0x77fb",
+        "result": "0xe000"
+      },
+      {
+        "firmware": "0xc0000",
+        "hardware": "0xc0000",
+        "capabilities": "0x7efb",
+        "result": "0xe003"
+      },
+      {
+        "firmware": "0xd0000",
+        "hardware": "0xd0000",
+        "capabilities": "0x7ffb",
+        "result": "0x0"
+      },
+      {
+        "firmware": "0xd0000",
+        "hardware": "0xc0000",
+        "capabilities": "0x7ffb",
+        "result": "0xe000"
+      },
+      {
+        "firmware": "0xd0000",
+        "hardware": "0xd0000",
+        "capabilities": "0x3ffb",
+        "result": "0xe003"
+      },
+      {
+        "firmware": "0xd0000",
+        "hardware": "0xd0000",
+        "capabilities": "0x77fb",
+        "result": "0xe000"
+      },
+      {
+        "firmware": "0xd0000",
+        "hardware": "0xd0000",
+        "capabilities": "0x7efb",
+        "result": "0xe003"
+      }
+    ],
+    "submission": {
+      "generic_instructions": 119470,
+      "repeat_instructions": 49125,
+      "commands": 1282
+    }
+  },
   "frames": [
     "stress-640-firing.png",
     "stress-640-steady.png"
   ],
   "sources": {
-    "sim/test_lunaria_stress.c": "dc28416bb52f9b4e0d69d3d4676027c735add7c36d5521ca2c7899306e566950",
-    "software/lunaria/lunaria.c": "8111e13723e0e4a59d826515d337c857ed4d3a12398f219f574626d12ad8bbfa",
-    "software/lunaria/lunaria_render.c": "8041e1af970680d1e4bd560381416e9720cf2fda0f4bad57839646c61da8525c",
-    "software/lunaria/lunaria.h": "2a390dcb81920f65909507044791600b5528c2c3d4ae63eba3c57daf94eb554c",
-    "scripts/run_lunaria_stress_checks.py": "9fcd7efd56bfb12ee88cb8f96395176491fc6c552c7c2974fbbc323fd4ce361d"
+    "sim/test_lunaria_stress.c": "9c850b7b27029f893194d6da14acbef935a9cf68a99da23edfe897e081614a4a",
+    "software/lunaria/lunaria.c": "c2f9fb2ae60dcad2ded3224cb846f374c65e1ab536405ef962de52431fac6dc7",
+    "software/lunaria/lunaria_render.c": "967113e262a7f2bd6f531f06cd5048b38b1d3977f7cbc169d3dec3dbcf19f83d",
+    "software/lunaria/lunaria.h": "0640ed62794dc93d18529806c913de4a08a79ccf0aa911b7ef2db69be45b5c1f",
+    "scripts/run_lunaria_stress_checks.py": "15a39b4183164801c22d77f29aa3f9b1180e21591e04e09e40766b84511e8bca",
+    "software/apb_reg_test/accel_api.h": "4fe92ab9ac0af78a03c61cb8fbb30bbdb5f5578656f57cf2abe40b6ba710e11f",
+    "software/apb_reg_test/accel_regs.h": "60c5790ec77d183d295a2b44214449d2d94e4c318475ce367ab1636988775867",
+    "rtl/accelerator/alpha_blit_engine.v": "a9fb624354ee4fb7b1752109afa8dd274d7752897f335b705cd7be5d8231c2d4",
+    "sim/tb_alpha_stream_cache.v": "0c85b4ac787f9d2d5d71324b96644b2c41dab9e9517190ee4e6e2bd88571d1d1"
   }
 }

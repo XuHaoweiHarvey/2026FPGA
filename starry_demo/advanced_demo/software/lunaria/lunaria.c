@@ -1,9 +1,11 @@
 #include "lunaria.h"
 #include "lunaria_tables.h"
+#if !LN_STRESS_TEST
 static const uint16_t intervals[8] = {560, 180, 48, 1440, 1440, 1440, 520, 720};
 /* Boundary retirement is primary. This long watchdog only bounds stationary
  * rose samples and very slow shots; it never fades a normal mid-screen shot. */
 static const uint8_t lanes[8] = {24, 6, 1, 48, 40, 48, 12, 6};
+#endif
 static int32_t absi(int32_t x) { return x < 0 ? -x : x; }
 static int32_t mul14(int32_t x, int32_t y) {
   return (int32_t)((int64_t)x * y / 16384);
@@ -49,10 +51,15 @@ static void clear_actors(lunaria_t *g) {
   g->stress_active = 0;
 #endif
   uint32_t i;
+  #if PIXELFORGE
+  g->active_count = 0;
+  #endif
   g->accent_due = 0;
   g->flash_ms = 0;
+#if !LN_STRESS_TEST
   for (i = 0; i < LN_CAPACITY; i++)
     g->bullets[i].active = 0;
+#endif
   for (i = 0; i < LN_SHOTS; i++)
     g->shots[i].active = 0;
   for (i = 0; i < LN_LASERS; i++)
@@ -133,7 +140,9 @@ static void enter_phase(lunaria_t *g) {
   g->hp = LN_PHASE_HP;
 }
 uint32_t ln_active(const lunaria_t *g) {
-#if LN_STRESS_TEST
+#if PIXELFORGE
+  return g->active_count;
+#elif LN_STRESS_TEST
   return g->stress_active;
 #else
   uint32_t n = 0, i;
@@ -178,6 +187,12 @@ void ln_update_metrics(lunaria_t *g) {
 uint32_t ln_boss_hp(const lunaria_t *g) {
   if (LN_STRESS_TEST)
     return g->hp * 8u;
+#if PIXELFORGE
+  /* WARNING already names the next phase, but its live HP is initialized
+   * only by enter_phase(). Keep its full segment in the campaign display. */
+  if (g->state == LN_WARNING)
+    return (8u - g->phase) * LN_PHASE_HP;
+#endif
   return g->state >= LN_DEFEAT ? 0u : (7u - g->phase) * LN_PHASE_HP + g->hp;
 }
 void ln_hit(lunaria_t *g, int16_t x, int16_t y) {
@@ -210,15 +225,9 @@ void ln_hit(lunaria_t *g, int16_t x, int16_t y) {
 }
 static ln_bullet_t *allocate(lunaria_t *g) {
 #if LN_STRESS_TEST
-  if (g->stress_active < g->bullet_limit) {
-    ln_bullet_t *b = &g->bullets[g->stress_active++];
-    uint8_t *p = (uint8_t *)b;
-    uint32_t j;
-    for (j = 0; j < sizeof(*b); j++)
-      p[j] = 0;
-    b->active = 1;
-    return b;
-  }
+  /* emit() initializes every field before this slot is rendered. */
+  if (g->stress_active < g->bullet_limit)
+    return &g->bullets[g->stress_active++];
 #else
   uint32_t n, i = g->allocation_cursor;
   for (n = 0; n < LN_CAPACITY; n++, i = (i + 1u == LN_CAPACITY ? 0u : i + 1u))
@@ -229,6 +238,9 @@ static ln_bullet_t *allocate(lunaria_t *g) {
       for (j = 0; j < sizeof(*b); j++)
         p[j] = 0;
       b->active = 1;
+#if PIXELFORGE
+      g->active_count++;
+#endif
       g->allocation_cursor = i + 1u == LN_CAPACITY ? 0u : i + 1u;
       return b;
     }
@@ -236,6 +248,7 @@ static ln_bullet_t *allocate(lunaria_t *g) {
   g->pool_drops++;
   return 0;
 }
+#if !LN_STRESS_TEST
 static void star_vector(uint32_t lane, uint32_t count, uint8_t six, int16_t *x,
                         int16_t *y) {
   uint32_t edge, f;
@@ -265,8 +278,10 @@ static void star_vector(uint32_t lane, uint32_t count, uint8_t six, int16_t *x,
                   mul14(ln_sin(b), rb) * (int32_t)f) /
                  256);
 }
+#endif
 static uint32_t emit(lunaria_t *g) {
-  if (LN_STRESS_TEST) {
+#if LN_STRESS_TEST
+  {
     uint32_t n = ln_active(g), i,
              count = g->bullet_limit > n ? g->bullet_limit - n : 0;
     if (count > 32u)
@@ -277,16 +292,11 @@ static uint32_t emit(lunaria_t *g) {
         break;
       b->x = g->boss_x * LN_Q;
       b->y = g->boss_y * LN_Q;
-      b->ox = g->boss_x;
-      b->oy = g->boss_y;
       /* Straight, downward fan. All births are at the visible Boss. */
-      b->angle = (uint16_t)(4096u + (uint32_t)g->event * 25033u % 24577u);
-      b->vx = 80 * LN_Q * 16 / 1000;
-      b->ux = (int16_t)mul14(b->vx, ln_cos(b->angle));
-      b->uy = (int16_t)mul14(b->vx, ln_sin(b->angle));
-      b->life = 1000;
-      b->age =
-          5; /* Fully opaque from birth: HUD counts match visible sprites. */
+      uint16_t angle = (uint16_t)(4096u + (uint32_t)g->event * 25033u % 24577u);
+      /* |327 * sin/cos| <= 5,357,568: signed 32-bit multiplication is exact. */
+      b->ux = (int16_t)((80 * LN_Q * 16 / 1000) * ln_cos(angle) / 16384);
+      b->uy = (int16_t)((80 * LN_Q * 16 / 1000) * ln_sin(angle) / 16384);
       g->event++;
       g->emissions++;
     }
@@ -294,6 +304,7 @@ static uint32_t emit(lunaria_t *g) {
       g->peak_bullets = n + i;
     return 1;
   }
+#else
   uint32_t i, p = g->phase, count = lanes[p];
   uint32_t petals = 4u + g->event % 3u;
   uint32_t variant = g->phase_ms / 2800u;
@@ -314,7 +325,7 @@ static uint32_t emit(lunaria_t *g) {
   if (g->bullet_limit > LN_DEFAULT_LIMIT) {
     uint32_t unit = p == 3 ? petals : p == 4 ? 10u : p == 5 ? 6u : 1u;
     /* 640 mode uses a 12.5% density boost, rounded to complete motifs. */
-    uint32_t density = g->bullet_limit == LN_CAPACITY ? 720u : g->bullet_limit;
+    uint32_t density = g->bullet_limit == 640u ? 720u : g->bullet_limit;
     count = count * density / LN_DEFAULT_LIMIT / unit * unit;
   }
   if (ln_active(g) + count > g->bullet_limit) {
@@ -465,6 +476,12 @@ static uint32_t emit(lunaria_t *g) {
       b->x = b->ox * LN_Q + mul14(b->ux, r);
       b->y = b->oy * LN_Q + mul14(b->uy, r);
     }
+#if PIXELFORGE
+    if (b->kind == 0) {
+      b->ux = (int16_t)mul14(b->vx, ln_cos(b->angle));
+      b->uy = (int16_t)mul14(b->vx, ln_sin(b->angle));
+    }
+#endif
     if (b->kind == 6)
       b->ux = (int16_t)a; /* no radial vector needed after birth */
     {
@@ -498,17 +515,17 @@ static uint32_t emit(lunaria_t *g) {
       g->peak_bullets = n;
   }
   return 1;
+#endif
 }
-static void move_bullet(lunaria_t *g, ln_bullet_t *b) {
 #if LN_STRESS_TEST
-  (void)g;
-  b->age++;
+static uint32_t move_bullet(ln_bullet_t *b) {
   b->x += b->ux;
   b->y += b->uy;
-  if (b->x < 8 * LN_Q || b->x > 632 * LN_Q || b->y < 80 * LN_Q ||
-      b->y > 472 * LN_Q)
-    b->active = 0;
+  return b->x >= 8 * LN_Q && b->x <= 632 * LN_Q && b->y >= 80 * LN_Q &&
+         b->y <= 472 * LN_Q;
+}
 #else
+static void move_bullet(lunaria_t *g, ln_bullet_t *b) {
   int32_t speed = b->vx;
   b->age++;
   if (b->kind == 3 || b->kind == 10) {
@@ -559,14 +576,19 @@ static void move_bullet(lunaria_t *g, ln_bullet_t *b) {
     }
     if (b->kind == 9)
       b->angle = (uint16_t)(b->angle + 105u);
+#if PIXELFORGE
+    if (b->kind == 0) { b->x += b->ux; b->y += b->uy; } else
+#endif
+    {
     b->x += mul14(speed, ln_cos(b->angle));
     b->y += mul14(speed, ln_sin(b->angle));
+    }
   }
   if (b->age > b->life || b->x < -32 * LN_Q || b->x > 672 * LN_Q ||
       b->y < -32 * LN_Q || b->y > 512 * LN_Q)
     b->active = 0;
-#endif
 }
+#endif
 /* Shared movement keeps preparation and combat controls identical. */
 static void move_player(lunaria_t *g, uint8_t buttons) {
   int32_t dx = ((buttons & UART_KEY_RIGHT) != 0) -
@@ -623,6 +645,7 @@ static void tick(lunaria_t *g, uint8_t buttons) {
   g->combat_ms += 16;
   if (g->flash_ms)
     g->flash_ms = g->flash_ms > 16 ? g->flash_ms - 16 : 0;
+#if !LN_STRESS_TEST
   if (g->accent_due && g->phase_ms >= g->accent_due) {
     g->accent_due = 0;
     if (ln_active(g) + 3 <= g->bullet_limit) {
@@ -639,6 +662,10 @@ static void tick(lunaria_t *g, uint8_t buttons) {
         b->oy = g->boss_y;
         b->angle = (uint16_t)(aim + ((int32_t)j - 1) * 1400);
         b->vx = 96 * LN_Q * 16 / 1000;
+#if PIXELFORGE
+        b->ux = (int16_t)mul14(b->vx, ln_cos(b->angle));
+        b->uy = (int16_t)mul14(b->vx, ln_sin(b->angle));
+#endif
         b->life = 1000;
         b->shape = 1;
         b->color = 2;
@@ -647,6 +674,7 @@ static void tick(lunaria_t *g, uint8_t buttons) {
       g->flash_ms = 128;
     }
   }
+#endif
   for (i = 0; i < LN_LASERS; i++) {
     ln_laser_t *l = &g->lasers[i];
     if (l->active) {
@@ -673,6 +701,15 @@ static void tick(lunaria_t *g, uint8_t buttons) {
       }
     }
   }
+  {
+    uint32_t boss_clock=g->sim_ms;
+#if PIXELFORGE
+    uint32_t frozen=0,j;
+    for(j=0;j<LN_LASERS;j++) frozen |= g->lasers[j].active;
+    if(frozen) g->boss_frozen_ms+=16;
+    boss_clock-=g->boss_frozen_ms;
+    if(!frozen) {
+#endif
   if (LN_STRESS_TEST) {
     g->boss_x = 320;
     g->boss_y = 128;
@@ -680,8 +717,12 @@ static void tick(lunaria_t *g, uint8_t buttons) {
     g->boss_x = 320;
     g->boss_y = g->phase == 3 ? 184 : 193;
   } else {
-    g->boss_x = (int16_t)(320 + mul14(28, ln_sin((uint16_t)(g->sim_ms * 7u))));
-    g->boss_y = (int16_t)(128 + mul14(7, ln_sin((uint16_t)(g->sim_ms * 9u))));
+    g->boss_x = (int16_t)(320 + mul14(28, ln_sin((uint16_t)(boss_clock * 7u))));
+    g->boss_y = (int16_t)(128 + mul14(7, ln_sin((uint16_t)(boss_clock * 9u))));
+  }
+#if PIXELFORGE
+    }
+#endif
   }
   move_player(g, buttons);
   if (g->hurt_ticks)
@@ -690,12 +731,10 @@ static void tick(lunaria_t *g, uint8_t buttons) {
   i = 0;
   while (i < g->stress_active) {
     ln_bullet_t *b = &g->bullets[i];
-    move_bullet(g, b);
-    if (!b->active) {
+    if (!move_bullet(b)) {
       /* Remove in O(1). Process the swapped bullet exactly once this tick. */
       g->stress_active--;
       *b = g->bullets[g->stress_active];
-      g->bullets[g->stress_active].active = 0;
     } else
       i++;
   }
@@ -705,12 +744,20 @@ static void tick(lunaria_t *g, uint8_t buttons) {
       ln_bullet_t *b = &g->bullets[i];
       int32_t dx, dy;
       move_bullet(g, b);
-      if (!b->active)
+      if (!b->active) {
+#if PIXELFORGE
+        g->active_count--;
+#endif
         continue;
+      }
       dx = (b->x - g->player_x) / LN_Q;
       dy = (b->y - g->player_y) / LN_Q;
-      if (!g->hurt_ticks && !g->invincible && dx * dx + dy * dy < 30) {
+      if (!g->hurt_ticks && !g->invincible && dx * dx + dy * dy <
+          ((PIXELFORGE && (b->shape == 0 || b->shape == 2 || b->shape == 4)) ? 20 : 30)) {
         b->active = 0;
+#if PIXELFORGE
+        g->active_count--;
+#endif
         g->lives--;
         g->hurt_ticks = 100;
         effect(g, (int16_t)(g->player_x / LN_Q), (int16_t)(g->player_y / LN_Q),
@@ -725,9 +772,10 @@ static void tick(lunaria_t *g, uint8_t buttons) {
       }
     }
 #endif
-  if (LN_STRESS_TEST) {
-    emit(g);
-  } else if (g->phase_ms >= g->next_emit_ms) {
+#if LN_STRESS_TEST
+  emit(g);
+#else
+  if (g->phase_ms >= g->next_emit_ms) {
     uint32_t interval = intervals[g->phase];
     if (g->bullet_limit < LN_DEFAULT_LIMIT)
       interval = interval * LN_DEFAULT_LIMIT / g->bullet_limit;
@@ -740,6 +788,7 @@ static void tick(lunaria_t *g, uint8_t buttons) {
     } else
       g->next_emit_ms = g->phase_ms + 64u;
   }
+#endif
   for (i = 0; i < LN_SHOTS; i++)
     if (g->shots[i].active) {
       ln_shot_t *s = &g->shots[i];

@@ -58,19 +58,28 @@ localparam [63:0] FRAME_BYTES = 64'd1 * FRAME_STRIDE * FRAME_HEIGHT;
 
 reg [4:0] state;
 reg [127:0] previous_source;
-// v12: 128 direct-mapped 64-byte source lines (8 KiB), immutable sealed atlas.
+// v13: 128 direct-mapped 64-byte source lines (8 KiB), immutable sealed atlas.
+// Each 16-byte beat has a validity bit: narrow 8/12-pixel tiles fill on their
+// own, without requiring a previous 16-pixel draw of the same source line.
 // Hash row bits as well as column bits to avoid stride-2560 conflict chains.
 reg [127:0] line_cache [0:511];
 reg [25:0] line_tags [0:127];
-reg [127:0] line_valid;
+reg [511:0] line_valid;
 reg [127:0] line_data;
 wire [6:0] line_slot = src_cursor[12:6] ^ src_cursor[19:13];
 wire [8:0] planned_reads = segment_beats - ((pixel_shift != 0 && final_segment) ? 1 : 0);
 wire line_eligible = PIXEL_X_ENABLE && SPRITE_CACHE_ENABLE && source_stride == 2560 &&
     src_cursor >= 32'h01384000 && src_cursor < 32'h014b0000 &&
     planned_reads != 0 && planned_reads <= 4-src_cursor[5:4];
-wire line_hit = line_eligible && line_valid[line_slot] && line_tags[line_slot] == src_cursor[31:6];
+wire [3:0] line_valid_beats = line_valid[{line_slot,2'b00} +: 4];
+wire line_tag_match = (|line_valid_beats) && line_tags[line_slot] == src_cursor[31:6];
+wire [3:0] requested_beats = planned_reads == 4 ? 4'b1111 :
+    planned_reads == 3 ? 4'b0111 : planned_reads == 2 ? 4'b0011 : 4'b0001;
+wire [3:0] line_request_mask = requested_beats << src_cursor[5:4];
+wire line_hit = line_eligible && line_tag_match &&
+    (line_valid_beats & line_request_mask) == line_request_mask;
 reg line_fill;
+reg [3:0] line_fill_mask;
 wire [127:0] source_payload = state == CACHE_DATA ? line_data : rdata;
 wire source_received = state == CACHE_DATA || (state == RD_DATA && rvalid);
 
@@ -183,10 +192,11 @@ wire [127:0] store_data = state == PAD_SOURCE ? previous_source >> ((4-pixel_shi
 // No reset on the storage array. Only entries received by a complete read
 // burst can be used. WR_LOAD below provides a synchronous memory read cycle.
 always @(posedge clk) begin
-    if (state == CACHE_LOAD)
-        line_data <= line_cache[{line_slot,2'b00} + src_cursor[5:4] + beat_index];
+    // One synchronous BRAM prefetch, then one cached source beat each clock.
+    if (state == CACHE_LOAD || (state == CACHE_DATA && !source_last))
+        line_data <= line_cache[{line_slot,2'b00} + src_cursor[5:4] + beat_index + (state == CACHE_DATA)];
     if (state == RD_DATA && rvalid && line_fill)
-        line_cache[{line_slot,2'b00} + beat_index] <= rdata;
+        line_cache[{line_slot,2'b00} + src_cursor[5:4] + beat_index] <= rdata;
     if (rst_n && (source_store || mixed_store || state == PAD_SOURCE))
         beat_mem[store_index] <= store_data;
     if (rst_n && state == BG_DATA && rvalid && rready)
@@ -208,7 +218,7 @@ end
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        state <= IDLE; previous_source <= 0; line_valid <= 0; line_fill <= 0;
+        state <= IDLE; previous_source <= 0; line_valid <= 0; line_fill <= 0; line_fill_mask <= 0;
         done <= 0; error_code <= 0; command_count <= 0;
         saved_back_base<=0;saved_alpha<=0;
         source <= 0; source_stride <= 0; x <= 0; y <= 0;
@@ -276,9 +286,13 @@ always @(posedge clk or negedge rst_n) begin
             end else begin
                 burst_beats <= segment_beats[8:0]; beat_index <= 0;
                 segment_read_error <= 0;
-                line_fill <= line_eligible && !line_hit && src_cursor[5:4] == 0 && planned_reads == 4;
-                if (line_eligible && !line_hit && src_cursor[5:4] == 0 && planned_reads == 4)
-                    line_valid[line_slot] <= 0;
+                line_fill <= line_eligible && !line_hit;
+                if (line_eligible && !line_hit) begin
+                    // Commit valid beats only after the complete successful R
+                    // burst. A failed fill cannot expose old or partial data.
+                    line_fill_mask <= (line_tag_match ? line_valid_beats : 4'b0) | line_request_mask;
+                    line_valid[{line_slot,2'b00} +: 4] <= 0;
+                end
                 cache_row <= cache_address_row;
                 cache_offset <= src_cursor[5:4];
                 cache_use <= cache_eligible && sprite_cache_valid[cache_address_row];
@@ -311,7 +325,7 @@ always @(posedge clk or negedge rst_n) begin
                         done <= 1; state <= IDLE;
                     end else begin
                         if (state == RD_DATA && line_fill) begin
-                            line_valid[line_slot] <= 1;
+                            line_valid[{line_slot,2'b00} +: 4] <= line_fill_mask;
                             line_tags[line_slot] <= src_cursor[31:6];
                         end
                         if (SPRITE_CACHE_ENABLE && cache_fill && state == RD_DATA)
@@ -320,7 +334,8 @@ always @(posedge clk or negedge rst_n) begin
                     end
                 end else begin
                     beat_index <= beat_index + 1'b1;
-                    if (state == CACHE_DATA) state <= CACHE_LOAD;
+                    // CACHE_DATA pipelines the next BRAM read alongside this
+                    // beat's store, so no per-beat CACHE_LOAD bubble is needed.
                 end
             end
         end

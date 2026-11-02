@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "format": "little-endian ARGB8888",
+  "assets": {
+    "background": {
+      "file": "background.argb",
+      "bytes": 1228800,
+      "width": 640,
+      "height": 480,
+      "fnv_words": 3362543217,
+      "sha256": "6b8985a5164c4f9b85ad61d709eba4ded3553cc95cc985b05606c014e98e36a6"
+    },
+    "atlas": {
+      "file": "atlas.argb",
+      "bytes": 1228800,
+      "width": 640,
+      "height": 480,
+      "fnv_words": 403315960,
+      "sha256": "01316cfd9ef7d995e9b0f4b1f70a522306633be6b694ce7f7991addcda8035b6"
+    }
+  },
+  "sprite_window": {
+    "base": 20463616,
+    "stride": 2560,
+    "bytes": 1228800
+  },
+  "render": {
+    "x": 640,
+    "y": 300,
+    "width": 640,
+    "height": 480
+  },
+  "bullet_size": 16,
+  "board_tested": false,
+  "art_source": "PixelForge / 像素熔炉; luminous round bullets and laser"
+}

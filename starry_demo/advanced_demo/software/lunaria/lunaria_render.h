@@ -3,6 +3,8 @@
 #include "lunaria.h"
 #define LN_SPRITE_BASE UINT32_C(0x01384000)
 #define LN_BACKGROUND_BASE UINT32_C(0x02000000)
+/* Software-only repeat descriptor; first command always supplies full Alpha state. */
+#define LN_COMMAND_REPEAT_ALPHA 0x103u
 #define LN_VIEW_X 640u
 #define LN_VIEW_Y 300u
 typedef struct {

@@ -13,7 +13,7 @@ parser.add_argument('--toolchain-prefix',type=Path,
                     help='Optional complete GNU cross-tool prefix, ending in a hyphen; default uses the formal IDE')
 parser.add_argument('--output', type=Path)
 parser.add_argument('--program', choices=('apb','m1a','m1b','m2','game','lunaria','keyboard-test','flash-probe','flash-maint'), default='apb')
-parser.add_argument('--opt', choices=('Og','O2'), default='Og')
+parser.add_argument('--opt', choices=('Og','O2','Os'), default='Og')
 parser.add_argument('--define', action='append', default=[], metavar='NAME=VALUE',
                     help='Optional C macro override, e.g. TEST_RECT_X=320; tests use a temporary output')
 args = parser.parse_args()
@@ -65,6 +65,8 @@ flags = ['-march=rv32im_zicsr_zifencei', '-mabi=ilp32', '-'+args.opt, '-g3', '-f
 for define in args.define:
     assert re.fullmatch(r'[A-Z][A-Z0-9_]*=[A-Za-z0-9_xX()+-]+',define), define
     flags.append('-D'+define)
+if 'PIXELFORGE=1' in args.define:
+    flags += ['-flto']
 if args.program == 'm1b':
     assert not any(d.startswith('DEMO_MODE=') for d in args.define)
     flags.append('-DDEMO_MODE=5')
@@ -108,6 +110,8 @@ keep = ('g_game_required_caps', 'g_game_alpha_hardware_compatible',
         'g_game_scale2_compatible', 'g_game_showcase_available',
         'g_lunaria_available', 'g_lunaria_asset_hashes', 'g_lunaria_required_hardware',
         'g_game_build_config') if args.program == 'lunaria' else ()
+if args.program == 'lunaria' and 'PIXELFORGE=1' in args.define:
+    keep += ('g_pixelforge_available',)
 if args.program == 'lunaria' and 'LN_STRESS_TEST=1' in args.define:
     keep += ('g_lunaria_stress_test',)
 run([gcc, *flags, '-nostdlib', '-nostartfiles', '-Wl,--gc-sections', '-T', linker,

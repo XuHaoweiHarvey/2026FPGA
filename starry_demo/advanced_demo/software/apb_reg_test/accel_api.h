@@ -4,6 +4,9 @@
 #ifndef GAME_ALLOW_SCALE2
 #define GAME_ALLOW_SCALE2 0
 #endif
+#ifndef LUNARIA_HARDWARE_VERSION
+#define LUNARIA_HARDWARE_VERSION UINT32_C(0x000c0000)
+#endif
 
 /* Polling-only API. CPU accesses only APB; src_addr is a DDR address for DMA.
  * Returns 0 on success, hardware ERROR_CODE or an E0xx/E1xx software error otherwise.
@@ -87,17 +90,17 @@ static inline uint32_t accel_init(void) {
     accel_cached_descriptor_valid=0u;
     version=accel_read(ACCEL_VERSION);
 #ifdef LUNARIA_PIXEL_X
-    if(version!=UINT32_C(0x000c0000)) return UINT32_C(0xE000);
+    if(version!=LUNARIA_HARDWARE_VERSION) return UINT32_C(0xE000);
 #endif
 #if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
     if((version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000) &&
-        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) || version==UINT32_C(0x000c0000)))) ||
+        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) || version==LUNARIA_HARDWARE_VERSION))) ||
        !(accel_read(ACCEL_CAPABILITIES)&ACCEL_CAP_DISPLAY_WINDOW)) return UINT32_C(0xE000);
 #endif
     if(accel_read(ACCEL_ID)!=ACCEL_ID_EXPECTED ||
 #if defined(GAME_DISPLAY_WINDOW) && GAME_DISPLAY_WINDOW
        (version!=UINT32_C(0x00080000) && version!=UINT32_C(0x00090000) && version!=UINT32_C(0x000a0000) &&
-        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) || version==UINT32_C(0x000c0000))))) return UINT32_C(0xE000);
+        !(GAME_ALLOW_SCALE2 && (version==UINT32_C(0x000b0000) || version==LUNARIA_HARDWARE_VERSION)))) return UINT32_C(0xE000);
 #else
        (version!=ACCEL_VERSION_EXPECTED && version!=UINT32_C(0x00070000))) return UINT32_C(0xE000);
 #endif
@@ -110,7 +113,7 @@ static inline uint32_t accel_init(void) {
     if(i==ACCEL_POLL_LIMIT) return UINT32_C(0xE001);
     caps=accel_read(ACCEL_CAPABILITIES);
 #if GAME_ALLOW_SCALE2
-    if(((version==UINT32_C(0x000b0000) || version==UINT32_C(0x000c0000))) != !!(caps&ACCEL_CAP_DISPLAY_SCALE2)) return UINT32_C(0xE003);
+    if(((version==UINT32_C(0x000b0000) || version==LUNARIA_HARDWARE_VERSION)) != !!(caps&ACCEL_CAP_DISPLAY_SCALE2)) return UINT32_C(0xE003);
     caps &= ~ACCEL_CAP_DISPLAY_SCALE2;
 #endif
     if(accel_read(ACCEL_WIDTH)!=1920 || accel_read(ACCEL_HEIGHT)!=1080 ||
@@ -265,6 +268,29 @@ static inline uint32_t accel_submit(uint32_t op,uint32_t src_addr,uint32_t src_s
     }
     return UINT32_C(0xE103);
 }
+#if LN_STRESS_TEST || PIXELFORGE
+/* Only within a batch, immediately after a full Alpha descriptor. The renderer
+ * guarantees identical source/stride/size/alpha until the next full command. */
+static inline uint32_t accel_submit_repeat_xy(uint32_t x,uint32_t y) {
+    uint32_t i,e;
+    volatile uint32_t *regs=(volatile uint32_t *)ACCEL_BASE;
+    if(!accel_command_batch_active || !accel_cached_descriptor_valid ||
+       accel_cached_command_op!=ACCEL_OP_ALPHA_BLEND) return 0xE103u;
+    for(i=0;i<ACCEL_POLL_LIMIT;++i) {
+        if(accel_read(ACCEL_STATUS)&ACCEL_COMMAND_QUEUE_READY) break;
+        e=accel_error(); if(e) return e;
+    }
+    if(i==ACCEL_POLL_LIMIT) return 0xE102u;
+    __asm__ volatile ("fence iorw,iorw" ::: "memory");
+    if(accel_cached_rect_x!=x) regs[ACCEL_RECT_X/4u]=x;
+    if(accel_cached_rect_y!=y) regs[ACCEL_RECT_Y/4u]=y;
+    regs[ACCEL_CONTROL/4u]=1u;
+    __asm__ volatile ("fence iorw,iorw" ::: "memory");
+    accel_cached_rect_x=x;accel_cached_rect_y=y;
+    ++accel_batch_command_count;
+    return 0;
+}
+#endif
 static inline uint32_t accel_fill_rect(uint32_t x,uint32_t y,uint32_t width,uint32_t height,uint32_t color) {
     return accel_submit(ACCEL_OP_FILL,0,0,x,y,width,height,color);
 }

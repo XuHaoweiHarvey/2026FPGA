@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "elf_sha256": "e6e9b6a256d7cddbb616828daf56eb20c8a7793f40c9d5485e8f8f4f686a7c34",
+  "bit_sha256": "61d2c1a5d785ba0d6a4cf4d390cfa3a905616255d70b484081762f237ff4f9b1",
+  "differential_ticks": 57600,
+  "laser_freeze_and_collision": true,
+  "health_bar_transitions": true,
+  "laser_render": {
+    "angles": 256,
+    "old_pixels": 5823096,
+    "new_pixels": 2274528,
+    "rtl_cycles": {
+      "old-0-cold": 66520,
+      "old-0-warm": 65733,
+      "old-32-cold": 72416,
+      "old-32-warm": 72392,
+      "old-48-cold": 54478,
+      "old-48-warm": 54493,
+      "old-64-cold": 48350,
+      "old-64-warm": 48360,
+      "new-0-cold": 33580,
+      "new-0-warm": 33007,
+      "new-32-cold": 25172,
+      "new-32-warm": 25169,
+      "new-48-cold": 19166,
+      "new-48-warm": 18988,
+      "new-64-cold": 16079,
+      "new-64-warm": 16077
+    },
+    "rtl_board_equivalent": false
+  },
+  "capacity_ticks": 153600,
+  "capacity": 1024,
+  "bullet_size": 16
+}

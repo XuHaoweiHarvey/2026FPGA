@@ -5,13 +5,22 @@
 #include "../interactive_demo/game_runtime.h"
 #include "../interactive_demo/uart_keyboard_input.h"
 #include "lunaria_asset_ids.h"
-#if LN_STRESS_TEST && defined(LN_STRESS_ATLAS_HASH)
+#if (LN_STRESS_TEST || PIXELFORGE) && defined(LN_STRESS_ATLAS_HASH)
 #undef LN_ATLAS_HASH
 #define LN_ATLAS_HASH LN_STRESS_ATLAS_HASH
 #endif
 #include "lunaria_render.h"
 #include "lunaria_upload.h"
 #include <stdint.h>
+#if PIXELFORGE
+#include <stddef.h>
+__attribute__((used, externally_visible))
+void *memcpy(void *destination,const void *source,size_t count) {
+  unsigned char *d=destination;const unsigned char *s=source;
+  while(count--) *d++=*s++;
+  return destination;
+}
+#endif
 #define FENCE() __asm__ volatile("fence iorw,iorw" ::: "memory")
 volatile game_debug_control_t g_debug_control;
 volatile game_debug_status_t g_debug_status, g_debug_first_fault;
@@ -25,10 +34,13 @@ const volatile uint32_t g_game_alpha_hardware_compatible = 0x3000;
 const volatile uint32_t g_game_scale2_compatible = 0x4000;
 const volatile uint32_t g_game_showcase_available = 1;
 const volatile uint32_t g_lunaria_available = 1;
+#if PIXELFORGE
+const volatile uint32_t g_pixelforge_available = 1;
+#endif
 #if LN_STRESS_TEST
 const volatile uint32_t g_lunaria_stress_test = 1;
 #endif
-const volatile uint32_t g_lunaria_required_hardware = 0x000c0000;
+const volatile uint32_t g_lunaria_required_hardware = LUNARIA_HARDWARE_VERSION;
 const volatile uint32_t g_lunaria_asset_hashes[2] = {LN_BACKGROUND_HASH,
                                                      LN_ATLAS_HASH};
 const volatile game_build_config_t g_game_build_config = {
@@ -293,6 +305,17 @@ static void upload(void) {
 }
 static uint32_t submit(void *context, const ln_command_t *c) {
   (void)context;
+#if PIXELFORGE
+  if (c->op == 3 && accel_cached_descriptor_valid &&
+      accel_cached_command_op == 3 && accel_cached_source_addr == c->src &&
+      accel_cached_source_stride == c->stride && accel_cached_rect_width == c->w &&
+      accel_cached_rect_height == c->h && accel_cached_rect_color == c->color)
+    return accel_submit_repeat_xy(c->x,c->y);
+#endif
+#if LN_STRESS_TEST
+  if (c->op == LN_COMMAND_REPEAT_ALPHA)
+    return accel_submit_repeat_xy(c->x, c->y);
+#endif
   return accel_submit(c->op, c->src, c->stride, c->x, c->y, c->w, c->h,
                       c->color);
 }
@@ -439,6 +462,10 @@ int main(void) {
     g_game_presentation.boss_phase = game.phase + 1u;
     g_game_presentation.boss_moving =
         game.state == LN_FIGHT && (game.phase < 3u || game.phase > 5u);
+#if PIXELFORGE
+    for (i=0;i<LN_LASERS;i++)
+      if(game.lasers[i].active) g_game_presentation.boss_moving=0;
+#endif
     if (g_debug_status.measurement_state != 2u &&
         (g_debug_status.measurement_state != 1u || measure_first_boundary)) {
       if (previous_boundary) {

@@ -13,17 +13,20 @@ STATES = ('标题画面','Boss 入场','战斗','阶段预警','击毁演出','V
 
 
 class LunariaWindow(DebugWindow):
-    def __init__(self, root, elf=DEFAULT_ELF, assets=DEFAULT_ASSETS, stress=False):
+    def __init__(self, root, elf=DEFAULT_ELF, assets=DEFAULT_ASSETS, stress=False, pixelforge=False):
+        self.pixelforge = pixelforge
         self.stress = stress
-        self.maximum_bullets = 832 if stress else 640
+        self.maximum_bullets = 1024 if pixelforge else 2048 if stress else 640
         def factory(elf, ide):
             bridge = LunariaBridge(elf, ide, assets,
                                  lambda message: self.events.put(('progress',message)))
+            if self.pixelforge and 'g_pixelforge_available' not in bridge.image.symbols:
+                raise ValueError('PixelForge requires the matching PixelForge ELF')
             if self.stress and bridge.image.symbol_u32('g_lunaria_stress_test') != 1:
                 raise ValueError('压力测试入口需要专用 stress ELF')
             return bridge
         super().__init__(root,elf,bridge_factory=factory)
-        root.title('LUNARIA 压力测试 — v12' if stress else 'LUNARIA 星海梦境 — v10 / v11')
+        root.title('PixelForge' if pixelforge else 'LUNARIA 压力测试 — v12' if stress else 'LUNARIA 星海梦境 — v10 / v11')
         if stress: self.invincible.set(True)
         self.alpha.set('255'); self.cap.set('1'); self.delay.set('0')
         self.bullet_limit = tk.StringVar(value='256')
@@ -39,7 +42,7 @@ class LunariaWindow(DebugWindow):
                         elif isinstance(widget,ttk.Button) and widget.cget('text') == '演示战役':
                             widget.configure(text='重启压力测试' if stress else '星海战役')
                 elif title.startswith('运行参数'):
-                    frame.configure(text='LUNARIA 参数：修改后点击应用')
+                    frame.configure(text=('PixelForge' if pixelforge else 'LUNARIA')+' 参数：修改后点击应用')
                     if stress:
                         for item in frame.winfo_children():
                             if isinstance(item,ttk.Checkbutton) and item.cget('text') == '无敌调试':
@@ -50,7 +53,7 @@ class LunariaWindow(DebugWindow):
                             widget.grid_remove()
                     ttk.Label(frame,text=f'敌弹上限 64–{self.maximum_bullets}').grid(row=0,column=0)
                     ttk.Combobox(frame,textvariable=self.bullet_limit,
-                                 values=((64,128,256,384,512,610,640,704,768,832) if stress else (64,128,256,384,512,640)),width=16).grid(row=1,column=0,padx=5)
+                                 values=((64,128,256,384,512,640,768,896,1024) if pixelforge else (64,128,256,512,610,640,832,1000,1280,1408,1536,1664,1792,1920,2048) if stress else (64,128,256,384,512,640)),width=16).grid(row=1,column=0,padx=5)
                     ttk.Checkbutton(frame,text='扩张时旋转花瓣 / 星形',variable=self.spin_patterns,
                                     state='disabled' if stress else 'normal').grid(
                         row=1,column=1,columnspan=2,padx=5)
@@ -60,6 +63,11 @@ class LunariaWindow(DebugWindow):
         self.notice.set('素材通过 4 KiB 邮箱上传，首次约 2.46 MB。更换已封存素材须先重新配置现有 bit。')
         self.summary.set('先结束 IDE Debug，点击连接，然后点击加载；窗口不会自动连接板卡。')
         self.log('素材清单：'+str(Path(assets).resolve()))
+
+    def log(self,message,*args,**kwargs):
+        if self.pixelforge:
+            message=message.replace('LUNARIA','PixelForge').replace('lunaria','PixelForge')
+        return super().log(message,*args,**kwargs)
 
     def apply(self):
         try:
@@ -128,9 +136,10 @@ def main():
     parser.add_argument('--elf',type=Path,default=DEFAULT_ELF)
     parser.add_argument('--assets',type=Path,default=DEFAULT_ASSETS)
     parser.add_argument('--stress',action='store_true',help='Use the dedicated invincible stress firmware')
+    parser.add_argument('--pixelforge',action='store_true')
     args = parser.parse_args()
     root = tk.Tk()
-    LunariaWindow(root,args.elf,args.assets,args.stress)
+    LunariaWindow(root,args.elf,args.assets,args.stress,args.pixelforge)
     root.mainloop()
 
 

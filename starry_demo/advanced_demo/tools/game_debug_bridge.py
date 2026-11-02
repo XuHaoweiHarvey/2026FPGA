@@ -331,9 +331,9 @@ class DebugBridge:
             hardware = self.read_words(APB, 2)
             status["hardware_id"], status["hardware_version"] = hardware
             status["hardware_optimizations"] = {
-                "alpha_stream": hardware[1] in (0x00090000, 0x000A0000, 0x000B0000, 0x000C0000),
-                "enemy_bullet_source_cache": hardware[1] in (0x000A0000, 0x000B0000, 0x000C0000),
-                "display_scale2": hardware[1] in (0x000B0000, 0x000C0000),
+                "alpha_stream": hardware[1] in (0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000),
+                "enemy_bullet_source_cache": hardware[1] in (0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000),
+                "display_scale2": hardware[1] in (0x000B0000, 0x000C0000, 0x000D0000),
             }
             status["cpu_was_running"] = running
             status["jtag_halts"] = self.halts
@@ -423,21 +423,21 @@ class DebugBridge:
             retry_after_running = False
             with self.halted() as was_running:
                 hardware = self.read_words(APB, 2)
-                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000, 0x00080000, 0x00090000, 0x000A0000, 0x000B0000, 0x000C0000):
-                    raise RuntimeError("硬件 ID/版本不匹配，需要配套 advanced v6/v7/v8/v9/v10/v11 位流")
+                if hardware[0] != 0x4143434C or hardware[1] not in (0x00060000, 0x00070000, 0x00080000, 0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000):
+                    raise RuntimeError("硬件 ID/版本不匹配，需要配套 advanced v6–v13 配套位流")
                 required = (self.image.symbol_u32("g_game_required_caps")
                             if "g_game_required_caps" in self.image.symbols else 0)
-                if bool(self.read_words(APB+0x40, 1)[0] & 0x4000) != (hardware[1] in (0x000B0000, 0x000C0000)):
+                if bool(self.read_words(APB+0x40, 1)[0] & 0x4000) != (hardware[1] in (0x000B0000, 0x000C0000, 0x000D0000)):
                     raise RuntimeError("硬件版本与两倍显示能力位不一致，停止加载。")
-                if bool(required & 0x800) != (hardware[1] in (0x00080000, 0x00090000, 0x000A0000, 0x000B0000, 0x000C0000)):
+                if bool(required & 0x800) != (hardware[1] in (0x00080000, 0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000)):
                     raise RuntimeError("窗口读取 v8 bit 与专用窗口 ELF 必须配套；全屏/旧居中 ELF 使用原 v7 bit。")
-                if hardware[1] in (0x000B0000, 0x000C0000):
+                if hardware[1] in (0x000B0000, 0x000C0000, 0x000D0000):
                     if ("g_game_scale2_compatible" not in self.image.symbols or
                             self.image.symbol_u32("g_game_scale2_compatible") != 0x4000):
                         raise RuntimeError("v11 两倍显示需要兼容的新展示/压力 ELF；旧 ELF 使用原 v10 bit。")
                     if not self.read_words(APB+0x40, 1)[0] & 0x4000:
                         raise RuntimeError("v11 缺少两倍显示能力，停止加载。")
-                if hardware[1] in (0x00090000, 0x000A0000, 0x000B0000, 0x000C0000):
+                if hardware[1] in (0x00090000, 0x000A0000, 0x000B0000, 0x000C0000, 0x000D0000):
                     if ("g_game_alpha_hardware_compatible" not in self.image.symbols or
                             self.image.symbol_u32("g_game_alpha_hardware_compatible") != 0x3000):
                         raise RuntimeError("v9/v10 硬件需加载修正 SPR 后的新优化 ELF；旧窗口 ELF 请配原 v8 bit。")

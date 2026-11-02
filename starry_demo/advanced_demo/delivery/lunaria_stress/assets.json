@@ -15,8 +15,8 @@
       "bytes": 1228800,
       "width": 640,
       "height": 480,
-      "fnv_words": 1958932327,
-      "sha256": "631630b8569c4dbac0b51bac68651ab6f4d324487bf0e9d618ea74533d06ecbd"
+      "fnv_words": 3317220742,
+      "sha256": "f45f9d47cf67edf32aabb221b9b3c75c8d6511195d937109236bb5c549940dcd"
     }
   },
   "sprite_window": {
@@ -30,13 +30,13 @@
     "width": 640,
     "height": 480
   },
-  "bullet_size": 12,
+  "bullet_size": 8,
   "board_tested": false,
   "art_source": "Original procedural LUNARIA preview",
   "stress_bullet_rect": [
     448,
     64,
-    12,
-    12
+    8,
+    8
   ]
 }

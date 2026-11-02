@@ -1,0 +1,24 @@
+{
+  "name": "PixelForge",
+  "maximum_bullets": 1024,
+  "bullet_texture_size": 16,
+  "board_tested": false,
+  "stable_60_fps_measured": false,
+  "stress_reference": {
+    "bullets": 1855,
+    "fps": 60,
+    "bullet_size": 8,
+    "applies_to_game": false
+  },
+  "artifacts": {
+    "assets.json": "67e49de9b860f4ef5cc9e5949e66ca6175c8b36a5df046adaa4a581a7d57cf2d",
+    "atlas.argb": "01316cfd9ef7d995e9b0f4b1f70a522306633be6b694ce7f7991addcda8035b6",
+    "background.argb": "6b8985a5164c4f9b85ad61d709eba4ded3553cc95cc985b05606c014e98e36a6",
+    "build-info.json": "232e077846912a298f9c59fb41b78822d0feb3b6be532f03153c02a7f852ac00",
+    "checks.json": "8008b549560741d89e8a33afcfbcf421f17b4af5f5c548d311ed5012f6e9eb50",
+    "PixelForge.elf": "e6e9b6a256d7cddbb616828daf56eb20c8a7793f40c9d5485e8f8f4f686a7c34",
+    "PixelForge.map": "72de8697ef0a2ff4e4022ae9f45b078f07a5c3f497c37428c15a425a955e8811",
+    "README.md": "ae44e722f0c799cfd06b2359c731d3c58713e865aceeeccb0ae50e2eed25bb17",
+    "ti60f225_oob.bit": "61d2c1a5d785ba0d6a4cf4d390cfa3a905616255d70b484081762f237ff4f9b1"
+  }
+}

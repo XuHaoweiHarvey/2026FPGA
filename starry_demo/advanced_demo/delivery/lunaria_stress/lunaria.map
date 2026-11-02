@@ -1,56 +1,59 @@
 Archive member included to satisfy reference by file (symbol)
 
 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
-                              C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o (__udivdi3)
+                              C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o (__udivdi3)
 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
                               D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o) (__clz_tab)
 
 Discarded input sections
 
- .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
- .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
- .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+ .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
+ .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
+ .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .text.ln_aim   0x00000000       0xb4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
  .text.ln_active
-                0x00000000       0x10 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_macro   0x00000000      0x7d2 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_macro   0x00000000      0x34e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_macro   0x00000000       0x5e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_macro   0x00000000      0x7d2 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_macro   0x00000000      0x34e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_macro   0x00000000       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_macro   0x00000000       0x5e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_macro   0x00000000       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0x00000000       0x10 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .rodata.ln_atan
+                0x00000000      0x102 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_macro   0x00000000      0x7d8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_macro   0x00000000      0x34e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_macro   0x00000000       0x5e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .group         0x00000000        0xc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .text          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .data          0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .bss           0x00000000        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_macro   0x00000000      0x7d8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_macro   0x00000000      0x34e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_macro   0x00000000       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_macro   0x00000000       0x5e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_macro   0x00000000       0x22 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .text          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
  .data          0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
  .bss           0x00000000        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
@@ -67,20 +70,20 @@ ram              0xf9000000         0x00010000         axwl!r
 
 Linker script and memory map
 
-LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
-LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
+LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+LOAD C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
 LOAD D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a
                 0x00002000                        __stack_size = DEFINED (__stack_size)?__stack_size:0x2000
 
 .init           0xf9000000       0x6c
  *(SORT_NONE(.init))
- .init          0xf9000000       0x6c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
+ .init          0xf9000000       0x6c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
                 0xf9000000                _start
                 0xf9000068                _init
 
-.text           0xf900006c     0x55f4
+.text           0xf900006c     0x5458
  *(.text.Proc_1)
  *(.text.Proc_2)
  *(.text.Proc_3)
@@ -98,93 +101,91 @@ LOAD D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf
  *(.text.unlikely .text.unlikely.*)
  *(.text.startup .text.startup.*)
  .text.startup.main
-                0xf900006c     0x1bdc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf900006c     0x1bdc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
                 0xf900006c                main
  *(.text .text.*)
- .text.publish  0xf9001c48      0x390 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .text.fail     0xf9001fd8       0x7c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .text.health   0xf9002054       0xc8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+ .text.publish  0xf9001c48      0x390 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .text.fail     0xf9001fd8       0x7c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .text.health   0xf9002054       0xc8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .text.session_begin
-                0xf900211c       0x78 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf900211c       0x78 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .text.session_end
-                0xf9002194       0xac C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9002194       0xac C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .text.accel_submit
-                0xf9002240      0x3a4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .text.submit   0xf90025e4       0x28 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9002240      0x3a4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .text.submit   0xf90025e4      0x104 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .text.move_player
-                0xf900260c       0xd8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .text.ln_sin   0xf90026e4       0x58 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf90026e4                ln_sin
- .text.ln_cos   0xf900273c       0x68 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf900273c                ln_cos
+                0xf90026e8       0xd8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .text.ln_sin   0xf90027c0       0x58 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf90027c0                ln_sin
+ .text.ln_cos   0xf9002818       0x68 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002818                ln_cos
  .text.ln_emitter_angle
-                0xf90027a4       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf90027a4                ln_emitter_angle
- .text.ln_aim   0xf90027c4       0xb4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf90027c4                ln_aim
+                0xf9002880       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002880                ln_emitter_angle
  .text.ln_reset
-                0xf9002878       0x74 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002878                ln_reset
+                0xf90028a0       0x74 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf90028a0                ln_reset
  .text.ln_begin
-                0xf90028ec       0x84 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf90028ec                ln_begin
+                0xf9002914       0x84 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002914                ln_begin
  .text.ln_configure
-                0xf9002970       0xc0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002970                ln_configure
+                0xf9002998       0xa4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002998                ln_configure
  .text.ln_visible
-                0xf9002a30       0x10 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002a30                ln_visible
+                0xf9002a3c       0x10 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002a3c                ln_visible
  .text.ln_elements
-                0xf9002a40      0x130 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002a40                ln_elements
+                0xf9002a4c      0x130 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002a4c                ln_elements
  .text.ln_update_metrics
-                0xf9002b70       0x60 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002b70                ln_update_metrics
+                0xf9002b7c       0x60 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002b7c                ln_update_metrics
  .text.ln_boss_hp
-                0xf9002bd0       0x14 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002bd0                ln_boss_hp
- .text.ln_hit   0xf9002be4       0xb4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002be4                ln_hit
- .text.ln_step  0xf9002c98      0xe1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                0xf9002c98                ln_step
- .text.fill     0xf9003ab4       0x74 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .text.art      0xf9003b28       0xd0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .text.text     0xf9003bf8      0x154 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .text.value    0xf9003d4c       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .text.menu     0xf9003d98      0x488 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0xf9002bdc       0x14 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002bdc                ln_boss_hp
+ .text.ln_hit   0xf9002bf0       0xb4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002bf0                ln_hit
+ .text.ln_step  0xf9002ca4      0xc18 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                0xf9002ca4                ln_step
+ .text.fill     0xf90038bc       0x74 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .text.art      0xf9003930       0xd0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .text.text     0xf9003a00      0x154 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .text.value    0xf9003b54       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .text.menu     0xf9003ba0      0x488 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .text.sprite.part.0
-                0xf9004220      0x174 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0xf9004028      0x174 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .text.ln_render
-                0xf9004394      0xe1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
-                0xf9004394                ln_render
+                0xf900419c      0xe78 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+                0xf900419c                ln_render
  .text.__udivdi3
-                0xf90051b0      0x4b0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
-                0xf90051b0                __udivdi3
+                0xf9005014      0x4b0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                0xf9005014                __udivdi3
  *(.gnu.linkonce.t.*)
  *(.note.gnu.build-id)
 
-.rela.dyn       0xf9005660        0x0
- .rela.init     0xf9005660        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
+.rela.dyn       0xf90054c4        0x0
+ .rela.init     0xf90054c4        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
 
 .fini
  *(SORT_NONE(.fini))
                 [!provide]                        PROVIDE (__etext = .)
                 [!provide]                        PROVIDE (_etext = .)
                 [!provide]                        PROVIDE (etext = .)
-                0xf9005660                        . = ALIGN (0x4)
+                0xf90054c4                        . = ALIGN (0x4)
 
-.preinit_array  0xf9005660        0x0
+.preinit_array  0xf90054c4        0x0
                 [!provide]                        PROVIDE (__preinit_array_start = .)
  *(.preinit_array)
                 [!provide]                        PROVIDE (__preinit_array_end = .)
 
-.init_array     0xf9005660        0x0
+.init_array     0xf90054c4        0x0
                 [!provide]                        PROVIDE (__init_array_start = .)
  *(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*))
  *(.init_array EXCLUDE_FILE(*crtend?.o *crtend.o *crtbegin?.o *crtbegin.o) .ctors)
                 [!provide]                        PROVIDE (__init_array_end = .)
 
-.fini_array     0xf9005660        0x0
+.fini_array     0xf90054c4        0x0
                 [!provide]                        PROVIDE (__fini_array_start = .)
  *(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*))
  *(.fini_array EXCLUDE_FILE(*crtend?.o *crtend.o *crtbegin?.o *crtbegin.o) .dtors)
@@ -204,251 +205,247 @@ LOAD D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf
  *(SORT_BY_NAME(.dtors.*))
  *(.dtors)
 
-.lalign         0xf9005660        0x0
-                0xf9005660                        PROVIDE (_data_lma = .)
+.lalign         0xf90054c4        0x0
+                0xf90054c4                        PROVIDE (_data_lma = .)
 
-.dalign         0xf9005660        0x0
-                0xf9005660                        PROVIDE (_data = .)
+.dalign         0xf90054c4        0x0
+                0xf90054c4                        PROVIDE (_data = .)
 
-.data           0xf9005660      0x65e
+.data           0xf90054c4      0x55a
  *(.rdata)
  *(.rodata .rodata.*)
- .rodata.main   0xf9005660       0x2c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+ .rodata.main   0xf90054c4       0x2c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .rodata.g_game_build_config
-                0xf900568c       0x44 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900568c                g_game_build_config
- .rodata.ln_atan
-                0xf90056d0      0x102 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- *fill*         0xf90057d2        0x2 
+                0xf90054f0       0x44 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf90054f0                g_game_build_config
  .rodata.ln_sine
-                0xf90057d4      0x200 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+                0xf9005534      0x200 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
  .rodata.menu.str1.4
-                0xf90059d4      0x143 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0xf9005734      0x143 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
                                  0xd8 (size before relaxing)
  .rodata.ln_render.str1.4
-                0xf9005b17        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0xf9005877        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
                                  0x1f (size before relaxing)
  .rodata.str1.4
-                0xf9005b17        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0xf9005877        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
                                  0x4b (size before relaxing)
- *fill*         0xf9005b17        0x1 
- .rodata        0xf9005b18       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+ *fill*         0xf9005877        0x1 
+ .rodata        0xf9005878       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .rodata.__clz_tab
-                0xf9005b38      0x100 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
-                0xf9005b38                __clz_tab
+                0xf9005898      0x100 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+                0xf9005898                __clz_tab
  *(.gnu.linkonce.r.*)
  *(.data .data.*)
  .data.g_lunaria_settings
-                0xf9005c38       0x2c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005c38                g_lunaria_settings
+                0xf9005998       0x2c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf9005998                g_lunaria_settings
  .data.g_lunaria_metrics
-                0xf9005c64       0x24 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005c64                g_lunaria_metrics
+                0xf90059c4       0x24 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf90059c4                g_lunaria_metrics
  *(.gnu.linkonce.d.*)
-                0xf9005c88                        . = ALIGN (0x8)
- *fill*         0xf9005c88        0x0 
-                0xf9006478                        PROVIDE (__global_pointer$ = (. + 0x7f0))
+                0xf90059e8                        . = ALIGN (0x8)
+                0xf90061d8                        PROVIDE (__global_pointer$ = (. + 0x7f0))
  *(.sdata .sdata.*)
- .sdata.alpha   0xf9005c88        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+ .sdata.alpha   0xf90059e8        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  *(.gnu.linkonce.s.*)
-                0xf9005c90                        . = ALIGN (0x8)
- *fill*         0xf9005c8c        0x4 
+                0xf90059f0                        . = ALIGN (0x8)
+ *fill*         0xf90059ec        0x4 
  *(.srodata.cst16)
  *(.srodata.cst8)
  *(.srodata.cst4)
  *(.srodata.cst2)
  *(.srodata .srodata.*)
  .srodata.g_lunaria_asset_hashes
-                0xf9005c90        0x8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005c90                g_lunaria_asset_hashes
+                0xf90059f0        0x8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf90059f0                g_lunaria_asset_hashes
  .srodata.g_lunaria_required_hardware
-                0xf9005c98        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005c98                g_lunaria_required_hardware
+                0xf90059f8        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf90059f8                g_lunaria_required_hardware
  .srodata.g_lunaria_stress_test
-                0xf9005c9c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005c9c                g_lunaria_stress_test
+                0xf90059fc        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf90059fc                g_lunaria_stress_test
  .srodata.g_lunaria_available
-                0xf9005ca0        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005ca0                g_lunaria_available
+                0xf9005a00        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf9005a00                g_lunaria_available
  .srodata.g_game_showcase_available
-                0xf9005ca4        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005ca4                g_game_showcase_available
+                0xf9005a04        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf9005a04                g_game_showcase_available
  .srodata.g_game_scale2_compatible
-                0xf9005ca8        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005ca8                g_game_scale2_compatible
+                0xf9005a08        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf9005a08                g_game_scale2_compatible
  .srodata.g_game_alpha_hardware_compatible
-                0xf9005cac        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005cac                g_game_alpha_hardware_compatible
+                0xf9005a0c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf9005a0c                g_game_alpha_hardware_compatible
  .srodata.g_game_required_caps
-                0xf9005cb0        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005cb0                g_game_required_caps
-                0xf9005cbe                        . = (. + 0xa)
- *fill*         0xf9005cb4        0xa 
-                0xf9005cc0                        . = ALIGN (0x4)
-                0xf9005cc0                        PROVIDE (_edata = .)
+                0xf9005a10        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf9005a10                g_game_required_caps
+                0xf9005a1e                        . = (. + 0xa)
+ *fill*         0xf9005a14        0xa 
+                0xf9005a20                        . = ALIGN (0x4)
+                0xf9005a20                        PROVIDE (_edata = .)
                 [!provide]                        PROVIDE (edata = .)
                 [!provide]                        PROVIDE (_fbss = .)
-                0xf9005cc0                        PROVIDE (__bss_start = .)
+                0xf9005a20                        PROVIDE (__bss_start = .)
 
-.bss            0xf9005cc0     0x7028
+.bss            0xf9005a20     0x7528
  *(.sbss*)
  .sbss.measure_first_boundary
-                0xf9005cc0        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a20        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_window_frames
-                0xf9005cc4        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a24        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_window_ms
-                0xf9005cc8        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a28        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_missed
-                0xf9005ccc        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a2c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_underflow
-                0xf9005cd0        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a30        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_command
-                0xf9005cd4        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a34        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_bound
-                0xf9005cd8        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a38        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_swap
-                0xf9005cdc        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a3c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measure_frames
-                0xf9005ce0        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a40        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.measurement_ms
-                0xf9005ce4        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a44        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.previous_boundary
-                0xf9005ce8        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a48        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.missed_base
-                0xf9005cec        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a4c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.underflow_base
-                0xf9005cf0        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a50        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.swap_base
-                0xf9005cf4        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a54        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.command_base
-                0xf9005cf8        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a58        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.fps_frames
-                0xf9005cfc        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .sbss.fps_ms   0xf9005d00        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a5c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .sbss.fps_ms   0xf9005a60        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.g_game_measurement_complete
-                0xf9005d04        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf9005d04                g_game_measurement_complete
+                0xf9005a64        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf9005a64                g_game_measurement_complete
  .sbss.accel_batch_command_count
-                0xf9005d08        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a68        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_batch_start_count
-                0xf9005d0c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a6c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_command_batch_active
-                0xf9005d10        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a70        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_descriptor_valid
-                0xf9005d14        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a74        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_command_count_valid
-                0xf9005d18        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a78        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_capabilities_valid
-                0xf9005d1c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a7c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_rect_color
-                0xf9005d20        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a80        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_rect_height
-                0xf9005d24        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a84        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_rect_width
-                0xf9005d28        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a88        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_rect_y
-                0xf9005d2c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a8c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_rect_x
-                0xf9005d30        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a90        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_source_stride
-                0xf9005d34        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a94        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_source_addr
-                0xf9005d38        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a98        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_command_op
-                0xf9005d3c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005a9c        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_command_count
-                0xf9005d40        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005aa0        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .sbss.accel_cached_capabilities
-                0xf9005d44        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0xf9005aa4        0x4 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  *(.gnu.linkonce.sb.*)
  *(.bss .bss.*)
- .bss.keyboard  0xf9005d48       0x2c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .bss.game      0xf9005d74     0x5c98 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- *fill*         0xf900ba0c        0x4 
+ .bss.keyboard  0xf9005aa8       0x2c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .bss.game      0xf9005ad4     0x6198 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ *fill*         0xf900bc6c        0x4 
  .bss.g_lunaria_chunk
-                0xf900ba10     0x1000 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900ba10                g_lunaria_chunk
+                0xf900bc70     0x1000 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf900bc70                g_lunaria_chunk
  .bss.g_lunaria_upload
-                0xf900ca10       0x3c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900ca10                g_lunaria_upload
+                0xf900cc70       0x3c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf900cc70                g_lunaria_upload
  .bss.g_game_presentation
-                0xf900ca4c       0x40 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900ca4c                g_game_presentation
+                0xf900ccac       0x40 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf900ccac                g_game_presentation
  .bss.g_game_runtime
-                0xf900ca8c       0x84 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900ca8c                g_game_runtime
+                0xf900ccec       0x84 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf900ccec                g_game_runtime
  .bss.g_debug_first_fault
-                0xf900cb10       0xdc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900cb10                g_debug_first_fault
+                0xf900cd70       0xdc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf900cd70                g_debug_first_fault
  .bss.g_debug_status
-                0xf900cbec       0xdc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900cbec                g_debug_status
+                0xf900ce4c       0xdc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf900ce4c                g_debug_status
  .bss.g_debug_control
-                0xf900ccc8       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                0xf900ccc8                g_debug_control
+                0xf900cf28       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                0xf900cf28                g_debug_control
  *(.gnu.linkonce.b.*)
  *(COMMON)
-                0xf900cce8                        . = ALIGN (0x4)
-                0xf900cce8                        . = ALIGN (0x8)
-                0xf900cce8                        PROVIDE (_end = .)
+                0xf900cf48                        . = ALIGN (0x4)
+                0xf900cf48                        . = ALIGN (0x8)
+                0xf900cf48                        PROVIDE (_end = .)
                 [!provide]                        PROVIDE (end = .)
 
-.stack          0xf900ccf0     0x2000
+.stack          0xf900cf50     0x2000
                 [!provide]                        PROVIDE (_heap_end = .)
                 0x00002000                        . = __stack_size
- *fill*         0xf900ccf0     0x2000 
-                0xf900ecf0                        PROVIDE (_sp = .)
-                0xf900ecf0                        __freertos_irq_stack_top = .
-OUTPUT(C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.elf elf32-littleriscv)
+ *fill*         0xf900cf50     0x2000 
+                0xf900ef50                        PROVIDE (_sp = .)
+                0xf900ef50                        __freertos_irq_stack_top = .
+OUTPUT(C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.elf elf32-littleriscv)
 
 .riscv.attributes
                 0x00000000       0x43
  .riscv.attributes
-                0x00000000       0x3d C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
+                0x00000000       0x3d C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
  .riscv.attributes
-                0x0000003d       0x43 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0x0000003d       0x43 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .riscv.attributes
-                0x00000080       0x3f C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+                0x00000080       0x3f C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
  .riscv.attributes
-                0x000000bf       0x3f C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0x000000bf       0x3f C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .riscv.attributes
                 0x000000fe       0x2a D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
  .riscv.attributes
                 0x00000128       0x2a D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
 
 .comment        0x00000000       0x33
- .comment       0x00000000       0x33 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+ .comment       0x00000000       0x33 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
                                  0x34 (size before relaxing)
- .comment       0x00000033        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+ .comment       0x00000033        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
                                  0x34 (size before relaxing)
- .comment       0x00000033        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+ .comment       0x00000033        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
                                  0x34 (size before relaxing)
  .comment       0x00000033        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
                                  0x34 (size before relaxing)
  .comment       0x00000033        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
                                  0x34 (size before relaxing)
 
-.debug_line     0x00000000     0xbe39
- .debug_line    0x00000000       0xbc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
- .debug_line    0x000000bc     0x615a C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_line    0x00006216     0x2f05 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_line    0x0000911b     0x2300 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_line    0x0000b41b      0x9df D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
- .debug_line    0x0000bdfa       0x3f D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+.debug_line     0x00000000     0xbcf5
+ .debug_line    0x00000000       0xbc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
+ .debug_line    0x000000bc     0x63c1 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_line    0x0000647d     0x2a2c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_line    0x00008ea9     0x242e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_line    0x0000b2d7      0x9df D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_line    0x0000bcb6       0x3f D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
 
 .debug_line_str
                 0x00000000      0x68c
  .debug_line_str
-                0x00000000      0x68c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
+                0x00000000      0x68c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
                                  0xaf (size before relaxing)
  .debug_line_str
-                0x0000068c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0x0000068c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
                                 0x375 (size before relaxing)
  .debug_line_str
-                0x0000068c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+                0x0000068c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
                                 0x21a (size before relaxing)
  .debug_line_str
-                0x0000068c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0x0000068c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
                                 0x22f (size before relaxing)
  .debug_line_str
                 0x0000068c        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
@@ -457,92 +454,92 @@ OUTPUT(C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.e
                 0x0000068c        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
                                 0x31a (size before relaxing)
 
-.debug_info     0x00000000     0x8ef2
- .debug_info    0x00000000       0x24 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
- .debug_info    0x00000024     0x4b04 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_info    0x00004b28     0x15f8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_info    0x00006120     0x2585 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_info    0x000086a5      0x767 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
- .debug_info    0x00008e0c       0xe6 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+.debug_info     0x00000000     0x8b9b
+ .debug_info    0x00000000       0x24 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
+ .debug_info    0x00000024     0x4bdf C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_info    0x00004c03     0x1241 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_info    0x00005e44     0x250a C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_info    0x0000834e      0x767 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_info    0x00008ab5       0xe6 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
 
-.debug_abbrev   0x00000000      0xf0c
- .debug_abbrev  0x00000000       0x14 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
- .debug_abbrev  0x00000014      0x515 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_abbrev  0x00000529      0x446 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_abbrev  0x0000096f      0x394 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
- .debug_abbrev  0x00000d03      0x199 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
- .debug_abbrev  0x00000e9c       0x70 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+.debug_abbrev   0x00000000      0xee3
+ .debug_abbrev  0x00000000       0x14 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
+ .debug_abbrev  0x00000014      0x4dd C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_abbrev  0x000004f1      0x444 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_abbrev  0x00000935      0x3a5 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+ .debug_abbrev  0x00000cda      0x199 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_abbrev  0x00000e73       0x70 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
 
 .debug_aranges  0x00000000      0x190
  .debug_aranges
-                0x00000000       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
+                0x00000000       0x20 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
  .debug_aranges
-                0x00000020       0x58 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0x00000020       0x58 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .debug_aranges
-                0x00000078       0x90 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+                0x00000078       0x90 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
  .debug_aranges
-                0x00000108       0x50 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0x00000108       0x50 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .debug_aranges
                 0x00000158       0x20 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
  .debug_aranges
                 0x00000178       0x18 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
 
-.debug_str      0x00000000     0x619c
- .debug_str     0x00000000     0x619c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\start.o
+.debug_str      0x00000000     0x619b
+ .debug_str     0x00000000     0x619b C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\start.o
                                  0xbb (size before relaxing)
- .debug_str     0x0000619c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
-                               0x600e (size before relaxing)
- .debug_str     0x0000619c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
-                               0x3940 (size before relaxing)
- .debug_str     0x0000619c        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
-                               0x394c (size before relaxing)
- .debug_str     0x0000619c        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+ .debug_str     0x0000619b        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+                               0x6055 (size before relaxing)
+ .debug_str     0x0000619b        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+                               0x38ea (size before relaxing)
+ .debug_str     0x0000619b        0x0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
+                               0x397c (size before relaxing)
+ .debug_str     0x0000619b        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
                                 0x27d (size before relaxing)
- .debug_str     0x0000619c        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
+ .debug_str     0x0000619b        0x0 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_clz.o)
                                 0x1ca (size before relaxing)
 
 .debug_loclists
-                0x00000000     0x5341
+                0x00000000     0x5371
  .debug_loclists
-                0x00000000     0x1f0e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0x00000000     0x1fcc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .debug_loclists
-                0x00001f0e      0xec3 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+                0x00001fcc      0xe5f C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
  .debug_loclists
-                0x00002dd1     0x1b23 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0x00002e2b     0x1af9 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .debug_loclists
-                0x000048f4      0xa4d D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                0x00004924      0xa4d D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
 
 .debug_rnglists
-                0x00000000      0xfa2
+                0x00000000      0xef2
  .debug_rnglists
-                0x00000000      0x76f C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
+                0x00000000      0x7a0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
  .debug_rnglists
-                0x0000076f      0x47a C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
+                0x000007a0      0x3ab C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
  .debug_rnglists
-                0x00000be9      0x2a3 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+                0x00000b4b      0x291 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
  .debug_rnglists
-                0x00000e8c      0x116 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
+                0x00000ddc      0x116 D:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/rv32im/ilp32\libgcc.a(_udivdi3.o)
 
-.debug_macro    0x00000000     0x11a8
- .debug_macro   0x00000000       0xcf C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x000000cf      0x7d2 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x000008a1      0x34e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00000bef      0x142 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00000d31      0x21a C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00000f4b       0x16 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00000f61       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00000f7d       0x28 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00000fa5       0x52 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00000ff7       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00001013       0x16 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00001029       0x5e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x00001087       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x000010a3       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_macro   0x000010bf       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_macro   0x0000110b       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_macro   0x00001157       0x51 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+.debug_macro    0x00000000     0x11b4
+ .debug_macro   0x00000000       0xcf C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x000000cf      0x7d8 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x000008a7      0x34e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00000bf5      0x142 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00000d37      0x21a C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00000f51       0x16 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00000f67       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00000f83       0x28 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00000fab       0x52 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00000ffd       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x00001019       0x16 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x0000102f       0x5e C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x0000108d       0x22 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x000010af       0x1c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_macro   0x000010cb       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_macro   0x00001117       0x4c C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_macro   0x00001163       0x51 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o
 
 .debug_frame    0x00000000      0x524
- .debug_frame   0x00000000      0x198 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\main.o
- .debug_frame   0x00000198      0x1c0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria.o
- .debug_frame   0x00000358      0x1cc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-v67cm4yg\lunaria_render.o
+ .debug_frame   0x00000000      0x198 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\main.o
+ .debug_frame   0x00000198      0x1c0 C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria.o
+ .debug_frame   0x00000358      0x1cc C:\Users\HUIPU\AppData\Local\Temp\lunaria-stress-build-7x6gctj2\lunaria_render.o

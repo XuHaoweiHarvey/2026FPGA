@@ -5,9 +5,16 @@
 #ifndef LN_STRESS_TEST
 #define LN_STRESS_TEST 0
 #endif
-#if LN_STRESS_TEST
-#define LN_CAPACITY 832u
-#define LN_STRESS_BULLET_SIZE 12u
+#ifndef PIXELFORGE
+#define PIXELFORGE 0
+#endif
+#if PIXELFORGE
+#ifndef LN_CAPACITY
+#define LN_CAPACITY 1024u
+#endif
+#elif LN_STRESS_TEST
+#define LN_CAPACITY 2048u
+#define LN_STRESS_BULLET_SIZE 8u
 #else
 #define LN_CAPACITY 640u
 #endif
@@ -39,9 +46,21 @@ enum {
 };
 typedef struct {
   int32_t x, y;
+#if LN_STRESS_TEST
+  /* The live prefix owns membership; stress needs only constant Q8 velocity.
+   */
+  int16_t ux, uy;
+#else
   int16_t vx, ox, oy, ux, uy;
+#if PIXELFORGE
+  uint16_t angle;
+  /* Runtime life is 1000 ticks; retirement occurs at age 1001. */
+  uint32_t age:10, life:10, active:1, color:2, shape:3, kind:4;
+#else
   uint16_t age, life, angle;
   uint8_t active, color, shape, kind;
+#endif
+#endif
 } ln_bullet_t;
 typedef struct {
   int32_t x, y;
@@ -63,6 +82,9 @@ typedef struct {
   uint32_t
       stress_active; /* Packed prefix: all live stress bullets are visible. */
 #endif
+  #if PIXELFORGE
+  uint32_t active_count, boss_frozen_ms;
+  #endif
   ln_shot_t shots[LN_SHOTS];
   ln_effect_t effects[LN_EFFECTS];
   ln_laser_t lasers[LN_LASERS];
