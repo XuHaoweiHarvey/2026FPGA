@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "picture_comparisons": 200,
+  "unchanged_regions_verified": 148,
+  "rgb_exact_match": true,
+  "before": {
+    "alpha_pixels": 44828056,
+    "alpha_rows": 1479575
+  },
+  "after": {
+    "alpha_pixels": 37079824,
+    "alpha_rows": 1183800
+  },
+  "rtl_controlled_stall_results": {
+    "wide0_fast0": "PASS LUNARIA WIDE=0 FAST=0: cold=2112 warm=2114 trim=1849 cycles; source_reads=120 background_reads=118 exact_pixels=3640; stalls/tags/pages/clipping/errors/reset\nsim/tb_lunaria_alpha_cache.v:164: $finish called at 77030000 (1ps)\n",
+    "wide0_fast1": "PASS LUNARIA WIDE=0 FAST=1: cold=1926 warm=1923 trim=1690 cycles; source_reads=120 background_reads=118 exact_pixels=3640; stalls/tags/pages/clipping/errors/reset\nsim/tb_lunaria_alpha_cache.v:164: $finish called at 70430000 (1ps)\n",
+    "wide1_fast0": "PASS LUNARIA WIDE=1 FAST=0: cold=2150 warm=1756 trim=1544 cycles; source_reads=45 background_reads=118 exact_pixels=3640; stalls/tags/pages/clipping/errors/reset\nsim/tb_lunaria_alpha_cache.v:164: $finish called at 69980000 (1ps)\n",
+    "wide1_fast1": "PASS LUNARIA WIDE=1 FAST=1: cold=1941 warm=1569 trim=1358 cycles; source_reads=45 background_reads=118 exact_pixels=3640; stalls/tags/pages/clipping/errors/reset\nsim/tb_lunaria_alpha_cache.v:164: $finish called at 62990000 (1ps)\n"
+  },
+  "rtl_scope": "unit engine only; no real DDR/display arbitration or CPU scheduling",
+  "sources": {
+    "software/lunaria/lunaria_render.c": "74b16377a346956850d5cc3e6c71410bc6ccc2e3c1c3633dae31d897af810eee",
+    "software/lunaria/lunaria_trim.h": "7159f64a22582394b99041f5af12a389c379c503e21775acb4923934705e3e12",
+    "scripts/prepare_lunaria_trim.py": "fc03c3dcb03ab08f9ebba4b5462c0dfc718df61b02827fc8fd5636229e2d1614",
+    "scripts/run_lunaria_render_checks.py": "641317765e5c95df2cfc5ab0df18f8b2740905d09816f389bb7238567e862513",
+    "sim/tb_lunaria_alpha_cache.v": "eacc827b609bae0a81688587591634388764361c63fb60e1d84ce9d86aa93062",
+    "rtl/accelerator/alpha_blit_engine.v": "185804a1ccc631c845dd2810cdabafc51997a7b0ebf915f249ef180a5e96f876",
+    "rtl/accelerator/alpha_pixel_pipeline.v": "c0c3cae67dc2357bc75b6ee30c101fd4511cfe53fdaad191cf061839df8ad8ef",
+    "rtl/accelerator/graphics_engine.v": "1167b723ff7457fb977755ea01044f04410eb0e42ae133bc9ff42fb8a1383343",
+    "rtl/framebuffer/rgb_framebuffer.v": "79c125937952529e7fa97a5a561e728b0e4bf154e550eead6bc0e1844921fed1",
+    "rtl/ti60f225_oob_top.v": "73fcebf3a3f7df975ab1db58e4e1106b16206ec838e952ebdf9aa2e43f7958ee"
+  },
+  "dlls": {
+    "lunaria_pc.dll": "7f8d65d5100d839fc02d1ed7472d798a8d15dbcd6ba61b26333b528fb5fe41ec",
+    "lunaria_full_rects.dll": "ca8ba2abf42b7c44a69bf4f6b05af60f38226cfde9ddf2385d24f7a6e3f137f4"
+  },
+  "atlas_sha256": "d80cd99177ada13d55d218c03d1db444e700664d6d7768b4c62ac1ad17393e78"
+}

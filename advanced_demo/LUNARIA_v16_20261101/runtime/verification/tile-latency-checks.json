@@ -1,0 +1,44 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "read_latency": 64,
+  "write_response_latency": 64,
+  "scope": "Controlled latency sensitivity, no CPU/display contention; not physical DDR calibration.",
+  "results": {
+    "v151": {
+      "overlap": 1,
+      "ahead": 1,
+      "commands": 575,
+      "cycles": 1450135,
+      "read_beats": 104592,
+      "write_beats": 95536,
+      "exact_RGB_pixels": 307200
+    },
+    "tiled": {
+      "overlap": 1,
+      "ahead": 1,
+      "commands": 575,
+      "cycles": 865267,
+      "read_beats": 76009,
+      "write_beats": 63670,
+      "exact_RGB_pixels": 307200
+    }
+  },
+  "sources": {
+    "rtl/accelerator/tiled_graphics_engine.v": "d3ad204ffecd980b13021456cf99c2184b7b990fd0cbced5da81fbddf2fe3371",
+    "rtl/accelerator/graphics_engine.v": "1167b723ff7457fb977755ea01044f04410eb0e42ae133bc9ff42fb8a1383343",
+    "rtl/accelerator/alpha_blit_engine.v": "185804a1ccc631c845dd2810cdabafc51997a7b0ebf915f249ef180a5e96f876",
+    "rtl/accelerator/alpha_pixel_pipeline.v": "c0c3cae67dc2357bc75b6ee30c101fd4511cfe53fdaad191cf061839df8ad8ef",
+    "rtl/accelerator/fill_rect_writer.v": "50706344832e98f535111b487f19db964711b6c6c2906249f1cc4a4f64783a6b",
+    "rtl/accelerator/blit_engine.v": "9106599fb835137fd08526e4feac6efbe459c1e7155037a23b4c425ff497aca3",
+    "sim/tb_lunaria_tile_trace.v": "1287979ceccb3fa0bead883dbad306df602af9269e55395c609c894e3a0298c4",
+    "sim/tb_lunaria_trace.v": "0aa14ade0ecc8a2c3ba31dee8e8c7d4dfc8c300394585505e31f2f339562ef3c",
+    "scripts/run_lunaria_tile_latency_checks.py": "745a17f39c8854e3078c4717b41da8f863111e003be7d2a199c7c3002030af30"
+  },
+  "inputs": {
+    "atlas.hex": "99823912541413232960aa4cfb572a6d98a278166b9a3d68d319fd572a2f325c",
+    "background.hex": "6fe321004ef4416c92b763ecd953b042e5455b8d4099175d09b2468862fa96f9",
+    "512.hex": "8cf4164090602e63168d9f446e4c5ad60a5b75aba9fd8cc9c2d574b95814189d",
+    "512.cmd": "190aaee0c7851400efefd28ff98de16fdc9654eccd9fe640384ac129e97c5f8e"
+  }
+}

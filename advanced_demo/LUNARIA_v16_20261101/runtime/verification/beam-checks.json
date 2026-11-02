@@ -1,0 +1,72 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "compared_gameplay_frames": 4000,
+  "non_laser_commands_unchanged": true,
+  "maximum_old_laser_commands": 382,
+  "samples": [
+    {
+      "phase": 6,
+      "kind": "warning",
+      "simulation_ms": 2128,
+      "bullets": 120,
+      "old_commands": 63,
+      "new_commands": 3,
+      "old_alpha_pixel_operations": 15792,
+      "new_nonzero_pixels": 3979,
+      "new_background_pixels_in_4pixel_groups": 5580
+    },
+    {
+      "phase": 6,
+      "kind": "active",
+      "simulation_ms": 2832,
+      "bullets": 144,
+      "old_commands": 329,
+      "new_commands": 3,
+      "old_alpha_pixel_operations": 82560,
+      "new_nonzero_pixels": 15878,
+      "new_background_pixels_in_4pixel_groups": 17516
+    },
+    {
+      "phase": 7,
+      "kind": "warning",
+      "simulation_ms": 2896,
+      "bullets": 160,
+      "old_commands": 64,
+      "new_commands": 3,
+      "old_alpha_pixel_operations": 15824,
+      "new_nonzero_pixels": 3971,
+      "new_background_pixels_in_4pixel_groups": 5612
+    },
+    {
+      "phase": 7,
+      "kind": "active",
+      "simulation_ms": 3600,
+      "bullets": 148,
+      "old_commands": 331,
+      "new_commands": 3,
+      "old_alpha_pixel_operations": 82800,
+      "new_nonzero_pixels": 15855,
+      "new_background_pixels_in_4pixel_groups": 17456
+    }
+  ],
+  "rtl": {
+    "0": "PASS BEAM=0: vertical=x horizontal=x cycles; exact pixels=0, source_reads=0; axes/diagonals/stalls/pages/errors/reset\nsim/tb_lunaria_beam.v:182: $finish called at 50000 (1ps)\n",
+    "1": "PASS BEAM=1: vertical=4800 horizontal=7445 cycles; exact pixels=19452, source_reads=0; axes/diagonals/stalls/pages/errors/reset\nsim/tb_lunaria_beam.v:182: $finish called at 634400000 (1ps)\n"
+  },
+  "scope": "MMIO command/RTL unit checks; no real DDR arbitration or HDMI/FPS measurement",
+  "sources": {
+    "scripts/run_lunaria_beam_checks.py": "fb6e730a84b1a0a8106725c44ff570e9f2dbbe352a03472fba1d0dbfbcaefa80",
+    "sim/tb_lunaria_beam.v": "54da8ed2be07cdbab2e5f7eeaee2a0c330c53759a16fb179891401460132b5b6",
+    "software/lunaria/lunaria.c": "14b4aa0c75aba10e5c93dd225abacb791b70011451a07b28e2d3e3947c750fd4",
+    "software/lunaria/lunaria_beam.h": "d488f1157b2f785e9900a543a9973885f5ce0d18cc628eef8c090797510b73d5",
+    "software/lunaria/lunaria_render.c": "74b16377a346956850d5cc3e6c71410bc6ccc2e3c1c3633dae31d897af810eee",
+    "software/lunaria/lunaria_pc.c": "aa9ecfc72c7bdc2dd2c6e51831e6114568194967c039ac22e056adbe72185658",
+    "rtl/accelerator/graphics_engine.v": "1167b723ff7457fb977755ea01044f04410eb0e42ae133bc9ff42fb8a1383343",
+    "rtl/accelerator/alpha_blit_engine.v": "185804a1ccc631c845dd2810cdabafc51997a7b0ebf915f249ef180a5e96f876"
+  },
+  "dlls": {
+    "lunaria_pc.dll": "7f8d65d5100d839fc02d1ed7472d798a8d15dbcd6ba61b26333b528fb5fe41ec",
+    "lunaria_legacy_lasers.dll": "92d11c29b393b90543697750fa84f6912a1e9b58c262e6fd99268850d9bf5dae"
+  }
+}

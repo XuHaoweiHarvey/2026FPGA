@@ -1,0 +1,318 @@
+Alpha artifacts: C:\Users\Xuhaowei\AppData\Local\Temp\fpga-alpha-checks-8hphurpb
+rtl/accelerator/graphics_command_queue.v:4: warning: timescale for graphics_command_queue inherited from another file.
+sim/tb_graphics_command_queue.v:1: ...: The inherited timescale is here.
+PASS graphics command queue: 9 checks, order/wrap/full/backpressure/flush
+sim/tb_graphics_command_queue.v:47: $finish called at 150000 (1ps)
+PASS ALPHA PIXELS: 537 beat vectors plus all 65,153 div255 inputs
+sim/tb_alpha_pixel_pipeline.v:74: $finish called at 32250000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT: snapshot, source preservation, exact pixels, B completion, bresp=0
+sim/tb_alpha_blit_engine.v:151: $finish called at 690000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT: snapshot, source preservation, exact pixels, B completion, bresp=0
+sim/tb_alpha_blit_engine.v:151: $finish called at 590000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000022 rlast_mode=0 timeout=0
+sim/tb_alpha_blit_engine.v:131: $finish called at 140000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000022 rlast_mode=0 timeout=0
+sim/tb_alpha_blit_engine.v:131: $finish called at 140000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT: snapshot, source preservation, exact pixels, B completion, bresp=1
+sim/tb_alpha_blit_engine.v:151: $finish called at 380000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT: snapshot, source preservation, exact pixels, B completion, bresp=1
+sim/tb_alpha_blit_engine.v:151: $finish called at 330000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000025 rlast_mode=1 timeout=0
+sim/tb_alpha_blit_engine.v:131: $finish called at 130000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000025 rlast_mode=1 timeout=0
+sim/tb_alpha_blit_engine.v:131: $finish called at 130000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000025 rlast_mode=2 timeout=0
+sim/tb_alpha_blit_engine.v:131: $finish called at 150000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000025 rlast_mode=2 timeout=0
+sim/tb_alpha_blit_engine.v:131: $finish called at 150000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000024 rlast_mode=0 timeout=1
+sim/tb_alpha_blit_engine.v:131: $finish called at 42100000 (1ps)
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_blit_engine.v:30: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'dest_mem'.
+sim/tb_alpha_blit_engine.v:45: warning: @* is sensitive to all 32 words in array 'source_mem'.
+PASS ALPHA BLIT drain: error=00000024 rlast_mode=0 timeout=1
+sim/tb_alpha_blit_engine.v:131: $finish called at 42100000 (1ps)
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_stream_cache.v:61: warning: @* is sensitive to all 12288 words in array 'memory'.
+PASS Alpha stream=0 cache=0: cold=900 warm=904 cycles; source_reads=59 background_reads=58 exact_pixels=1196; stalls/pages/clipping/errors/reset
+sim/tb_alpha_stream_cache.v:162: $finish called at 41100000 (1ps)
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_stream_cache.v:61: warning: @* is sensitive to all 12288 words in array 'memory'.
+PASS Alpha stream=1 cache=0: cold=675 warm=671 cycles; source_reads=59 background_reads=58 exact_pixels=1196; stalls/pages/clipping/errors/reset
+sim/tb_alpha_stream_cache.v:162: $finish called at 29300000 (1ps)
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_stream_cache.v:61: warning: @* is sensitive to all 12288 words in array 'memory'.
+PASS Alpha stream=0 cache=1: cold=900 warm=791 cycles; source_reads=27 background_reads=58 exact_pixels=1196; stalls/pages/clipping/errors/reset
+sim/tb_alpha_stream_cache.v:162: $finish called at 39200000 (1ps)
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 9 (beam_mode) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 10 (tile_local) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 11 (tile_read_data) floating.
+sim/tb_alpha_stream_cache.v:47: warning: Instantiating module alpha_blit_engine with dangling input port 16 (beam_rgb) floating.
+sim/tb_alpha_stream_cache.v:61: warning: @* is sensitive to all 12288 words in array 'memory'.
+PASS Alpha stream=1 cache=1: cold=675 warm=566 cycles; source_reads=27 background_reads=58 exact_pixels=1196; stalls/pages/clipping/errors/reset
+sim/tb_alpha_stream_cache.v:162: $finish called at 27500000 (1ps)
+PASS SOURCE GUARD: 426 rectangles (400 random), 64x48 stride=256; accept/hold/reset checked
+sim/tb_blit_source_guard.v:225: $finish called at 9161000 (1ps)
+PASS SOURCE GUARD: 426 rectangles (400 random), 64x48 stride=256; accept/hold/reset checked
+sim/tb_blit_source_guard.v:225: $finish called at 9321000 (1ps)
+rtl/control/accel_regs.v:5: warning: timescale for accel_regs inherited from another file.
+sim/tb_m2_asset_regs.v:1: ...: The inherited timescale is here.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 19 (init_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 20 (init_aw_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 21 (init_wlast_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 22 (init_b_responses) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 23 (init_aw_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 33 (command_queue_ready) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 35 (reader_frame_base) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 36 (reader_outstanding) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 37 (reader_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 38 (reader_reserved_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 40 (boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 41 (swap_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 42 (missed_boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 43 (service_status) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 44 (writer_throttle_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 45 (writer_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 46 (reader_ar_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 47 (reader_ar_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 48 (reader_r_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 49 (reader_r_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 50 (display_underflow_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 51 (reader_frame_completions) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 52 (reader_fifo_level) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 53 (writer_max_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 54 (service_read_quota) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 55 (service_watermarks) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 56 (alpha_perf_counters) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 57 (read_perf_counters) floating.
+PASS M2 APB asset begin/seal/error/legacy version/CPU reset, WAIT=0
+sim/tb_m2_asset_regs.v:80: $finish called at 1800000 (1ps)
+rtl/control/accel_regs.v:5: warning: timescale for accel_regs inherited from another file.
+sim/tb_m2_asset_regs.v:1: ...: The inherited timescale is here.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 19 (init_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 20 (init_aw_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 21 (init_wlast_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 22 (init_b_responses) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 23 (init_aw_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 33 (command_queue_ready) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 35 (reader_frame_base) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 36 (reader_outstanding) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 37 (reader_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 38 (reader_reserved_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 40 (boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 41 (swap_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 42 (missed_boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 43 (service_status) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 44 (writer_throttle_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 45 (writer_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 46 (reader_ar_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 47 (reader_ar_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 48 (reader_r_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 49 (reader_r_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 50 (display_underflow_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 51 (reader_frame_completions) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 52 (reader_fifo_level) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 53 (writer_max_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 54 (service_read_quota) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 55 (service_watermarks) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 56 (alpha_perf_counters) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 57 (read_perf_counters) floating.
+PASS M2 APB asset begin/seal/error/legacy version/CPU reset, WAIT=1
+sim/tb_m2_asset_regs.v:80: $finish called at 2150000 (1ps)
+rtl/control/accel_regs.v:5: warning: timescale for accel_regs inherited from another file.
+sim/tb_m2_asset_regs.v:1: ...: The inherited timescale is here.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 19 (init_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 20 (init_aw_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 21 (init_wlast_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 22 (init_b_responses) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 23 (init_aw_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 33 (command_queue_ready) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 35 (reader_frame_base) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 36 (reader_outstanding) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 37 (reader_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 38 (reader_reserved_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 40 (boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 41 (swap_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 42 (missed_boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 43 (service_status) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 44 (writer_throttle_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 45 (writer_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 46 (reader_ar_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 47 (reader_ar_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 48 (reader_r_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 49 (reader_r_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 50 (display_underflow_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 51 (reader_frame_completions) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 52 (reader_fifo_level) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 53 (writer_max_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 54 (service_read_quota) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 55 (service_watermarks) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 56 (alpha_perf_counters) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 57 (read_perf_counters) floating.
+PASS M2 APB asset begin/seal/error/legacy version/CPU reset, WAIT=3
+sim/tb_m2_asset_regs.v:80: $finish called at 2850000 (1ps)
+rtl/control/accel_regs.v:5: warning: timescale for accel_regs inherited from another file.
+sim/tb_m2_asset_regs.v:1: ...: The inherited timescale is here.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 19 (init_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 20 (init_aw_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 21 (init_wlast_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 22 (init_b_responses) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 23 (init_aw_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 33 (command_queue_ready) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 35 (reader_frame_base) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 36 (reader_outstanding) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 37 (reader_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 38 (reader_reserved_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 40 (boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 41 (swap_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 42 (missed_boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 43 (service_status) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 44 (writer_throttle_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 45 (writer_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 46 (reader_ar_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 47 (reader_ar_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 48 (reader_r_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 49 (reader_r_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 50 (display_underflow_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 51 (reader_frame_completions) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 52 (reader_fifo_level) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 53 (writer_max_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 54 (service_read_quota) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 55 (service_watermarks) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 56 (alpha_perf_counters) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 57 (read_perf_counters) floating.
+PASS M2 APB asset begin/seal/error/legacy version/CPU reset, WAIT=0
+sim/tb_m2_asset_regs.v:80: $finish called at 1800000 (1ps)
+rtl/control/accel_regs.v:5: warning: timescale for accel_regs inherited from another file.
+sim/tb_m2_asset_regs.v:1: ...: The inherited timescale is here.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 19 (init_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 20 (init_aw_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 21 (init_wlast_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 22 (init_b_responses) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 23 (init_aw_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 33 (command_queue_ready) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 35 (reader_frame_base) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 36 (reader_outstanding) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 37 (reader_data_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 38 (reader_reserved_beats) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 40 (boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 41 (swap_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 42 (missed_boundary_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 43 (service_status) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 44 (writer_throttle_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 45 (writer_bursts) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 46 (reader_ar_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 47 (reader_ar_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 48 (reader_r_stall_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 49 (reader_r_max_stall) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 50 (display_underflow_count) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 51 (reader_frame_completions) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 52 (reader_fifo_level) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 53 (writer_max_cycles) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 54 (service_read_quota) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 55 (service_watermarks) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 56 (alpha_perf_counters) floating.
+sim/tb_m2_asset_regs.v:19: warning: Instantiating module accel_regs with dangling input port 57 (read_perf_counters) floating.
+PASS M2 APB asset begin/seal/error/legacy version/CPU reset, WAIT=0
+sim/tb_m2_asset_regs.v:80: $finish called at 1800000 (1ps)
+rtl/framebuffer/cpu_ddr_bridge.v:4: warning: timescale for cpu_ddr_bridge inherited from another file.
+sim/tb_cpu_ddr_bridge.v:1: ...: The inherited timescale is here.
+PASS CPU DDR bridge: 4 lanes, AW/W independence, address offset, front/padding guard, ID/RLAST faults, backpressure, reset drain
+sim/tb_cpu_ddr_bridge.v:189: $finish called at 3200000 (1ps)
+rtl/framebuffer/cpu_ddr_bridge.v:4: warning: timescale for cpu_ddr_bridge inherited from another file.
+sim/tb_cpu_ddr_bridge.v:1: ...: The inherited timescale is here.
+PASS CPU DDR bridge: 4 lanes, AW/W independence, address offset, front/padding guard, ID/RLAST faults, backpressure, reset drain
+sim/tb_cpu_ddr_bridge.v:189: $finish called at 4120000 (1ps)
+rtl/accelerator/fill_rect_writer.v:3: warning: timescale for fill_rect_writer inherited from another file.
+rtl/accelerator/graphics_engine.v:1: ...: The inherited timescale is here.
+sim/tb_m2_full_asset_blit.v:35: warning: Instantiating module graphics_engine with dangling input port 13 (back_base) floating.
+sim/tb_m2_full_asset_blit.v:35: warning: Instantiating module graphics_engine with dangling input port 15 (tile_local) floating.
+sim/tb_m2_full_asset_blit.v:35: warning: Instantiating module graphics_engine with dangling input port 16 (tile_read_data) floating.
+PASS M2 full asset BLIT: pre-READY rejection without AXI, three 640x480 images, 230400 read/write beats, stalled channels, final B drained, viewport exact
+sim/tb_m2_full_asset_blit.v:155: $finish called at 12528390000 (1ps)
+rtl/accelerator/fill_rect_writer.v:3: warning: timescale for fill_rect_writer inherited from another file.
+rtl/accelerator/graphics_engine.v:1: ...: The inherited timescale is here.
+sim/tb_m2_full_asset_blit.v:35: warning: Instantiating module graphics_engine with dangling input port 13 (back_base) floating.
+sim/tb_m2_full_asset_blit.v:35: warning: Instantiating module graphics_engine with dangling input port 15 (tile_local) floating.
+sim/tb_m2_full_asset_blit.v:35: warning: Instantiating module graphics_engine with dangling input port 16 (tile_read_data) floating.
+PASS FULLSCREEN BLIT: unsealed rejection, 1920x1080 exact pixels, last 64x56 and 16x8 tile restoration, exact neighbor, stride=7680, stalled AXI and final B drained
+sim/tb_m2_full_asset_blit.v:155: $finish called at 28243320000 (1ps)
+PASS Alpha arithmetic/DMA/APB and sealed background/sprite source/CPU guards, including legacy builds.

@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "results": {
+    "min1-back800000-batch4": "PASS TILE CONTRACT back=00800000: full batch, gaps, idle flush, barriers, tile crossings, overlap order, all 307200 XRGB pixels\nsim/tb_lunaria_tile_contract.v:146: $finish called at 3071190000 (1ps)\n",
+    "min1-back0-batch4": "PASS TILE CONTRACT back=00000000: full batch, gaps, idle flush, barriers, tile crossings, overlap order, all 307200 XRGB pixels\nsim/tb_lunaria_tile_contract.v:146: $finish called at 3071190000 (1ps)\n",
+    "min8-back800000-batch4": "PASS TILE CONTRACT back=00800000: full batch, gaps, idle flush, barriers, tile crossings, overlap order, all 307200 XRGB pixels\nsim/tb_lunaria_tile_contract.v:146: $finish called at 1115510000 (1ps)\n",
+    "min8-back800000-batch1024": "PASS TILE CONTRACT back=00800000: full batch, gaps, idle flush, barriers, tile crossings, overlap order, all 307200 XRGB pixels\nsim/tb_lunaria_tile_contract.v:146: $finish called at 53037660000 (1ps)\n"
+  },
+  "sources": {
+    "sim/tb_lunaria_tile_contract.v": "229c8ad3ba22417eb2b1fc83638a8dd6114caebc7704af044d323276eb8fbc1f",
+    "rtl/accelerator/tiled_graphics_engine.v": "d3ad204ffecd980b13021456cf99c2184b7b990fd0cbced5da81fbddf2fe3371",
+    "rtl/accelerator/graphics_engine.v": "1167b723ff7457fb977755ea01044f04410eb0e42ae133bc9ff42fb8a1383343",
+    "rtl/accelerator/alpha_blit_engine.v": "185804a1ccc631c845dd2810cdabafc51997a7b0ebf915f249ef180a5e96f876",
+    "rtl/accelerator/alpha_pixel_pipeline.v": "c0c3cae67dc2357bc75b6ee30c101fd4511cfe53fdaad191cf061839df8ad8ef",
+    "rtl/accelerator/fill_rect_writer.v": "50706344832e98f535111b487f19db964711b6c6c2906249f1cc4a4f64783a6b",
+    "rtl/accelerator/blit_engine.v": "9106599fb835137fd08526e4feac6efbe459c1e7155037a23b4c425ff497aca3",
+    "scripts/run_lunaria_tile_contract_checks.py": "f68b1ff8a8e52a7136d4243f71d7c944778ddb3c3aa1d5b17f5e76be6e4caf0a"
+  }
+}

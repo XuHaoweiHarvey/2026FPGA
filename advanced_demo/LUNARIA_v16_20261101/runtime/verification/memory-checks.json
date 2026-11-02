@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "elf_sha256": "3131251165fb2e3857d59be8576edcfa4c5298fcea6b7c4b0da8cbca7f3d821e",
+  "ocram_including_stack": 63632,
+  "stack_reserved_bytes": 8192,
+  "headroom_before_debug_reserved": 880,
+  "largest_compiler_reported_C_frame": 176,
+  "sum_compiler_reported_C_frames": 1088,
+  "stack_scope": "GCC static C frames; not a measured high-water mark or library call-graph bound",
+  "cpu_data_bus": "generated DBusSimplePlugin (no data cache)",
+  "scratch_per_slot": [
+    65536,
+    196608
+  ],
+  "source_window_first_byte": 2306560,
+  "rtl_results": {
+    "tb_cpu_ddr_bridge": "PASS CPU DDR bridge: 4 lanes, AW/W independence, address offset, front/padding guard, ID/RLAST faults, backpressure, reset drain\nsim/tb_cpu_ddr_bridge.v:189: $finish called at 4120000 (1ps)\n",
+    "tb_buffer_manager": "PASS buffer manager: 66 async events, busy/pending/reader drain/FIFO ack/sticky clear/base snapshot/12 swaps\nsim/tb_buffer_manager.v:94: $finish called at 18006165 (1ps)\n",
+    "tb_alpha_pixel_pipeline": "PASS ALPHA PIXELS: 537 beat vectors plus all 65,153 div255 inputs\nsim/tb_alpha_pixel_pipeline.v:74: $finish called at 32250000 (1ps)\n"
+  },
+  "sources": {
+    "ip/soc_control/soc_control.v": "f4a308df6d90dda124edabf9a6238c0af56bf99569c527d6108593715d2f97ba",
+    "rtl/accelerator/alpha_pixel_pipeline.v": "c0c3cae67dc2357bc75b6ee30c101fd4511cfe53fdaad191cf061839df8ad8ef",
+    "rtl/framebuffer/buffer_manager.v": "e9c4b2af0b6d3ebbe62ce6aa70cbdd24a6aeb16d37fb1b4d1dfec624d026fc75",
+    "rtl/framebuffer/cpu_ddr_bridge.v": "89342f50ada4a24ec566ff3a65df120ed131d90938bc3850e60cec54a1704089",
+    "rtl/framebuffer/video_frame_cdc.v": "0f1f71d0c39be557ed47be92881fa31552c3adb29683032eb0c7c3301fc0647e",
+    "scripts/run_lunaria_memory_checks.py": "16bc0f653947be8523d472d2685a078ac94ffce814f35e420096edd7ea92da07",
+    "sim/tb_alpha_pixel_pipeline.v": "52b9c1867d06e9370aae1ad4dafb73b5a95643711f81a48c2564fa00ad041d55",
+    "sim/tb_buffer_manager.v": "e390013d9790bf0919cf9e2009cca13cedbe44b73f0fecd35b16d1956e4445a8",
+    "sim/tb_cpu_ddr_bridge.v": "6113c1892bdede1e2bdd5f1d70ebe074fb703f68a7089e24d3a9682cebafb1a6",
+    "software/lunaria/lunaria_pool.c": "0843057394b33c3a34464216dd497d18cf939f7ed23bd68dd7739dacde29ecce",
+    "software/lunaria/lunaria_pool.h": "3dc196be0b47b4d888cbe9ae53503bfc29b02fff45f8508ea6e84e04d35ee10e",
+    "software/lunaria/main.c": "1d5483a15d007650532d51464b6c9b7ff76a2f465bd148354f95bc2e765385eb"
+  }
+}

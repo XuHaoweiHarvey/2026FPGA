@@ -1,0 +1,98 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "samples": [
+    {
+      "target": 400,
+      "active_bullets": 473,
+      "visible_bullets": 448,
+      "tick": 181,
+      "results": {
+        "v151": {
+          "overlap": 1,
+          "ahead": 1,
+          "commands": 512,
+          "cycles": 516470,
+          "read_beats": 96002,
+          "write_beats": 86618,
+          "exact_RGB_pixels": 307200
+        },
+        "tiled": {
+          "overlap": 1,
+          "ahead": 1,
+          "commands": 512,
+          "cycles": 478951,
+          "read_beats": 63778,
+          "write_beats": 54538,
+          "exact_RGB_pixels": 307200
+        }
+      }
+    },
+    {
+      "target": 512,
+      "active_bullets": 546,
+      "visible_bullets": 500,
+      "tick": 271,
+      "results": {
+        "v151": {
+          "overlap": 1,
+          "ahead": 1,
+          "commands": 575,
+          "cycles": 570188,
+          "read_beats": 104592,
+          "write_beats": 95536,
+          "exact_RGB_pixels": 307200
+        },
+        "tiled": {
+          "overlap": 1,
+          "ahead": 1,
+          "commands": 575,
+          "cycles": 553234,
+          "read_beats": 76009,
+          "write_beats": 63670,
+          "exact_RGB_pixels": 307200
+        }
+      }
+    },
+    {
+      "target": 768,
+      "active_bullets": 829,
+      "visible_bullets": 721,
+      "tick": 451,
+      "results": {
+        "v151": {
+          "overlap": 1,
+          "ahead": 1,
+          "commands": 824,
+          "cycles": 811244,
+          "read_beats": 149508,
+          "write_beats": 135995,
+          "exact_RGB_pixels": 307200
+        },
+        "tiled": {
+          "overlap": 1,
+          "ahead": 1,
+          "commands": 824,
+          "cycles": 718162,
+          "read_beats": 90319,
+          "write_beats": 71350,
+          "exact_RGB_pixels": 307200
+        }
+      }
+    }
+  ],
+  "scope": "Actual C/atlas/commands, exact RGB; controlled independent AXI channels, no CPU/display competition, background restore excluded. Cycles are NOT board FPS.",
+  "dll_sha256": "7f8d65d5100d839fc02d1ed7472d798a8d15dbcd6ba61b26333b528fb5fe41ec",
+  "atlas_sha256": "d80cd99177ada13d55d218c03d1db444e700664d6d7768b4c62ac1ad17393e78",
+  "sources": {
+    "rtl/accelerator/alpha_blit_engine.v": "185804a1ccc631c845dd2810cdabafc51997a7b0ebf915f249ef180a5e96f876",
+    "rtl/accelerator/alpha_pixel_pipeline.v": "c0c3cae67dc2357bc75b6ee30c101fd4511cfe53fdaad191cf061839df8ad8ef",
+    "rtl/accelerator/graphics_engine.v": "1167b723ff7457fb977755ea01044f04410eb0e42ae133bc9ff42fb8a1383343",
+    "rtl/accelerator/fill_rect_writer.v": "50706344832e98f535111b487f19db964711b6c6c2906249f1cc4a4f64783a6b",
+    "rtl/accelerator/blit_engine.v": "9106599fb835137fd08526e4feac6efbe459c1e7155037a23b4c425ff497aca3",
+    "rtl/accelerator/tiled_graphics_engine.v": "d3ad204ffecd980b13021456cf99c2184b7b990fd0cbced5da81fbddf2fe3371",
+    "sim/tb_lunaria_trace.v": "0aa14ade0ecc8a2c3ba31dee8e8c7d4dfc8c300394585505e31f2f339562ef3c",
+    "sim/tb_lunaria_tile_trace.v": "1287979ceccb3fa0bead883dbad306df602af9269e55395c609c894e3a0298c4",
+    "scripts/run_lunaria_tile_trace_checks.py": "62c5f97ba12f586ef7acf7ec7768bffecaee182b979b0c5f232a5eff0f6008aa"
+  }
+}

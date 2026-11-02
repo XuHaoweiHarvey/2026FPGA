@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "output": "PASS 512 resident slots without DDR; 4096 live slots, 80 swaps, forward/reverse page eviction, dirty reset; aligned back-only scratch writes\n",
+  "sources": {
+    "sim/test_lunaria_pool.c": "1229de523976623f839fc4dcf9c80ac9f24c4d35ab18e7ea4146fe0490185e7a",
+    "software/lunaria/lunaria_pool.c": "0843057394b33c3a34464216dd497d18cf939f7ed23bd68dd7739dacde29ecce",
+    "software/lunaria/lunaria_pool.h": "3dc196be0b47b4d888cbe9ae53503bfc29b02fff45f8508ea6e84e04d35ee10e"
+  }
+}
