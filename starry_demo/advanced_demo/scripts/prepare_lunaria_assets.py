@@ -41,21 +41,66 @@ def main():
                      ('player-atlas-32px-8frames.png',(448,96)),
                      ('hit-atlas-32px-8frames.png',(448,160))]:
         atlas.paste(Image.open(SOURCE/name).convert('RGBA'), xy)
-    original = Image.open(SOURCE/'bullet-atlas-32px.png').convert('RGBA')
-    for row in range(3):
-        for col in range(4):
-            tile = original.crop((col*32,row*32,col*32+32,row*32+32))
-            atlas.paste(tile.resize((16,16), Image.Resampling.LANCZOS), (448+col*16,row*16))
-    # Directional rice sprites and true five-point stars occupy previously
-    # unused atlas cells, without changing the protected hardware windows.
-    stars = Image.open(SOURCE/'star-bullet-atlas-32px.png').convert('RGBA')
-    for row in range(3):
-        rice = original.crop((32,row*32,64,row*32+32))
+    # Pixel-native, bounded artwork: solid cores and a one-pixel low-alpha rim.
+    palette = [(55,160,191),(143,86,190),(205,142,54),(205,105,153)]
+    rim_palette = [(108,170,186),(157,131,183),(191,164,112),(190,148,172)]
+    def bullet(color, shape=0):
+        rim = rim_palette[palette.index(color)]
+        tile = Image.new('RGBA',(16,16)); d = ImageDraw.Draw(tile)
+        highlight=tuple(c+(245-c)*3//5 for c in color)
+        if shape == 1:
+            d.ellipse((4,1,11,14),fill=(*rim,12)); d.ellipse((5,2,10,13),fill=(*color,255))
+            d.ellipse((6,3,9,10),fill=(*highlight,255))
+        elif shape == 3:
+            d.polygon([(8,1),(14,8),(8,14),(1,8)],fill=(*rim,12))
+            d.polygon([(8,2),(13,8),(8,13),(2,8)],fill=(*color,255))
+            d.polygon([(8,3),(11,7),(8,11),(5,7)],fill=(*highlight,255))
+        else:
+            d.ellipse((2,2,13,13),fill=(*rim,12)); d.ellipse((3,3,12,12),fill=(*color,255))
+            d.ellipse((5,4,10,9),fill=(*highlight,255))
+        return tile
+    for row,color in enumerate(palette):
+        for col in range(4): atlas.paste(bullet(color,col),(448+16*col,16*row))
         for angle in range(8):
-            tile = rice.rotate(-angle*45,resample=Image.Resampling.BICUBIC)
-            atlas.paste(tile.resize((16,16),Image.Resampling.LANCZOS),(512+angle*16,row*16))
-        tile = stars.crop((row*32,0,row*32+32,32))
-        atlas.paste(tile.resize((16,16),Image.Resampling.LANCZOS),(512+row*16,48))
+            atlas.paste(bullet(color,1).rotate(-angle*45,resample=Image.Resampling.BICUBIC),(512+angle*16,row*16))
+        # Retired star slots also contain circles; old shape IDs cannot show stars.
+        atlas.paste(bullet(color),(448+row*16,64))
+    # Wide beam: 28 px solid body (previously 8), 32 px tile, 12 px sampling.
+    # Four times the tile area and four times the sample stride keep work bounded.
+    for sx,warning in ((576,False),(608,True)):
+        tile=Image.new('RGBA',(32,32));d=ImageDraw.Draw(tile)
+        if warning:
+            d.ellipse((2,2,29,29),fill=(168,150,121,20))
+            d.ellipse((14,14,17,17),fill=(211,155,63,210))
+        else:
+            # Uniform opaque body avoids overlapping highlight scallops.
+            # Preserve the existing faint rim and all beam dimensions.
+            d.ellipse((1,1,30,30),fill=(190,161,184,18))
+            d.ellipse((2,2,29,29),fill=(190,78,150,255))
+        atlas.paste(tile,(sx,96))
+    # Dedicated warning bead, player needle, live beam and life icon.
+    for sx in (512,528,544,560):
+        tile=Image.new('RGBA',(16,16));d=ImageDraw.Draw(tile)
+        if sx==512: d.ellipse((6,6,9,9),fill=(255,199,91,230))
+        elif sx==528:
+            d.line((8,1,8,14),fill=(222,249,255,255),width=2)
+            d.line((7,5,7,13),fill=(99,178,210,100),width=1)
+        elif sx==544:
+            d.ellipse((1,1,14,14),fill=(255,144,189,32));d.ellipse((4,4,11,11),fill=(255,177,210,230));d.ellipse((6,6,9,9),fill=(255,253,243,255))
+        else: d.polygon([(8,2),(13,8),(8,13),(3,8)],fill=(175,229,243,255))
+        atlas.paste(tile,(sx,64))
+    for frame in range(4):
+        tile=Image.new('RGBA',(16,16));d=ImageDraw.Draw(tile);radius=2+frame*2
+        d.ellipse((8-radius,8-radius,7+radius,7+radius),outline=(253,220,178,220-frame*40),width=1)
+        d.line((8,4,8,11),fill=(255,249,220,255-frame*55));d.line((4,8,11,8),fill=(255,249,220,255-frame*55))
+        atlas.paste(tile,(448+frame*16,80))
+    # Bake the halo into existing Boss frames: no extra runtime draw or larger sprite.
+    for frame in range(16):
+        sx,sy=frame%4*112,frame//4*112
+        boss=atlas.crop((sx,sy,sx+112,sy+112)); halo=Image.new('RGBA',(112,112));d=ImageDraw.Draw(halo)
+        d.ellipse((5,5,106,106),outline=(132,167,217,55),width=1)
+        d.arc((10,10,101,101),frame*22,frame*22+100,fill=(196,191,242,110),width=1)
+        halo.alpha_composite(boss);atlas.paste(halo,(sx,sy))
     f = ImageFont.truetype('C:/Windows/Fonts/segoeui.ttf', 17)
     draw = ImageDraw.Draw(atlas)
     for index in range(64):
@@ -69,6 +114,14 @@ def main():
     label(atlas,'WARNING',(448,408,192,32),23,'#ffc1ee')
     atlas.save(OUT/'atlas.png')
     background = Image.open(SOURCE/'starfield-640x480.png').convert('RGBA')
+    # Dark, calm playfield; preserve more of the original nebula near the edge.
+    pixels=background.load()
+    for y in range(480):
+        for x in range(640):
+            red,green,blue,_=pixels[x,y]
+            edge=min(1.0,abs(x-320)/320)
+            gain=0.34+0.25*edge*edge
+            pixels[x,y]=(int(red*gain),int(green*gain),int(blue*gain),255)
     background.save(OUT/'background.png')
     files = {}
     hashes = []

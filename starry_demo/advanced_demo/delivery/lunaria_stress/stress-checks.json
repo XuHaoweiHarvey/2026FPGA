@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "board_tested": false,
+  "elf_sha256": "829643a384781f8a13412bd6afa14a293f25e4a034353924bb7d748ea2486f18",
+  "output": "PASS limit 64: visible 64, continuous fire score 8100\nPASS limit 65: visible 65, continuous fire score 16200\nPASS limit 128: visible 128, continuous fire score 24300\nPASS limit 256: visible 256, continuous fire score 32400\nPASS limit 384: visible 384, continuous fire score 40500\nPASS limit 512: visible 512, continuous fire score 48600\nPASS limit 610: visible 610, continuous fire score 56700\nPASS limit 640: visible 640, continuous fire score 64800\nFRAME stress-640-firing: B=640 A=645 commands=698 pixels=132736\nFRAME stress-640-steady: B=640 A=642 commands=695 pixels=131968\nPASS limit 704: visible 704, continuous fire score 73200\nPASS limit 768: visible 768, continuous fire score 81300\nPASS limit 832: visible 832, continuous fire score 89400\nFRAME stress-832-steady: B=832 A=834 commands=887 pixels=159616\nPASS 28959586 stress checks; 600000 ms steady 832 visible bullets; no board FPS claim\n",
+  "rtl_output": "PASS stress RTL warm same-source: 16x16=721 cycles, 12x12=478 cycles\nPASS Alpha stream=1 cache=1: cold=615 warm=514 cycles; source_reads=78 background_reads=299 exact_pixels=5932; stalls/pages/clipping/errors/reset\nC:\\Users\\HUIPU\\AppData\\Local\\Temp\\stress-alpha-wwe7ppag\\stress.v:184: $finish called at 131580000 (1ps)\n",
+  "frames": [
+    "stress-640-firing.png",
+    "stress-640-steady.png"
+  ],
+  "sources": {
+    "sim/test_lunaria_stress.c": "dc28416bb52f9b4e0d69d3d4676027c735add7c36d5521ca2c7899306e566950",
+    "software/lunaria/lunaria.c": "8111e13723e0e4a59d826515d337c857ed4d3a12398f219f574626d12ad8bbfa",
+    "software/lunaria/lunaria_render.c": "8041e1af970680d1e4bd560381416e9720cf2fda0f4bad57839646c61da8525c",
+    "software/lunaria/lunaria.h": "2a390dcb81920f65909507044791600b5528c2c3d4ae63eba3c57daf94eb554c",
+    "scripts/run_lunaria_stress_checks.py": "9fcd7efd56bfb12ee88cb8f96395176491fc6c552c7c2974fbbc323fd4ce361d"
+  }
+}

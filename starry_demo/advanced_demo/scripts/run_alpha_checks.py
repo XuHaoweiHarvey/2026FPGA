@@ -38,6 +38,12 @@ for stream, cache in ((0,0), (1,0), (0,1), (1,1)):
         'sim/tb_alpha_stream_cache.v', 'rtl/accelerator/alpha_pixel_pipeline.v',
         'rtl/accelerator/alpha_blit_engine.v'], [
         f'-Ptb_alpha_stream_cache.STREAM={stream}', f'-Ptb_alpha_stream_cache.CACHE={cache}'])
+for stream, cache in ((0,0), (1,0), (0,1), (1,1)):
+    sim(f'pixel-x-{stream}-{cache}', 'tb_alpha_stream_cache', [
+        'sim/tb_alpha_stream_cache.v', 'rtl/accelerator/alpha_pixel_pipeline.v',
+        'rtl/accelerator/alpha_blit_engine.v'], [
+        '-Ptb_alpha_stream_cache.PIXEL_X=1',
+        f'-Ptb_alpha_stream_cache.STREAM={stream}', f'-Ptb_alpha_stream_cache.CACHE={cache}'])
 for enabled in (0, 1):
     sim(f'source-guard-alpha{enabled}','tb_blit_source_guard',[
         'sim/tb_blit_source_guard.v','rtl/framebuffer/blit_source_guard.v'],[

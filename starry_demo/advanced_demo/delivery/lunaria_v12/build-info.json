@@ -1,0 +1,18 @@
+{
+  "elf_sha256": "8d63c6290e240481dda21a0991f33904c7b2e40564e9f4c7e192d61aefacf764",
+  "sources": {
+    "software/lunaria/lunaria.c": "a8bfeb901a981cb1ca4ed01a111b3a6252f2ef4d4617f77287bee1b243745153",
+    "software/lunaria/lunaria_render.c": "7541dc1288d6040d3c2d4abbf83635555d5b276eeb80137f293a2ee310935d4e",
+    "software/lunaria/main.c": "9d489862b8cc1a8e95e85322f4603865a134143c29d53a35f1740724cfd1f944",
+    "software/lunaria/lunaria.h": "8c15ab7fada52fc0ae338ee49d670eecb91966e35187ace4fb1d4422b788e60c",
+    "software/lunaria/lunaria_asset_ids.h": "bad76749aa886317818661c8b2b1d909118742abef2238f7c2de81aae1bac19b",
+    "software/lunaria/lunaria_render.h": "69c93d1c82eb4645897d0f12ef671c2c7ca5db53b753788a362a67309d9b86cb",
+    "software/lunaria/lunaria_tables.h": "24498a67df3792e2c42d2d43786f4bc8bbf31b2e48393859cd3afdaa361df89b",
+    "software/lunaria/lunaria_upload.h": "72c81d5c3d4cca8708124703a8f2ff45e9f5bcafbecba183dbc4bf6d943595db"
+  },
+  "assets": {
+    "atlas.argb": "3ca8c928d0d8f0e29803b48771b2367d1cd74f14ed58cc3144361a01e97bc3cb",
+    "background.argb": "6b8985a5164c4f9b85ad61d709eba4ded3553cc95cc985b05606c014e98e36a6",
+    "assets.json": "a391367d8ab790714b368cf29fdd1b0ff87f9b99c6a8fd327f403ebf810e6359"
+  }
+}

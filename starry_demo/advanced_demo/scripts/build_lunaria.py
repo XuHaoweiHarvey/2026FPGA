@@ -15,7 +15,7 @@ if args.prepare_assets:
     subprocess.run([sys.executable,str(ROOT/'scripts/prepare_lunaria_assets.py')],cwd=ROOT,check=True)
 subprocess.run([sys.executable,str(ROOT/'scripts/build_apb_software.py'),
                 '--program','lunaria','--ide-root',str(args.ide_root),'--opt','O2',
-                '--define','GAME_DISPLAY_WINDOW=1','--define','GAME_ALLOW_SCALE2=1'],
+                '--define','GAME_DISPLAY_WINDOW=1','--define','GAME_ALLOW_SCALE2=1','--define','LUNARIA_PIXEL_X=1'],
                cwd=ROOT,check=True)
 source_files = sorted((ROOT/'software/lunaria').glob('*.c')) + sorted((ROOT/'software/lunaria').glob('*.h'))
 sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()

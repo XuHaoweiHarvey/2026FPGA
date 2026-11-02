@@ -82,6 +82,24 @@ class Checks(unittest.TestCase):
     def setUpClass(cls):
         cls.assets = read_assets(DEFAULT_ASSETS)
 
+    def test_pixel_x_firmware_rejects_old_hardware_before_load(self):
+        from unittest.mock import Mock
+        from game_debug_bridge import APB
+        for version in (0xA0000, 0xB0000, 0xC0000):
+            fake = FakeUpload()
+            original_read = fake.read_words
+            fake.read_words = lambda address,count: [version] if address == APB+4 else original_read(address,count)
+            fake.upload_assets = Mock()
+            with patch.object(DebugBridge, 'load') as load:
+                if version != 0xC0000:
+                    with self.assertRaises(RuntimeError): fake.load()
+                    load.assert_not_called()
+                    fake.upload_assets.assert_not_called()
+                else:
+                    fake.load()
+                    load.assert_called_once()
+                    fake.upload_assets.assert_called_once()
+
     def test_real_elf_and_assets(self):
         image = ElfImage(DEFAULT_ELF)
         bridge = LunariaBridge()
@@ -223,7 +241,7 @@ class Checks(unittest.TestCase):
         self.assertEqual(fake.writes[-1],(address+8,0))
 
     def test_settings_invalid_locked_halted_and_old_elf_never_write(self):
-        for limit in (-1,0,63,513,4096,64.5,True):
+        for limit in (-1,0,63,641,4096,64.5,True):
             fake,_ = self.settings_fake()
             with self.assertRaises(ValueError): LunariaBridge.configure(fake,limit)
             self.assertFalse(fake.writes)
@@ -255,7 +273,7 @@ class Checks(unittest.TestCase):
             window.bullet_limit.set('4096')
             window.apply()
             self.assertIsNone(window.bridge)
-            self.assertIn('64–512',window.rows[-1]['message'])
+            self.assertIn('64–640',window.rows[-1]['message'])
             self.assertIn('LUNARIA',root.title())
         finally: root.destroy()
 

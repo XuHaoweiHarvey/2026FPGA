@@ -1,0 +1,29 @@
+{
+  "variant": "stress",
+  "core_hz": 100000000,
+  "default_bullets": 256,
+  "maximum_bullets": 832,
+  "revision": "stress-round2",
+  "bullet_texture_size": 12,
+  "previous_user_report": {
+    "stable_bullets": 610,
+    "fps": 60,
+    "fps_at_640": 30,
+    "applies_to_this_revision": false
+  },
+  "always_invincible": true,
+  "board_tested": false,
+  "stable_60_fps_measured": false,
+  "ocram_headroom": 3856,
+  "artifacts": {
+    "assets.json": "b4b2b4152397dbaba5e5c74c122ba4b6c445b703fca4bc83cd0417b7b594eed3",
+    "atlas.argb": "631630b8569c4dbac0b51bac68651ab6f4d324487bf0e9d618ea74533d06ecbd",
+    "background.argb": "6b8985a5164c4f9b85ad61d709eba4ded3553cc95cc985b05606c014e98e36a6",
+    "build-info.json": "21b5f154bd50ac5cd9be633cac57237306c9935ae4a923d87ed5d5ffeeda4fea",
+    "lunaria.elf": "829643a384781f8a13412bd6afa14a293f25e4a034353924bb7d748ea2486f18",
+    "lunaria.map": "592b41fe677fd645968b71aa2e5b013263c628ca4538c0df4a6f82e942f641ea",
+    "README.md": "0fd5ad321fcc1a9f3cf887ede90f80e77ae5c0e59632600aa81ce7c4154cd802",
+    "stress-checks.json": "f2bd160dec648f27d0897e33bccc1d9d1804065b2e013e2265d555cb4b3bbc08",
+    "ti60f225_oob.bit": "1c4d827eb5887dcdd14ea93ae62896f8da99a2b4d8bfa0f2b7a2065b0af03d2e"
+  }
+}
