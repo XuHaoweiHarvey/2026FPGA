@@ -8,7 +8,7 @@
 |---|---|
 | `basic_demo/` | CPU/FPGA 渲染对比的硬件工程、软件源码和基础版交付文件 |
 | `starry_demo/` | PixelForge 与 LUNARIA 压力测试、共享硬件/软件源码及素材 |
-| `docs/` | 架构、寄存器、协议、验证和历史实板证据 |
+| [docs/](docs/README.md) | 集中维护的架构、寄存器、构建、性能、验收和实板证据 |
 | `docs_reference/` | 比赛要求和开发板参考资料 |
 
 ## 可以直接取得的运行文件
@@ -76,4 +76,5 @@ BIN 与原等效 M2 构建的归档 SHA256 一致。基础版 bit 沿用 2026-10
 
 比赛压缩包使用本仓库根目录，排除隐藏的 `.git` 版本历史目录。
 普通 ZIP 打包不读取 `.gitignore`；保留各级工程配置、素材、交付文件和文档。
-`docs/` 与 `starry_demo/docs/` 包含历史记录，旧路径和旧版本说明不作为当前启动入口。
+公共说明统一从 [docs/README.md](docs/README.md) 查阅；`starry_demo/docs/` 只保留导航。
+历史实板证据集中在 `docs/evidence/`，适用版本与计量范围见性能和验收说明。

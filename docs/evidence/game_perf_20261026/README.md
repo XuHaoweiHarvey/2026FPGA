@@ -13,4 +13,6 @@ raw_underflows=66 是累计历史值，不能当成本次新增。
 本地候选 bit/ELF 已另存到被忽略的 `advanced_demo/output/performance_baseline_20261026_30fps/`，
 它保留产物身份，不证明该哈希就是板上运行文件。
 
-分析及建议见 [性能交接报告](../../../advanced_demo/docs/PERFORMANCE_HANDOFF_20261026.md)。
+本记录属于旧居中飞机游戏的历史基线，不能代表现役 PixelForge 或压力测试。
+统一性能口径见 [BENCHMARK](../../BENCHMARK.md)，原分析见
+[性能交接报告](../../../starry_demo/advanced_demo/docs/PERFORMANCE_HANDOFF_20261026.md)。

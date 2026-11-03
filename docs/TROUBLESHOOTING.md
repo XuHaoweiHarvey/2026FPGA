@@ -1,99 +1,27 @@
-# Troubleshooting
+# 故障排查
 
-只记录仓库历史与当前源码能支持的问题；正常构建见[BUILD](BUILD.md)，当前架构见[ARCHITECTURE](ARCHITECTURE.md)，测试数据见[VALIDATION](VALIDATION.md)。A～E最终均已实板通过。下文的旧接线/旧像素格式只用于说明故障，不是当前修改指令。
+当前运行入口见 [BUILD](BUILD.md)，协议与恢复条件见 [REGISTER_MAP](REGISTER_MAP.md)。先核对实际 bit/ELF、素材和本机路径，再保存诊断，不凭单个 LED 或历史文件名判断版本。
 
-## HDMI black screen during continuous rendering
+## 找不到 ELF、路径失效或加载旧程序
 
-### Symptom
+基础应用的源码构建结果是 `basic_demo/software/basic_demo/build/basic_demo.elf`；直接演示的归档文件是 `basic_demo/delivery/basic_demo.elf`。build 被忽略，Git 检出后没有本地 ELF 属正常情况：从源码 Build，或选择 delivery ELF。
 
-Back做全屏FILL+矩形时HDMI黑屏，尚未REQUEST就出现；CPU halt约30秒或Writer停止后旧Front稳定。hold从60改400曾用于诊断，能观察“Writer活跃黑屏、空闲恢复”。missed_boundaries在绘制期10→19，真正swap后仍19；reader_error/error_code/errors为0，Front/Back及reader_base交换本身正确。
+IDE 的 Application、Image、Symbols 要使用同一个文件。直接加载 delivery 时关闭启动前 Build，自行重编译时使用默认 build 并启用 Build。迁移机器后核对 .project/.cproject、BSP/common、Launch、两个 OpenOCD -f、SVD 和寄存器描述的绝对路径。
 
-### Cause
+游戏启动器找不到工具时按 [paths.local.cmd.example](../starry_demo/paths.local.cmd.example) 配置本机路径。切换 PixelForge/压力版后素材校验失败，先重新配置对应 v13 bit，清除旧封存素材，再用配套 ELF/assets 完整加载。
 
-```text
-Writer连续写burst过于激进
- → Display Reader服务不足 / AR或R等待
- → DDR read FIFO、unpack、Display FIFO供数不足
- → cvo_axi_v2: fifo_rd_empty && fifo_rd_en
- → 清frame_ena，H/V状态回SYNC、计数重启
- → HDMI black screen / 重新锁定
- → 新边界出现而旧DDR帧未完成，missed_boundaries增长
-```
+## GDB 连接后立刻退出
 
-原FILL最大32beats/burst、一个outstanding，RESP收到成功B后立即回PREP继续写，全屏16200bursts。原Reader reservation仅保证有空间容纳返回，不保证DDR何时服务。合法延迟的RRESP仍可一直OKAY，所以reader_error=0不排除显示饥饿。
-
-**可确认的是外部写负载缺少读服务约束及CVO欠载后重启时序；加密scheduler内部具体AR优先级或R延迟分配无法由已有资料可靠断言。** 新诊断分别记录AR/R等待，不把推测写成控制器内部事实。
-
-### Diagnosis
-
-比较Writer活跃/空闲、back_ready/frame_presented、hold和missed增量，排除“每次swap自身黑屏”的解释。逐模块跟踪fill_rect_writer、ddr_rd_buffer、FIFO、CVO和manager。
-
-合法写偏置AXI模型复现：Back构建时busy=1、R_wait=5817、FIFO=0并触发CVO underflow；关闭新策略的同模型负对照同样失败。照片/LED本身不足以定位AR还是R。
-
-### Fix
-
-正式保留`ddr_write_admission`，不改Front/Back/swap和原CVO：
-
-1. Reader active时，上一笔写B以后须完成128个真实RVALID&&RREADY，才考虑下一笔最多32beat写。
-2. FIFO≤384保护、≥512恢复，准入时仍须>384；水位为core域既有WrDNum。
-3. 新AW准入一旦暴露就锁存到B，不能因水位下降撤回VALID；W/B、AR/R不门控，已有事务完整排空。
-4. 写进行中的R不预付下一笔额度；新reader launch/flush清新额度，reader整帧完成且safe时允许slack进展。
-5. 追加88..B8诊断；video underflow按周期计数，经注册Gray/三拍到core，保留启动历史。
-
-不降低分辨率/刷新率，不删全屏fill、不增hold掩盖、不清missed、不忽略欠载、不强制提前swap。低水位6144bytes在active594MB/s下约10.34µs名义余量；严苛模型最大R等待422cycles=4.22µs、已暴露写事务70cycles=0.70µs。这是测试预算，不是未知DDR最坏延迟的数学保证。
-
-### Verification
-
-完整1920×1080并发WAIT0/1/3及更严R/B延迟检查248,832,000最终pixels，稳定期欠载/missed增量0、Writer持续进展、安全swap正确；C功能回归通过。负责人随后重新Compile、下载并确认实板连续显示稳定，D通过；最终E也已通过。
-
-复现命令及Simulation throughput见[VALIDATION](VALIDATION.md)。负对照`--unthrottled`预期失败，仅用于仿真，不把关闭保护的配置用于正式设计。
-
-## GDB disconnects after the target is examined
-
-### Symptom
-
-OpenOCD识别Ti60 TAP `0x10660A79`、Target successfully examined、接受GDB连接后退出。IDE日志保留了确切失败：
+历史实际错误为：
 
 ```text
-Error in final launch sequence
-Failed to execute MI command:
 set $pc=0x0xf9000000
 Invalid number "0x0xf9000000".
 ```
 
-### Cause
+IDE Startup 的 Set PC hex 字段会自动补 `0x`，填写 `f9000000`。Target Description disabled、Prefer extended-remote 等 warning 不是这次错误的原因。
 
-Startup的Set PC hex字段错误填写`0xf9000000`，IDE自行再加`0x`。Target Description disabled和Prefer extended-remote是warning，不是这次退出根因。
-
-### Diagnosis
-
-正式workspace曾在`embedded_sw/soc_control/bsp`；`.metadata/.log`于2026-10-14 22:12:22记录该MI错误。用同版本实际GDB解析器离线重放，稳定复现Invalid number。
-
-### Fix
-
-Set PC字段填`f9000000`（无0x），命令应为`set $pc=0xf9000000`。当前`apb_reg_test_ti.launch`与项目配置生成器已采用正确格式；保留成功gpioDemo_ti的Titanium Hard JTAG组织，不切Soft TAP或改Target Description模式。
-
-### Verification
-
-`check_apb_debug.py`用实际GDB和OpenOCD Jim验证解析/配置（硬件命令mock）；负责人完成真实Hard JTAG/APB验收并确认B通过。当前软件沿用同一launch，E已实板通过。
-
-## FTDI target description and the wrong configuration file
-
-### Symptom
-
-生成配置的FTDI description与Programmer实际USB Target不一致。修改旧Demo路径下ftdi_ti.cfg不一定影响当前应用。历史未保留该次失败的完整错误原文，不编造OpenOCD报错字符串。
-
-### Cause
-
-实际板卡为Quad RS232-HS；成功参考是2026.1重新生成BSP的`gpioDemo_ti.launch`，并非旧memTest_ti。当前launch使用本项目`software/apb_reg_test/openocd/`的配置副本，不使用旧D:/Efinity/projects/...路径。
-
-### Diagnosis
-
-以Programmer检测结果和Debug Configurations实际`-f`路径核对，不仅看FPGA型号、旧settings的Trion DEVKIT或编辑过的同名文件。
-
-### Fix
-
-保持当前已验证参数：
+关闭占用 FTDI 的 Programmer、旧 OpenOCD/GDB，再启动当前项目的 Titanium Hard JTAG。已验证 FTDI 参数为：
 
 ```tcl
 ftdi device_desc "Quad RS232-HS"
@@ -101,164 +29,49 @@ ftdi vid_pid 0x0403 0x6011
 ftdi channel 1
 ```
 
-Titanium DEVKIT=11、Hard JTAG_USER1、800kHz、readWaitCycles40、jtagMapping 8 8 0 1 2 2；`cpu0.yaml`来自正式soc_control。OpenOCD工作区固定末1KiB F900FC00，避免覆盖RAM应用入口；不为修复改生成Sapphire或参考Demo。
+实际配置入口在 [基础软件 openocd](../basic_demo/software/basic_demo/openocd/)，不要编辑另一个旧 Demo 中的同名文件。OpenOCD 工作区位于 OCRAM 末 1 KiB，不能覆盖程序入口。Efinix Jim Tcl 曾不支持包装脚本的 `info script`，当前配置通过 Launch 传入 `bsp_loc`，无需恢复旧自定位脚本。
 
-### Verification
+## 连续绘制时黑屏或欠载增长
 
-负责人在成功gpioDemo_ti环境确认单步、Resume与程序运行；正式apb_reg_test随后B～E均通过。当前具体配置入口见[BUILD](BUILD.md)。
+历史症状是 writer 活跃时黑屏、CPU 暂停或 writer 空闲后旧 Front 恢复；reader_error=0 仍可能是显示饥饿。合法 AXI 响应不保证返回足够及时，不能只看 RRESP。
 
-## Jim Tcl does not support the wrapper's info script command
+当前正式设计保留显示写准入：每笔写 B 后等待 128 个真实显示 R 握手，FIFO LOW/HIGH=384/512，下一笔写最多 32 beats；准入保持到 B，不能撤回已暴露的 AW/W。详见 [显示保护合同](GRAPHICS_ENGINE.md#显示写保护)。
 
-### Symptom
+排查时依次记录：
 
-用户实际反馈，项目包装脚本第二行的`[info script]`在当前Efinix OpenOCD内置Jim Tcl中不支持。没有归档完整异常文本，不补写猜测的错误字符串。
+1. bit/ELF 配对、VERSION/CAPABILITIES、SERVICE_STATUS、QUOTA=128、WATERMARKS=0x02000180；版本号不足以区分历史时序修复前后。
+2. PLL/cal_done、INIT_DONE、初始化 beats/bursts、FRONT_VALID，确认启动画面先稳定。
+3. BUSY、ERROR_CODE、WRITER_OWNED、CPU 会话/错误，区分仍在等待 B 与提交已完成。
+4. underflow/missed 相对稳定 baseline 的增量、FIFO 水位、AR/R 最大等待、writer 最大等待及 throttle 是否进展。
 
-### Cause
+UNDERFLOW_COUNT 统计 video 欠载周期，不是黑屏次数；启动历史值可非零。AR/R max 反映外部等待，不能直接推断加密 DDR scheduler 内部原因。历史写保护修复后，负责人确认连续显示稳定；重新交付仍按 [VALIDATION](VALIDATION.md) 复验。
 
-包装脚本依赖该Tcl命令求自身路径，与本版Jim实现不兼容。
+## pending 不清或画面不更新
 
-### Diagnosis
+检查 BOUNDARY_COUNT 是否前进、旧显示 R/RLAST 是否排空、READER_OUTSTANDING/ERROR、FIFO/流水线 idle、blank 与 flush 条件，以及 writer/CPU 会话是否释放。最后 AR 不等于完整帧读完，SWAP_DONE 也不表示画面已经扫描输出。
 
-按当前launch实际配置入口执行；本地检查使用真正的OpenOCD/Jim，而非只用普通Tcl代替。
+CLEAR_DONE 只清 sticky DONE，不取消 pending。当前没有 CANCEL_SWAP；pending 会阻止新绘图命令。INIT/reader 协议故障需要平台复位，CPU Debug reset 不清平台 owner、素材 READY 或已发事务。保存状态后按设计恢复，不能强制交换或释放在途命令。
 
-### Fix
+## RGB 色条错位或出现周期性横带
 
-`debug_ti.cfg`直接使用launch显式传入的`bsp_loc`作为proj_loc，不依赖`info script`、cwd或逐级父目录搜索。保持gpioDemo_ti的`-c set bsp_loc`和两个`-f`组织；兼容入口`sapphire.cfg`也不再使用该命令。
+历史 TPG 的组合 frame_start 曾在 h/v 同时更新时产生毛刺，误清写 FIFO。当前使用寄存器产生 20 ns 脉冲，保留原同步与初始化屏障；不要恢复旧组合译码。
 
-### Verification
+当前是 XRGB8888、128-bit beat 低 pixel 先输出，活动链不使用 Bayer/Debayer。历史 Bayer 相位和 R/B 交换设置不适用于当前颜色问题。按 [像素格式](ARCHITECTURE.md#时钟与像素格式) 核对 P0～P3、B/G/R/X、unpack 与双像素输出。
 
-实际Jim配置解析回归通过；B已由负责人真实Debug验收，后续阶段保持成功文件。
+## Packer 报 jtag_inst1_TDI 缺失
 
-## Packer: required pin jtag_inst1_TDI is not found
+早期无 CPU 显示工程曾因 JTAG 输入被优化删除，临时用 TDI→TDO 透传解决 required pin。当前 Sapphire 已唯一驱动 TDO，不能恢复该占位透传、叠加 EDB 或修改生成 debug_top。核对所开的工程、IP 注册和顶层接线。
 
-### Symptom
-
-无CPU/EDB的早期显示基线packing报告：
-
-```text
-ERROR : Required pin jtag_inst1_TDI is not found
-ERROR : Found 1 errors while checking core interface requirements
-ERROR : Failed to run packer
-```
-
-### Cause
-
-仍保留JTAG_USER1 physical，但TDO曾接常量0，TDI无使用者被优化删除；generated interface要求该输入存在。
-
-### Diagnosis
-
-核对peri required input/output、顶层TDI实际使用及综合结果，不直接删除物理JTAG block。
-
-### Fix
-
-**历史无CPU基线**曾用TDI→TDO透传保留required pin，临时副本综合/packing验证通过。**当前正式版本**已由Sapphire唯一驱动TDO；必须移除历史占位，不能同时存在Sapphire/透传/EDB多个驱动者。不要将旧透传重新加回当前顶层。
-
-### Verification
-
-历史packing检查解决required pin错误；当前Sapphire接入和Hard JTAG已通过B～E实板验收。当前无EDB依赖，也未手改生成debug_top.v。
-
-## RGB color bars corrupted by an asynchronous frame-start glitch
-
-### Symptom
-
-早期RGB基线HDMI有重复明暗横带和密集彩色竖纹，用户反馈LED2/3/7全闪烁。
-
-### Cause
-
-旧`rgb_tpg`组合译码`rst_n && v_count==0 && h_count==0`同时用于writer start及write FIFO异步reset。首活动行结束时h从末值回0、v从0变1，传播间隙可短暂译码为真，帧中清FIFO。只按clk边沿采样的测试会漏掉这种毛刺。
-
-### Diagnosis
-
-逐个frame_start事件检查捕获异常脉冲；64×8激励曾出现560ns额外间隔，正常应6720ns。连续512×64路径第一帧8192beats变成8064beats，随后像素/地址错误；1536word跨FIFO回绕测试通过，排除单纯FIFO顺序假设。
-
-### Fix
-
-将frame_start改为寄存器，在最后一行最后一周期置高一拍；进入首行horizontal blank时输出20ns脉冲，下一拍清零。保持原writer同步与FIFO reset接法、固定启动delay和DDR/IP参数。当前RGB TPG继续保留这一修复。
-
-### Verification
-
-四次frame_start间隔正确；连续三帧98304pixels逐像素通过，P0/P1/P2/P3、128→64、双像素和RGB分量检查通过。负责人2026-10-14确认A持续红绿蓝白显示通过。
-
-当前LED2/7为sticky、LED3是实时underflow；“全闪烁”本身不能证明AXI错误或唯一根因，也不能据此猜改reset。降低TPG帧率只可作为隔离带宽的诊断，不代替毛刺修复。
-
-## Historical Bayer / Debayer chain (inactive)
-
-### Symptom
-
-首个无摄像头基线曾复用Demo10 Bayer链，本地仿真发现红蓝色条内部周期性混色。**当前XRGB8888链不经过该Debayer，不按本节设置当前颜色。**
-
-### Cause
-
-按旧Framebuffer读序 `[31:24]→[23:16]→[15:8]→[7:0]`定义连续Bayer8样本，有效输入相位为BGGR：偶行B G B G，奇行G R G R。旧raw_to_rgb偶数处理行high像素的R/B插值来源接反；代码注释互相矛盾，不能按注释猜相位。
-
-### Diagnosis
-
-历史CSI截断顺序为`{data[39:32],data[29:22],data[19:12],data[9:2]}`，TPG接其后的32bit vin。ser2par把早字移到128bit高位，vid_par2ser高16bit先输出；gain在VS下降沿复位行相位，偶行high/low使用B/G增益、奇行使用G/R。line_buffer中o_p_01为当前行、o_p_00上一行、o_p_11上上行；按中间行追踪raw_to_rgb，再核对debayer输出内部B/G/R与历史顶层R/B mapping，不能把byte/pixel序号反过来。
-
-### Fix
-
-历史正式副本仅交换raw_to_rgb偶数处理行high像素的`w_r_00_00_h0`/`w_b_00_00_h0`取值来源：内部R取后者>>1、B取前者>>1，保持其余插值。gain=Q8.8的0100、gamma旁路；保留历史顶层再次R/B映射，得到最终RGB。首两行、左边界及色条交界仍受旧插值边界影响，未重写边界算法。
-
-| 历史最终色条 | 偶行32bit字 | 奇行32bit字 | 修正后内部RGB | 历史DVI输入RGB |
-|---|---|---|---|---|
-| RED | 00000000 | 00FF00FF | 0000FF | FF0000 |
-| GREEN | 00FF00FF | FF00FF00 | 00FF00 | 00FF00 |
-| BLUE | FF00FF00 | 00000000 | FF0000 | 0000FF |
-| WHITE | FFFFFFFF | FFFFFFFF | FFFFFF | FFFFFF |
-
-这些字按**高byte先**解释，与当前XRGB beat低pixel先不同。历史配置在tpg_config.vh，当前RGB配置在rgb_tpg_config.vh，不混用。
-
-### Verification
-
-历史gain/line_buffer/raw_to_rgb仿真及无摄像头显示基线通过；Phase 2转为XRGB8888后用独立RGB路径验证颜色。**Needs confirmation：有效输入BGGR不证明Sensor原生Bayer相位，后者仍需CSI物理序号/Sensor坐标资料；该未知项不影响当前架构。**
-
-## Runtime triage: pending swap or black screen
-
-### Symptom
-
-复验/后续扩展时pending不清、画面不更新或启动黑屏。
-
-### Cause
-
-不能仅凭现象认定新根因。可能是仍在等B、没有边界事件、旧R/流水线未结束、FIFO empty未确认、INIT/reader错误或误用旧bit/ELF。
-
-### Diagnosis
-
-按序读取：
-
-1. SERVICE_STATUS bit5、QUOTA=128、WATERMARKS=02000180确认含正式保护的bit；VERSION相同不能单独识别修复前后版本。
-2. cal_done/PLL及INIT_DONE、init beats/bursts、FRONT_VALID；CPU运行前应能稳定显示启动色条。
-3. STATUS.BUSY/ERROR_CODE、BUFFER_STATUS.WRITER_OWNED；最后B未完成不能swap。
-4. BOUNDARY_COUNT是否前进；READER_OUTSTANDING、DATA/RESERVED、READER_ERROR与FIFO水位；最后AR不是读完成。
-5. underflow/missed相对稳定baseline的delta、AR/R各自max与writer max。AR max大偏向请求等待，R max大偏向在途返回/接收进展不足；这些不是对IP内部的确定证明。
-
-### Fix
-
-先保存完整CSR/结果结构、bit/ELF来源和时序报告；不清历史计数掩盖错误，不用增hold、取消全屏fill、改DDR timing/PLL或强制交换绕过。CLEAR_DONE不是取消pending。INIT/reader错误按当前设计需平台复位/重新配置恢复；软件不能中断未完成AXI。
-
-### Verification
-
-以连续绘制/显示、读写均进展、无稳态欠载/missed、正确安全换帧与参数图像为标准，使用[VALIDATION](VALIDATION.md)复验，不把CPU暂停后的恢复当连续性通过。
-
-## LED observations
-
-当前顶层LED的**逻辑含义**如下，板上亮灭极性需按原硬件判断；优先以CSR确认，不仅凭闪烁推断故障。
+## 基础版 LED 含义
 
 | LED | 逻辑信号 |
 |---|---|
-| 0 | cal_done后心跳cnt[24] |
+| 0 | cal_done 后心跳 cnt[24] |
 | 1 | INIT_DONE |
-| 2 | write FIFO full sticky，随对应TPG域复位清除 |
-| 3 | CVO实时read_underflow，非sticky计数 |
-| 4 | AXI write beat counter的bit22 |
-| 5 | AXI read beat counter的bit22 |
+| 2 | 初始化 write FIFO full sticky |
+| 3 | CVO 实时 underflow |
+| 4 / 5 | AXI 写 / 读 beat counter bit22 |
 | 6 | vid_rst_n |
-| 7 | AXI response error sticky，随对应诊断域复位清除 |
+| 7 | AXI response error sticky |
 
-read_underflow_sticky虽在内部存在，LED3实际接实时信号；新增DISPLAY_UNDERFLOW_COUNT提供平台累计观察。启动期短暂欠载与稳态持续新增按baseline/delta区分。
-
-## Legacy notes retained without code changes
-
-历史Phase 1记录的`frame_info_det.frame_len_d0 <= frame_end_r0`不是可靠帧长度比较；旧FrameBuffer存在6bit内部ID到4bit DDR接口等继承细节。当前活动RGB路径不使用该旧frame_info_det；相关源码本次只读，未顺手修复。重新启用旧链前须独立复核，不能从Phase 2颜色验收推导旧Camera/Debayer全链已验证。
-
-SDC历史将CLK_25M的`<USER_PERIOD>`修正为40.000ns，已在当前基线中；不要求本轮再改约束。Camera/DSI物理块仍保留，时钟名含MIPI也可能服务core/TPG，不按名称删除。
+亮灭极性按板卡电路判断，当前顶层见 [ti60f225_oob_top.v](../basic_demo/rtl/ti60f225_oob_top.v)。LED3 是实时信号，累计欠载查看 CSR；闪烁现象本身不能证明具体根因。外围名含 Camera/MIPI 的时钟可能仍为 core/video 提供服务，不按名称删除。
