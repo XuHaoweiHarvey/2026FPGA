@@ -1,6 +1,6 @@
 """Package PixelForge using the existing v13 hardware and 16px sprites and luminous round/laser artwork."""
 from pathlib import Path
-import hashlib,json,math,shutil,subprocess,sys,tempfile
+import argparse,hashlib,json,math,os,shutil,subprocess,sys,tempfile
 from PIL import Image,ImageDraw
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tools'))
@@ -8,9 +8,13 @@ from game_debug_bridge import ElfImage,RAM_END
 from lunaria_debug_bridge import fnv_words,read_assets
 from prepare_lunaria_assets import label
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
-normal=ROOT/'delivery/lunaria_v12';stress=ROOT/'delivery/lunaria_stress'
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--output',type=Path,default=ROOT/'delivery/PixelForge')
+parser.add_argument('--ide-root',type=Path,default=Path(os.environ.get('RISCV_IDE_ROOT','D:/Efinity/efinity-riscv-ide-2026.1')))
+args=parser.parse_args()
+normal=ROOT/'design/game_assets';stress=ROOT/'delivery/lunaria_stress'
 protected={p:sha(p) for folder in (normal,stress) for p in folder.iterdir() if p.is_file()}
-out=ROOT/'delivery/PixelForge';out.mkdir(exist_ok=True)
+out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 atlas=Image.frombytes('RGBA',(640,480),(normal/'atlas.argb').read_bytes(),'raw','BGRA')
 original=atlas.copy()
 ImageDraw.Draw(atlas).rectangle((0,448,255,479),fill=(0,0,0,0))
@@ -92,7 +96,7 @@ assert hardware['version']=='0xd0000' and sha(stress/'ti60f225_oob.bit')==hardwa
 defines=['PIXELFORGE=1','LN_STRESS_ATLAS_HASH='+hex(digest),'GAME_DISPLAY_WINDOW=1','GAME_ALLOW_SCALE2=1','LUNARIA_PIXEL_X=1','LUNARIA_HARDWARE_VERSION=0xd0000']
 with tempfile.TemporaryDirectory(prefix='pixelforge-build-') as folder:
     temp=Path(folder)
-    command=[sys.executable,'-B',str(ROOT/'scripts/build_apb_software.py'),'--program','lunaria','--opt','Os','--ide-root','D:/Efinity/efinity-riscv-ide-2026.1','--output',str(temp)]
+    command=[sys.executable,'-B',str(ROOT/'scripts/build_apb_software.py'),'--program','lunaria','--opt','Os','--ide-root',str(args.ide_root),'--output',str(temp)]
     for define in defines:command+=['--define',define]
     subprocess.run(command,cwd=ROOT,check=True)
     elf=ElfImage(temp/'lunaria.elf')

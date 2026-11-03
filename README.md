@@ -51,7 +51,8 @@ BIN 与原等效 M2 构建的归档 SHA256 一致。基础版 bit 沿用 2026-10
 
 玩法、操作和验证范围以 [PixelForge 说明](starry_demo/advanced_demo/docs/PIXELFORGE.md)
 及 [压力测试说明](starry_demo/advanced_demo/docs/LUNARIA_STRESS.md) 为准。
-同名说明也在各交付目录内。`delivery/lunaria_v12` 是 PixelForge 构建和检查的输入，需保留。
+同名说明也在各交付目录内。高级版只保留 PixelForge 和压力测试两个交付模式，
+共用构建素材位于 `starry_demo/advanced_demo/design/game_assets`。
 
 ## 从源码构建
 
@@ -59,11 +60,13 @@ BIN 与原等效 M2 构建的归档 SHA256 一致。基础版 bit 沿用 2026-10
   `python -B build.py --ide-root <本机Efinity-RISC-V-IDE目录>`。
 - 基础硬件：在 Efinity 中打开 `basic_demo/ti60f225_oob.xml`。
 - PixelForge 软件：构建入口是 `starry_demo/advanced_demo/scripts/build_pixelforge.py`，
-  使用现有 `delivery/lunaria_v12` 素材和压力版 v13 bit；工具链位置见该脚本及游戏说明。
-- 游戏 v13 硬件的构建脚本依赖原准备目录
-  `starry_demo/advanced_demo/output/lunaria_hardware_v12`，该目录不在本精简包内。
-  当前基础硬件工程或游戏共享工程的默认参数不能直接当成最终 v13 bit 的复现结果；
-  直接演示请使用随包保留的 v13 bit，重新构建时先按构建脚本准备完整工程及参数。
+  使用 `design/game_assets` 的共用素材和压力版 v13 bit；工具链位置见该脚本及游戏说明。
+- 压力版软件：在 `starry_demo/advanced_demo` 中执行
+  `python -B scripts/build_lunaria_stress.py`，默认复用已记录的 v13 bit。
+- 游戏 v13 硬件：`starry_demo/prepare_hardware.cmd` 准备
+  `starry_demo/advanced_demo/output/game_hardware_v13` 工程，随后可在 Efinity 完整 Compile，
+  再用 `scripts/build_lunaria_stress.py --hardware package` 校验时序和打包。
+  直接演示使用随包保留的 v13 bit；共享工程的默认参数不代表最终 v13 配置。
 
 ## Git 同步与比赛打包
 

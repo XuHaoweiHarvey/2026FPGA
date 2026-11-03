@@ -13,7 +13,9 @@ STATES = ('标题画面','Boss 入场','战斗','阶段预警','击毁演出','V
 
 
 class LunariaWindow(DebugWindow):
-    def __init__(self, root, elf=DEFAULT_ELF, assets=DEFAULT_ASSETS, stress=False, pixelforge=False):
+    def __init__(self, root, elf=DEFAULT_ELF, assets=DEFAULT_ASSETS, stress=False, pixelforge=None):
+        if pixelforge is None:
+            pixelforge = not stress
         self.pixelforge = pixelforge
         self.stress = stress
         self.maximum_bullets = 1024 if pixelforge else 2048 if stress else 640
@@ -26,7 +28,7 @@ class LunariaWindow(DebugWindow):
                 raise ValueError('压力测试入口需要专用 stress ELF')
             return bridge
         super().__init__(root,elf,bridge_factory=factory)
-        root.title('PixelForge' if pixelforge else 'LUNARIA 压力测试 — v12' if stress else 'LUNARIA 星海梦境 — v10 / v11')
+        root.title('PixelForge' if pixelforge else 'LUNARIA 压力测试 — v13')
         if stress: self.invincible.set(True)
         self.alpha.set('255'); self.cap.set('1'); self.delay.set('0')
         self.bullet_limit = tk.StringVar(value='256')
@@ -135,11 +137,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--elf',type=Path,default=DEFAULT_ELF)
     parser.add_argument('--assets',type=Path,default=DEFAULT_ASSETS)
-    parser.add_argument('--stress',action='store_true',help='Use the dedicated invincible stress firmware')
-    parser.add_argument('--pixelforge',action='store_true')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--stress',action='store_true',help='Use the dedicated invincible stress firmware')
+    modes.add_argument('--pixelforge',action='store_true')
     args = parser.parse_args()
     root = tk.Tk()
-    LunariaWindow(root,args.elf,args.assets,args.stress,args.pixelforge)
+    if args.stress:
+        if args.elf == DEFAULT_ELF:
+            args.elf = DEFAULT_ELF.parent.parent/'lunaria_stress/lunaria.elf'
+        if args.assets == DEFAULT_ASSETS:
+            args.assets = DEFAULT_ASSETS.parent.parent/'lunaria_stress/assets.json'
+    LunariaWindow(root,args.elf,args.assets,args.stress,not args.stress)
     root.mainloop()
 
 

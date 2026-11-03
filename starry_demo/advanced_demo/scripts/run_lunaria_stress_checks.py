@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tools'))
 from lunaria_debug_bridge import LunariaBridge, read_assets
 from lunaria_debug_window import LunariaWindow
-from run_lunaria_checks import rasterize
+from run_lunaria_checks import rasterize, source_image
 
 
 def check_rv32_initialization():
@@ -181,7 +181,7 @@ assert bridge.image.symbol_u32('g_lunaria_stress_test')==1
 assert bridge.image.symbol_u32('g_lunaria_settings',10)==2048
 assert bridge.asset_hashes==[h for _,h in read_assets(delivery/'assets.json')]
 # The actual packed tile is 8x8, with visible opaque body/highlights retained.
-old_atlas=Image.open(ROOT/'output/lunaria/atlas.png').convert('RGBA')
+old_atlas=source_image('atlas')
 old=old_atlas.crop((450,2,462,14));new=stress_atlas.crop((448,64,456,72))
 assert new.tobytes()==old.resize((8,8), Image.Resampling.LANCZOS).tobytes()
 assert new.getchannel('A').getbbox()==(0,0,8,8)
@@ -236,12 +236,12 @@ with tempfile.TemporaryDirectory(prefix='stress-alpha-') as directory:
     temp=Path(directory);bench=temp/'stress.v';binary=temp/'stress.vvp'
     bench.write_text(fixture,encoding='utf8')
     for cache,latency in ((1,0),(1,20),(0,20)):
-        subprocess.run(['D:/iverilog/iverilog/bin/iverilog.exe','-g2005-sv','-s','tb_alpha_stream_cache',
+        subprocess.run(['D:/iverilog/bin/iverilog.exe','-g2005-sv','-s','tb_alpha_stream_cache',
                         '-Ptb_alpha_stream_cache.STREAM=1',f'-Ptb_alpha_stream_cache.CACHE={cache}',
                         '-Ptb_alpha_stream_cache.PIXEL_X=1',f'-Ptb_alpha_stream_cache.SOURCE_LATENCY={latency}',
                         '-o',str(binary),str(bench),str(ROOT/'rtl/accelerator/alpha_pixel_pipeline.v'),
                         str(ROOT/'rtl/accelerator/alpha_blit_engine.v')],check=True,cwd=ROOT)
-        rtl=subprocess.run(['D:/iverilog/iverilog/bin/vvp.exe',str(binary)],capture_output=True,text=True)
+        rtl=subprocess.run(['D:/iverilog/bin/vvp.exe',str(binary)],capture_output=True,text=True)
         print(rtl.stdout,end='');print(rtl.stderr,end='');rtl.check_returncode()
         rtl_outputs.append(rtl.stdout)
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()

@@ -39,3 +39,7 @@
 /paths.local.cmd
 **/__pycache__/
 *.pyc
+
+# Intermediate outputs for the two retained game modes.
+/advanced_demo/output/
+/advanced_demo/software/lunaria/build/

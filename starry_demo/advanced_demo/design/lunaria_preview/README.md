@@ -27,6 +27,6 @@
 - preview-checks.json：实际结果和源文件 SHA-256。最近通过 10,914 条断言，覆盖六档板端数量、五档参考数量与 320–820 px 布局。
 - assets/：程序生成的背景、Boss、玩家、命中特效、米粒弹和星弹图集。
 
-新星弹素材由 node design/lunaria_preview/inspect-lunaria.cjs --assets-only 导出。scripts/prepare_lunaria_assets.py 将素材重排为板端图集，包含八个米粒弹方向和三种星弹颜色。升级旧星海版时需重新配置原 v10/v11 bit 解除旧素材封存，再加载配套 ELF 和素材。
+新星弹素材由 node design/lunaria_preview/inspect-lunaria.cjs --assets-only 导出。scripts/prepare_lunaria_assets.py 可将原始素材重排为基础图集。当前两个最终模式使用 design/game_assets 中归档的共用构建素材，运行时加载各自 delivery 下的配套图集。
 
-交付目录 output/lunaria/ 内的 preview.html 可直接浏览。上板步骤、数量口径和实测状态见 docs/LUNARIA_GAME.md。
+浏览预览可打开本目录的 lunaria-inspection.html。正式游戏和压力测试的上板步骤、数量口径与实测状态分别见 docs/PIXELFORGE.md 和 docs/LUNARIA_STRESS.md。

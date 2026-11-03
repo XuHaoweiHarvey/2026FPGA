@@ -9,8 +9,8 @@ import time
 from game_debug_bridge import (APB, DebugBridge, DEFAULT_IDE, ROOT, STATUS_FIELDS,
                                CONTROL_MAGIC, tcl_word)
 
-DEFAULT_ELF = ROOT / 'software/lunaria/build/lunaria.elf'
-DEFAULT_ASSETS = ROOT / 'output/lunaria/assets.json'
+DEFAULT_ELF = ROOT / 'delivery/PixelForge/PixelForge.elf'
+DEFAULT_ASSETS = ROOT / 'delivery/PixelForge/assets.json'
 MAGIC, WAIT, PROCESS, READY, FAULT = 0x4C4E5531, 1, 2, 3, 255
 WORDS, CHUNK_WORDS = 307200, 1024
 SETTINGS_MAGIC = 0x4c4e5331
@@ -150,6 +150,8 @@ class LunariaBridge(DebugBridge):
 
     def configure(self, limit, spin=False, options=None):
         """Commit one frame-boundary settings request; never reset/load the board."""
+        if 'g_lunaria_settings' not in self.image.symbols:
+            raise RuntimeError('当前 ELF 不支持子弹数量设置，请加载新版 LUNARIA ELF')
         maximum = (self.image.symbol_u32('g_lunaria_settings',10)
                    if ('g_lunaria_stress_test' in self.image.symbols or 'g_pixelforge_available' in self.image.symbols) else 640)
         if type(limit) is not int or not 64 <= limit <= maximum or spin not in (0, 1):
@@ -159,8 +161,6 @@ class LunariaBridge(DebugBridge):
             if not (delay == 0 and interval == 900 and cap == 1 and
                     invincible in (0, 1) and 0 <= alpha <= 255):
                 raise ValueError('Alpha 须为 0–255 的整数')
-        if 'g_lunaria_settings' not in self.image.symbols:
-            raise RuntimeError('当前 ELF 不支持子弹数量设置，请加载新版 LUNARIA ELF')
         with self.halted() as running:
             if not running:
                 raise RuntimeError('CPU 原本已暂停，请先在原调试器继续运行')

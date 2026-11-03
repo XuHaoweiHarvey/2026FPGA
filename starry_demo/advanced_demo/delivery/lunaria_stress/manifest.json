@@ -181,8 +181,26 @@
     "build-info.json": "49db580fbe955af713663e5099376848e40fe67238b80f8101bda317226734f1",
     "lunaria.elf": "4458e8185a752149865a49c6073e2b686ea705f054f1b4272da6568be3ba625f",
     "lunaria.map": "10cd76ceef725a9928c30ba29407be039bd62229409a1a47805698c11fade9e8",
-    "README.md": "a82e0c6bdf46f147a9c5ba5d9d19d43ac9dc3f374a068c2c8f3e4d57fcee6ad7",
-    "stress-checks.json": "f3a79575045976f5ea6f57897a0015c5960e6d3253f5f15b205c6e2ef16b8a1c",
+    "README.md": "22e92cbf83b19944123e36b0755dda2f16677db80b3c8195680d3d4b552cc5bc",
+    "stress-checks.json": "50e67cdacbce76ed121ce64f887282cc7abb915c45ab36243fac449bee6d41c8",
     "ti60f225_oob.bit": "61d2c1a5d785ba0d6a4cf4d390cfa3a905616255d70b484081762f237ff4f9b1"
+  },
+  "layout_cleanup": {
+    "date": "2026-11-03",
+    "retained_modes": [
+      "PixelForge",
+      "lunaria_stress"
+    ],
+    "shared_build_assets": "design/game_assets",
+    "runtime_artifacts_unchanged": true,
+    "original_build_info_preserved": true,
+    "validation": {
+      "both_software_rebuilds": "passed",
+      "rebuilt_atlas_background_bit_match": "passed",
+      "loader_tests": 13,
+      "pixelforge_checks": "passed",
+      "stress_checks": "passed",
+      "board_tested_this_cleanup": false
+    }
   }
 }

@@ -1,15 +1,16 @@
-"""Build/package a separate stress firmware without replacing the normal ELF."""
+"""Build the retained stress firmware using shared artwork and v13 hardware."""
 from pathlib import Path
 import argparse
+import copy
 import hashlib
 import re
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
-from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'tools'))
@@ -17,19 +18,26 @@ from game_debug_bridge import ElfImage, RAM_END
 from lunaria_debug_bridge import read_assets, fnv_words
 
 out = ROOT/'delivery/lunaria_stress'
-assets = ROOT/'output/lunaria'
-hw = ROOT/'output/lunaria_hardware_v12'  # Reuse the existing complete build tree.
+assets = ROOT/'design/game_assets'
+hw = ROOT/'output/game_hardware_v13'
 bit = hw/'outflow/ti60f225_oob.bit'
 HARDWARE_VERSION = 0xD0000
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--hardware', choices=('prepare','compile','package'), default='package')
-parser.add_argument('--efinity', type=Path, default=Path('D:/Efinity/2026.1'))
+parser.add_argument('--hardware', choices=('reuse','prepare','compile','package'), default='reuse',
+                    help='Reuse the recorded delivery bit, or prepare/compile/package a v13 project')
+parser.add_argument('--efinity', type=Path, default=Path('D:/Efinity'))
+parser.add_argument('--ide-root', type=Path, default=Path(os.environ.get('RISCV_IDE_ROOT','D:/Efinity/efinity-riscv-ide-2026.1')))
+parser.add_argument('--output', type=Path, default=out)
 args = parser.parse_args()
+reference = out
+out = args.output.resolve()
+if args.hardware != 'reuse' and out != reference:
+    parser.error('--output is supported only when reusing recorded hardware')
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
-normal = ROOT/'delivery/lunaria_v12'
+normal = ROOT/'delivery/PixelForge'
 normal_hashes = {p.name: sha(p) for p in normal.iterdir() if p.is_file()}
 # Only changed inputs are rewritten, so package can reject a stale bit by mtime.
-# The historical directory name stays unchanged; its project now builds stress v13.
+# Both retained modes use the same v13 hardware.
 def prepared_top():
     text = (ROOT/'rtl/ti60f225_oob_top.v').read_text(encoding='utf8')
     for name in ('DISPLAY_WINDOW_ENABLE','DISPLAY_SCALE2_ENABLE','ALPHA_PIXEL_X_ENABLE',
@@ -52,6 +60,14 @@ def input_digest(path):
     return hashlib.sha256(data).hexdigest()
 
 if args.hardware in ('prepare','compile'):
+    if not (hw/'ip/soc_control/soc_control.v').exists():
+        for name in ('rtl','ip','embedded_sw','constraints'):
+            shutil.copytree(ROOT/name,hw/name,dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns('build','__pycache__','.metadata'))
+        for name in ('ti60f225_oob.xml','ti60f225_oob.peri.xml','ti60f225_oob.sdc'):
+            shutil.copy2(ROOT/name,hw/name)
+        (hw/'software/flash').mkdir(parents=True,exist_ok=True)
+        shutil.copy2(ROOT/'software/flash/jtag_wait.hex',hw/'software/flash/jtag_wait.hex')
     assert (hw/'ip/soc_control/soc_control.v').exists(), 'Existing generated IP is required'
     for source in (ROOT/'rtl').rglob('*'):
         if source.is_file() and source.suffix in ('.v','.sv','.vh'):
@@ -78,50 +94,59 @@ if args.hardware in ('prepare','compile'):
     assert all(input_digest(p)==digest for p,digest in compile_inputs.items()), 'Inputs changed during compilation'
     assert bit.stat().st_mtime >= compile_start, 'Compiler did not replace the bit'
 
-assert (hw/'rtl/ti60f225_oob_top.v').read_text(encoding='utf8') == prepared_top(), 'Run --hardware prepare/compile first'
-for source in (ROOT/'rtl').rglob('*'):
-    if source.is_file() and source.suffix in ('.v','.sv','.vh') and source.name != 'ti60f225_oob_top.v':
-        assert sha(source) == sha(hw/source.relative_to(ROOT)), f'Unprepared RTL: {source}'
-hw_sources = hardware_sources()
-current_inputs = {p.relative_to(hw).as_posix():input_digest(p) for p in hw_sources}
-previous = json.loads((out/'build-info.json').read_text(encoding='utf8'))
-pending = previous.get('hardware_pending')
-if pending:
-    assert current_inputs == pending['sources'], 'Prepared hardware inputs changed: prepare and compile again'
-    assert bit.exists() and bit.stat().st_mtime >= pending['prepared_at'], 'Compile the prepared hardware first'
+if args.hardware == 'reuse':
+    previous = json.loads((reference/'build-info.json').read_text(encoding='utf8'))
+    hardware = copy.deepcopy(previous['hardware'])
+    bit = reference/'ti60f225_oob.bit'
+    assert hardware['version'] == hex(HARDWARE_VERSION)
+    assert bit.is_file() and sha(bit) == hardware['bit_sha256'], 'Recorded v13 bit is missing or changed'
+    assert not previous.get('hardware_pending'), 'Complete or resolve the pending hardware build before reuse'
 else:
-    recorded = previous.get('hardware', {})
-    assert current_inputs == recorded.get('sources'), 'Hardware inputs changed: run --hardware prepare/compile'
-    assert bit.exists() and sha(bit) == recorded.get('bit_sha256'), 'Unrecorded bit: prepare and compile before packaging'
-# The tool rewrites project XML after bit generation; use its content hash, not mtime.
-input_time = max(p.stat().st_mtime for p in hw_sources if p != hw/'ti60f225_oob.xml')
-assert bit.exists(), 'Complete Efinity compilation before packaging'
-assert bit.stat().st_mtime >= input_time, 'Stale bit: run full Efinity Compile'
-timing_path = hw/'outflow/ti60f225_oob.timing.rpt'
-assert timing_path.stat().st_mtime >= input_time, 'Stale timing report'
-if pending:
-    assert timing_path.stat().st_mtime >= pending['prepared_at'], 'Compile did not update timing report'
-timing = timing_path.read_text(errors='replace')
-relationship = timing.split('Setup (Max) Clock Relationship',1)[1].split('---------- Clock Relationship Summary (end)',1)[0]
-setup_text, hold_text = relationship.split('Hold (Min) Clock Relationship')
-slacks = lambda text: [float(m[1]) for m in re.findall(r'^\s*\S+\s+\S+\s+(-?[\d.]+)\s+(-?[\d.]+)\s+\(',text,re.M)]
-setup, hold = slacks(setup_text), slacks(hold_text)
-assert setup and hold and min(setup) >= 0 and min(hold) >= 0, 'Timing closure failed'
-assert re.search(r'^core_clk\s+10\.000\s+100\.000', timing, re.M), 'Unexpected core clock'
-core_setup = float(re.search(r'^core_clk\s+core_clk\s+10\.000\s+([\d.]+)',setup_text,re.M)[1])
-place = (hw/'outflow/ti60f225_oob.place.rpt').read_text(errors='replace')
-resources = {}
-for label in ('XLRs','Memory Blocks','DSP Blocks'):
-    used,total = re.search(r'^'+label+r': (\d+) / (\d+)',place,re.M).groups()
-    resources[label] = dict(used=int(used),available=int(total))
-hardware = dict(version=hex(HARDWARE_VERSION),core_hz=100000000,
-                project=hw.relative_to(ROOT).as_posix()+'/ti60f225_oob.xml',
-                setup_min_ns=min(setup),hold_min_ns=min(hold),core_setup_ns=core_setup,resources=resources,
-                bit_sha256=sha(bit),timing_sha256=sha(timing_path),
-                sources=current_inputs)
+    assert (hw/'rtl/ti60f225_oob_top.v').read_text(encoding='utf8') == prepared_top(), 'Run --hardware prepare/compile first'
+    for source in (ROOT/'rtl').rglob('*'):
+        if source.is_file() and source.suffix in ('.v','.sv','.vh') and source.name != 'ti60f225_oob_top.v':
+            assert sha(source) == sha(hw/source.relative_to(ROOT)), f'Unprepared RTL: {source}'
+    hw_sources = hardware_sources()
+    current_inputs = {p.relative_to(hw).as_posix():input_digest(p) for p in hw_sources}
+    previous = json.loads((out/'build-info.json').read_text(encoding='utf8'))
+    pending = previous.get('hardware_pending')
+    if pending:
+        assert current_inputs == pending['sources'], 'Prepared hardware inputs changed: prepare and compile again'
+        assert bit.exists() and bit.stat().st_mtime >= pending['prepared_at'], 'Compile the prepared hardware first'
+    else:
+        recorded = previous.get('hardware', {})
+        assert current_inputs == recorded.get('sources'), 'Hardware inputs changed: run --hardware prepare/compile'
+        assert bit.exists() and sha(bit) == recorded.get('bit_sha256'), 'Unrecorded bit: prepare and compile before packaging'
+    # The tool rewrites project XML after bit generation; use its content hash, not mtime.
+    input_time = max(p.stat().st_mtime for p in hw_sources if p != hw/'ti60f225_oob.xml')
+    assert bit.exists(), 'Complete Efinity compilation before packaging'
+    assert bit.stat().st_mtime >= input_time, 'Stale bit: run full Efinity Compile'
+    timing_path = hw/'outflow/ti60f225_oob.timing.rpt'
+    assert timing_path.stat().st_mtime >= input_time, 'Stale timing report'
+    if pending:
+        assert timing_path.stat().st_mtime >= pending['prepared_at'], 'Compile did not update timing report'
+    timing = timing_path.read_text(errors='replace')
+    relationship = timing.split('Setup (Max) Clock Relationship',1)[1].split('---------- Clock Relationship Summary (end)',1)[0]
+    setup_text, hold_text = relationship.split('Hold (Min) Clock Relationship')
+    slacks = lambda text: [float(m[1]) for m in re.findall(r'^\s*\S+\s+\S+\s+(-?[\d.]+)\s+(-?[\d.]+)\s+\(',text,re.M)]
+    setup, hold = slacks(setup_text), slacks(hold_text)
+    assert setup and hold and min(setup) >= 0 and min(hold) >= 0, 'Timing closure failed'
+    assert re.search(r'^core_clk\s+10\.000\s+100\.000', timing, re.M), 'Unexpected core clock'
+    core_setup = float(re.search(r'^core_clk\s+core_clk\s+10\.000\s+([\d.]+)',setup_text,re.M)[1])
+    place = (hw/'outflow/ti60f225_oob.place.rpt').read_text(errors='replace')
+    resources = {}
+    for label in ('XLRs','Memory Blocks','DSP Blocks'):
+        used,total = re.search(r'^'+label+r': (\d+) / (\d+)',place,re.M).groups()
+        resources[label] = dict(used=int(used),available=int(total))
+    hardware = dict(version=hex(HARDWARE_VERSION),core_hz=100000000,
+                    project=hw.relative_to(ROOT).as_posix()+'/ti60f225_oob.xml',
+                    setup_min_ns=min(setup),hold_min_ns=min(hold),core_setup_ns=core_setup,resources=resources,
+                    bit_sha256=sha(bit),timing_sha256=sha(timing_path),
+                    sources=current_inputs)
 # Repack only the stress atlas, without touching shared/normal artwork.
 # Shrink the existing high-contrast round bullet for an 8x8 stress workload.
-out.mkdir(exist_ok=True)
+from PIL import Image
+out.mkdir(parents=True,exist_ok=True)
 atlas = Image.frombytes('RGBA',(640,480),(assets/'atlas.argb').read_bytes(),'raw','BGRA')
 original = atlas.crop((448,0,464,16))
 assert original.getchannel('A').getbbox() == (2,2,14,14)
@@ -137,7 +162,7 @@ with tempfile.TemporaryDirectory(prefix='lunaria-stress-build-') as folder:
     temp = Path(folder)
     command = [sys.executable, '-B', str(ROOT/'scripts/build_apb_software.py'),
                '--program', 'lunaria', '--opt', 'O2', '--ide-root',
-               'D:/Efinity/efinity-riscv-ide-2026.1', '--output', str(temp)]
+               str(args.ide_root), '--output', str(temp)]
     for define in defines:
         command += ['--define', define]
     subprocess.run(command, cwd=ROOT, check=True)
@@ -151,7 +176,7 @@ with tempfile.TemporaryDirectory(prefix='lunaria-stress-build-') as folder:
     (out/'atlas.argb').write_bytes(data)
     shutil.copy2(assets/'background.argb',out/'background.argb')
     (out/'assets.json').write_text(json.dumps(asset_manifest,indent=2)+'\n',encoding='utf8')
-    out.mkdir(exist_ok=True)
+    out.mkdir(parents=True,exist_ok=True)
     for name in ('lunaria.elf', 'lunaria.map'):
         shutil.copy2(temp/name, out/name)
     sources = list((ROOT/'software/lunaria').glob('*.c')) + list((ROOT/'software/lunaria').glob('*.h'))

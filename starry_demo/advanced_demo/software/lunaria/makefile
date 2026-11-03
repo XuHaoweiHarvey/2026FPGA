@@ -1,5 +1,9 @@
-.PHONY: all clean
+PYTHON ?= python
+.PHONY: all pixelforge stress clean
 all:
-	cmd /c call "../../../rebuild_lunaria.cmd"
+	$(PYTHON) -B ../../scripts/build_pixelforge.py
+pixelforge: all
+stress:
+	$(PYTHON) -B ../../scripts/build_lunaria_stress.py
 clean:
-	@echo Use rebuild_lunaria.cmd to rebuild all software objects.
+	@echo Builds use temporary objects; delivery packages are retained.

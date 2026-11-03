@@ -1,6 +1,6 @@
 # PixelForge 正式游戏移植版
 
-使用 starry_demo/start_PixelForge.cmd，交付目录 advanced_demo/delivery/PixelForge。加载 PixelForge.elf 与同目录 assets.json。旧 lunaria_v12 和 lunaria_stress 交付目录保持不变。
+使用 starry_demo/start_PixelForge.cmd，交付目录 advanced_demo/delivery/PixelForge。加载 PixelForge.elf 与同目录 assets.json。高级版只保留 PixelForge 和 lunaria_stress 两个交付模式。
 
 ## 移植内容
 
@@ -60,7 +60,7 @@ python -B scripts/build_pixelforge.py
 python -B scripts/run_pixelforge_checks.py
 ```
 
-使用既有RISC-V工具链、Python/Pillow和Windows字体。构建仅读取旧正式版图集及压力版v13 bit，以独立PixelForge包交付；共享源码的移植改动由PIXELFORGE宏隔离。无需重新生成IP。本版不修改旧启动CMD。
+使用既有RISC-V工具链、Python/Pillow和Windows字体。构建从 design/game_assets 读取共用基础图集、背景与清单，从压力版交付目录读取已校验的 v13 bit；不依赖已删除的旧模式。共享源码的移植改动由 PIXELFORGE 宏隔离。无需重新生成 IP。
 
 ## 战斗HUD排版更新
 

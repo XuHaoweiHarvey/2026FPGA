@@ -36,12 +36,14 @@
 在 advanced_demo 下运行：
 
 ```powershell
-python -B scripts/build_lunaria_stress.py --hardware package
+python -B scripts/build_lunaria_stress.py
 # 以下检查在已初始化 MSVC 的终端运行
 python -B scripts/run_lunaria_stress_checks.py
-python -B scripts/build_lunaria_stress.py --hardware package
+python -B scripts/build_lunaria_stress.py
 ```
 
 构建需现有Python/Pillow和RISC-V工具链；RV32验证优先复用系统临时目录中的Unicorn 2.1.4，缺失时首次下载。检查报告与ELF、bit及源码哈希绑定。相同bit不重复覆盖，允许Programmer只读映射文件时更新软件交付。
 
-如以后需要完整硬件重编，可用 build_lunaria_stress.py --hardware compile；或先 --hardware prepare，在Efinity打开 output/lunaria_hardware_v12/ti60f225_oob.xml 完整Compile，再 --hardware package。该历史目录名下仍是v13工程。脚本检查输入哈希、最终时序和bit来源，避免把旧bit当新硬件打包。
+软件构建默认从 design/game_assets 读取共用素材，并复用本交付目录中已记录哈希的 v13 bit，不依赖旧游戏模式或本地硬件编译缓存。
+
+如以后需要完整硬件重编，可用 build_lunaria_stress.py --hardware compile；或先 --hardware prepare，在 Efinity 打开 output/game_hardware_v13/ti60f225_oob.xml 完整 Compile，再 --hardware package。准备命令会从现有源码、IP 和 BSP 建立完整 v13 工程。脚本检查输入哈希、最终时序和 bit 来源。

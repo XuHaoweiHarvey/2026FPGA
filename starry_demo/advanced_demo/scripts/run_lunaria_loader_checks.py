@@ -22,7 +22,7 @@ from run_game_debug_checks import FakeBridge
 
 class FakeUpload(LunariaBridge):
     def __init__(self):
-        super().__init__()
+        super().__init__(DEFAULT_ELF, assets=DEFAULT_ASSETS)
         self.cpu = 'running'
         self.mail = dict.fromkeys(FIELDS,0)
         self.mail.update(magic=MAGIC,version=1,state=WAIT)
@@ -85,13 +85,13 @@ class Checks(unittest.TestCase):
     def test_pixel_x_firmware_rejects_old_hardware_before_load(self):
         from unittest.mock import Mock
         from game_debug_bridge import APB
-        for version in (0xA0000, 0xB0000, 0xC0000):
+        for version in (0xA0000, 0xB0000, 0xC0000, 0xD0000):
             fake = FakeUpload()
             original_read = fake.read_words
             fake.read_words = lambda address,count: [version] if address == APB+4 else original_read(address,count)
             fake.upload_assets = Mock()
             with patch.object(DebugBridge, 'load') as load:
-                if version != 0xC0000:
+                if version != 0xD0000:
                     with self.assertRaises(RuntimeError): fake.load()
                     load.assert_not_called()
                     fake.upload_assets.assert_not_called()
@@ -241,7 +241,7 @@ class Checks(unittest.TestCase):
         self.assertEqual(fake.writes[-1],(address+8,0))
 
     def test_settings_invalid_locked_halted_and_old_elf_never_write(self):
-        for limit in (-1,0,63,641,4096,64.5,True):
+        for limit in (-1,0,63,1025,4096,64.5,True):
             fake,_ = self.settings_fake()
             with self.assertRaises(ValueError): LunariaBridge.configure(fake,limit)
             self.assertFalse(fake.writes)
@@ -273,8 +273,8 @@ class Checks(unittest.TestCase):
             window.bullet_limit.set('4096')
             window.apply()
             self.assertIsNone(window.bridge)
-            self.assertIn('64–640',window.rows[-1]['message'])
-            self.assertIn('LUNARIA',root.title())
+            self.assertIn('64–1024',window.rows[-1]['message'])
+            self.assertEqual(root.title(),'PixelForge')
         finally: root.destroy()
 
 
@@ -287,5 +287,7 @@ if __name__ == '__main__':
               'sources':{name:sha(ROOT/name) for name in ('tools/lunaria_debug_bridge.py',
                  'tools/lunaria_debug_window.py','tools/game_debug_bridge.py','tools/game_debug_window.py',
                  'scripts/run_lunaria_loader_checks.py')}}
-    (ROOT/'output/lunaria/verification/loader-checks.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
+    report_path = ROOT/'output/lunaria/verification/loader-checks.json'
+    report_path.parent.mkdir(parents=True,exist_ok=True)
+    report_path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     print('PASS offline LUNARIA ELF/assets/upload/UI checks; no board connected')

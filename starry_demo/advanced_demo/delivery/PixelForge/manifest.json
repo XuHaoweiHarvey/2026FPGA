@@ -18,7 +18,25 @@
     "checks.json": "8008b549560741d89e8a33afcfbcf421f17b4af5f5c548d311ed5012f6e9eb50",
     "PixelForge.elf": "e6e9b6a256d7cddbb616828daf56eb20c8a7793f40c9d5485e8f8f4f686a7c34",
     "PixelForge.map": "72de8697ef0a2ff4e4022ae9f45b078f07a5c3f497c37428c15a425a955e8811",
-    "README.md": "ae44e722f0c799cfd06b2359c731d3c58713e865aceeeccb0ae50e2eed25bb17",
+    "README.md": "be4b44ef8cca3f53be970dace55a13f3dd09e12eee7f4aa236a2bd3a153d8aac",
     "ti60f225_oob.bit": "61d2c1a5d785ba0d6a4cf4d390cfa3a905616255d70b484081762f237ff4f9b1"
+  },
+  "layout_cleanup": {
+    "date": "2026-11-03",
+    "retained_modes": [
+      "PixelForge",
+      "lunaria_stress"
+    ],
+    "shared_build_assets": "design/game_assets",
+    "runtime_artifacts_unchanged": true,
+    "original_build_info_preserved": true,
+    "validation": {
+      "both_software_rebuilds": "passed",
+      "rebuilt_atlas_background_bit_match": "passed",
+      "loader_tests": 13,
+      "pixelforge_checks": "passed",
+      "stress_checks": "passed",
+      "board_tested_this_cleanup": false
+    }
   }
 }

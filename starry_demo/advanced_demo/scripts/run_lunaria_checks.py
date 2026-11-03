@@ -11,12 +11,17 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'output/lunaria'
+ASSETS = ROOT / 'design/game_assets'
+
+
+def source_image(name):
+    return Image.frombytes('RGBA',(640,480),(ASSETS/(name+'.argb')).read_bytes(),'raw','BGRA')
 
 
 def rasterize(path, contact_sheets=True, atlas_override=None):
-    atlas = Image.open(OUT/'atlas.png').convert('RGBA')
+    atlas = source_image('atlas')
     if atlas_override is not None: atlas = atlas_override
-    background = Image.open(OUT/'background.png').convert('RGBA')
+    background = source_image('background')
     data = path.read_bytes()
     offset, files = 0, []
     while offset < len(data):
@@ -69,7 +74,7 @@ def rasterize(path, contact_sheets=True, atlas_override=None):
 
 def main():
     # Rice directions and replacement circles must contain real visible artwork.
-    atlas = Image.open(OUT/'atlas.png').convert('RGBA')
+    atlas = source_image('atlas')
     for color in range(4):
         for angle in range(8):
             assert atlas.crop((512+angle*16,color*16,528+angle*16,color*16+16)).getchannel('A').getbbox(), 'Missing directional rice sprite'
@@ -99,7 +104,7 @@ def main():
         'output':result.stdout,'frames':files,
         'source_sha256':{p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
             for p in [ROOT/'sim/test_lunaria.c',ROOT/'software/lunaria/lunaria.c',ROOT/'software/lunaria/lunaria.h',ROOT/'software/lunaria/lunaria_render.c',ROOT/'software/lunaria/lunaria_render.h']},
-        'atlas_sha256':hashlib.sha256((OUT/'atlas.argb').read_bytes()).hexdigest()},indent=2),encoding='utf8')
+        'atlas_sha256':hashlib.sha256((ASSETS/'atlas.argb').read_bytes()).hexdigest()},indent=2),encoding='utf8')
     print('PASS native renderer, alignment/window bounds, alpha and dirty double buffers')
 
 

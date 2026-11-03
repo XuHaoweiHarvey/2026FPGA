@@ -247,8 +247,8 @@ int main(int argc,char **argv){
     fixture+=f'$display("BEAM_RTL {variant} {angle} {run} %0d",total);\n'
  fixture+='$finish;end\ninitial begin #100000000;$fatal(1,"timeout");end\nendmodule\n'
  (temp/'beam.v').write_text(fixture,encoding='utf8');binary=temp/'beam.vvp'
- subprocess.run(['D:/iverilog/iverilog/bin/iverilog.exe','-g2005-sv','-s','tb_alpha_stream_cache','-Ptb_alpha_stream_cache.PIXEL_X=1','-Ptb_alpha_stream_cache.SOURCE_LATENCY=20','-o',str(binary),str(temp/'beam.v'),str(ROOT/'rtl/accelerator/alpha_blit_engine.v'),str(ROOT/'rtl/accelerator/alpha_pixel_pipeline.v')],check=True)
- result=subprocess.run(['D:/iverilog/iverilog/bin/vvp.exe',str(binary)],capture_output=True,text=True)
+ subprocess.run(['D:/iverilog/bin/iverilog.exe','-g2005-sv','-s','tb_alpha_stream_cache','-Ptb_alpha_stream_cache.PIXEL_X=1','-Ptb_alpha_stream_cache.SOURCE_LATENCY=20','-o',str(binary),str(temp/'beam.v'),str(ROOT/'rtl/accelerator/alpha_blit_engine.v'),str(ROOT/'rtl/accelerator/alpha_pixel_pipeline.v')],check=True)
+ result=subprocess.run(['D:/iverilog/bin/vvp.exe',str(binary)],capture_output=True,text=True)
  print(result.stdout,end='');result.check_returncode()
  cycles={}
  for variant,angle,run,count in re.findall(r'BEAM_RTL (old|new) (\d+) (cold|warm) (\d+)',result.stdout):cycles[(variant,int(angle),run)]=int(count)
@@ -262,7 +262,7 @@ assert bridge.image.symbol_u32('g_pixelforge_available')==1
 assert bridge.image.symbol_u32('g_lunaria_settings',10)==1024
 assert bridge.image.symbol_u32('g_lunaria_required_hardware')==0xD0000
 assert bridge.asset_hashes==[h for _,h in read_assets(out/'assets.json')]
-old=Image.frombytes('RGBA',(640,480),(ROOT/'delivery/lunaria_v12/atlas.argb').read_bytes(),'raw','BGRA')
+old=Image.frombytes('RGBA',(640,480),(ROOT/'design/game_assets/atlas.argb').read_bytes(),'raw','BGRA')
 new=Image.frombytes('RGBA',(640,480),(out/'atlas.argb').read_bytes(),'raw','BGRA')
 # Reconstruct the original with ONLY authorised changes; all other pixels match.
 patched=old.copy()
