@@ -1,4 +1,0 @@
-PASS project: 58 unique, existing design entries; current RGB/control integration
-PASS register contract: 57 current RTL/header/documented offsets agree
-PASS V4 UART pad reservation: RX R4/GPIOL_02, TX R14/GPIOR_28; SoC/BSP connected; physical link still requires board validation
-PASS SPI0 generated ports/BSP/1.8-V pin bindings and JTAG wait init

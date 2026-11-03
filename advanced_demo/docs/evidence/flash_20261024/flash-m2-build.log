@@ -1,9 +1,0 @@
-C:/Efinity/efinity-riscv-ide-2026.1/toolchain/bin/../lib/gcc/riscv-none-elf/13.4.0/../../../../riscv-none-elf/bin/ld.exe: warning: C:\Users\12295\Documents\ChatGPT\FPGA\flash-work\advanced_demo\output\m2-regression\m2_demo.elf has a LOAD segment with RWX permissions
-PASS formal BSP RAM ELF: APB base=0xf8100000, RAM=0xf9000000/65536 bytes
-f9000000 T _start
-f900006c 000007f8 T main
-f9000c90 00000008 T m2_error_stop
-f90028c8 00000018 T m2_cycle_boundary
-f9003e40 000003b8 B g_m2_result
-f9006200 B _sp
-ELF: C:\Users\12295\Documents\ChatGPT\FPGA\flash-work\advanced_demo\output\m2-regression\m2_demo.elf

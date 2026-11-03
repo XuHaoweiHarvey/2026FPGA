@@ -1,0 +1,8 @@
+# Keep delivery bytes stable for SHA256 verification after clone/download.
+* -text whitespace=cr-at-eol
+*.bit -diff
+*.bin -diff
+*.elf -diff
+*.map -diff
+*.rpt -diff
+*.out -diff

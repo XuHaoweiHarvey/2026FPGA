@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "name": "basic_demo",
+  "created_utc": "2026-11-03T13:16:46.4753213Z",
+  "software": {
+    "source": "basic_demo/software/basic_demo",
+    "build_command": "python -B build.py --ide-root D:/Efinity/efinity-riscv-ide-2026.1",
+    "compiler": "xPack GNU RISC-V Embedded GCC 13.4.0",
+    "isa": "rv32im_zicsr_zifencei",
+    "abi": "ilp32",
+    "optimization": "O2",
+    "elf": "basic_demo.elf",
+    "ocram_origin": "0xf9000000",
+    "ocram_bytes": 65536,
+    "stack_top": "0xf9006200",
+    "reserved_debug_start": "0xf900fc00",
+    "sources_sha256": {
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/bsp.h": "fa57593ce084019c3bd54acabda92374ca377e1330984ad9daacc8a23647d609",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/freertosHalConfig.h": "1a193b788b55e906041b9298f2f0fee1e7b77739351d0e0675eccecbe01b6315",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/LICENSE.MD": "fcad259554a1118f297273bc2ae8805b07b066d297e1c3b9a6ac82d815add8dd",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/print_full.h": "64083154100c17f33b7a2f421388ec02c4072ec0f3509cf9e9097260534195ca",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/print.h": "ecfae60245c1f3b4e11d5c9e093a3daeeb8f89e1ae4eb69c17ae6d7f36223852",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/semihosting.h": "854082d59b5396ffc8b8154e5568a3920ef957faa327895401f998ed69927226",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/soc.dts": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/soc.h": "217d5b814f5d1972fdf0d9ec09a516dc42e3bbbcf5c57413606a20e79581538f",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/include/soc.mk": "3641490e4d7b2a0eecb0f0c9661bd1a38831e8527f5f96d1a017510d5d0d2cf0",
+      "basic_demo/embedded_sw/soc_control/bsp/efinix/EfxSapphireSoc/linker/default.ld": "96c0ac4c4bc2a7546b1b83e7755a84f863efa81375010b97bf2d5503153828a4",
+      "basic_demo/embedded_sw/soc_control/software/standalone/common/start.S": "1f766009dfadd1b2b7808433054e211cd78ff14ec1054af85a8a61b6b413b462",
+      "basic_demo/ip/soc_control/settings.json": "905438d75bc86a3d90fb15f18b049e43dc3bb125b42b47df10bf2b5f05734aba",
+      "basic_demo/software/basic_demo/accel_api.h": "b2ead47140057f70586ee79f40a5c722e76d73f5775d616b5b163fa45b531a83",
+      "basic_demo/software/basic_demo/accel_regs.h": "c4fca95be4d8dc0f124f3e23006bb2f37e6ba5529c66bc02a00fb9ceae1fcc2a",
+      "basic_demo/software/basic_demo/assets.h": "a2f0b3b89565d5b76696ea7adece5255b05dfdded3d1a35118ee6486f70e6742",
+      "basic_demo/software/basic_demo/benchmark_clock.h": "afe3fcb34476f3f306247280c7f9e2c26067032cee4dfcf699989ccee9c0b7e7",
+      "basic_demo/software/basic_demo/build.py": "327304cbe98eed6ced266d80f148d86e7b11ec8b39b81b2405b654414f3c066d",
+      "basic_demo/software/basic_demo/hud.h": "481534b308bb4fa2de0e74b5cc776dd2ed71a3b3e6f0071f0807183565905ed4",
+      "basic_demo/software/basic_demo/main.c": "241d26a074e778839308d458d6ab5e03ada4607c1606517d5cc4f2845a27f3ab",
+      "basic_demo/software/basic_demo/metrics.h": "2fcc60d349ad9334b592a4d99dce21fa2fe0c0fc470af31a04844fcbd91e88a0",
+      "basic_demo/software/basic_demo/render.h": "59ea723e3e08f2c528d3ca29289dd61cacd691cfe398def38b1869ccd32ed571",
+      "basic_demo/software/basic_demo/scene.h": "abd72086e279978dfa04774d41827dcbe527fa626875c76784250b6cd144f969"
+    }
+  },
+  "hardware": {
+    "rebuilt_this_session": false,
+    "artifact_origin": "basic_demo/outflow",
+    "original_build_date": "2026-10-24",
+    "bit_sha256": "c6731cadc745adb0a72b0d9d512ae02c84727c6cfbffe726af953df5c006fa86",
+    "report": "ti60f225_oob.timing.rpt"
+  },
+  "validation": {
+    "software_build": "passed",
+    "elf_load_and_stack_bounds": "passed",
+    "rv32_scene_rect24": "passed",
+    "rv32_scene_rect50": "passed",
+    "bin_matches_archived_m2_sha256": true,
+    "board_tested_this_session": false,
+    "linker_warning": "Existing LOAD segment with RWX permissions"
+  },
+  "files_sha256": {
+    "basic_demo.bin": "c558d8d5f398339d71593fccd186a03b141bebe55ae5b469f75699770814a56a",
+    "basic_demo.elf": "8e73d8c8bcb30b871baa6db08002801edb05a66faa326a658b0708943f17f969",
+    "basic_demo.map": "885a11cc5ea14367410b393ba0efaa57c6d5030d1c034deb58c6d9d4760898eb",
+    "ti60f225_oob.bit": "c6731cadc745adb0a72b0d9d512ae02c84727c6cfbffe726af953df5c006fa86",
+    "ti60f225_oob.pgm.out": "5fb6be4ed7297834a511f856b9beeb477e934179551044ef13f19ff9da28ba22",
+    "ti60f225_oob.place.rpt": "b0580cdfb265c2cf0e8057f80adbb967465df3411521cb2343377fd58e4b763d",
+    "ti60f225_oob.timing.rpt": "1d6872ad1d20e6177aa763e7a68a91aaa90db10f61ac262c632208bfc5df8b4b"
+  }
+}
